@@ -13,11 +13,17 @@ authors = [{ name = "Lopax", email = "lopax76@users.noreply.github.com" }]
 keywords = ["knowledge-graph", "memory", "ai-agents", "documentation", "code-graph"]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Documentation",
     "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
 ]
 dependencies = []
 
@@ -32,6 +38,8 @@ secondbrain-mcp = "secondbrain.mcp_server:main"
 [project.urls]
 Homepage = "https://github.com/lopax76/second-brain"
 Repository = "https://github.com/lopax76/second-brain"
+Issues = "https://github.com/lopax76/second-brain/issues"
+Documentation = "https://github.com/lopax76/second-brain#readme"
 
 [tool.setuptools]
 packages = ["secondbrain"]

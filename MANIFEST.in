@@ -1,0 +1,6 @@
+# Ship the vendored 3D viewer assets in the source distribution (wheels already include them
+# via [tool.setuptools.package-data]). Without this, the sdist would omit ui/*.js and ui/*.html.
+include LICENSE
+include README.md
+include README.it.md
+recursive-include secondbrain/ui *.html *.js
