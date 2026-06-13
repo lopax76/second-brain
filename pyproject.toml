@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "second-brain"
+name = "second-brain-graph"
 dynamic = ["version"]
 description = "A living, always-fresh, low-token map of every project: files, links, areas and mechanics, with a navigable 3D view."
 readme = "README.md"

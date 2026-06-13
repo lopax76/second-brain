@@ -16,7 +16,7 @@ maintainer with their own PyPI token (the build is reproducible; only the upload
 python -m pip install --upgrade build twine
 # from the repo root:
 rm -rf dist           # PowerShell: Remove-Item dist -Recurse -Force
-python -m build       # -> dist/second_brain-<ver>-py3-none-any.whl + .tar.gz
+python -m build       # -> dist/second_brain_graph-<ver>-py3-none-any.whl + .tar.gz
 python -m twine check dist/*
 ```
 
@@ -30,7 +30,7 @@ Both artifacts must report `PASSED`. They already include the vendored 3D viewer
 python -m twine upload --repository testpypi dist/*
 # then, in a fresh venv, verify it installs and runs:
 pip install --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple/ "second-brain[mcp]"
+  --extra-index-url https://pypi.org/simple/ "second-brain-graph[mcp]"
 second-brain --version
 ```
 

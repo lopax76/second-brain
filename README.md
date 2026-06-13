@@ -116,7 +116,7 @@ Second Brain's code-import layer renders the whole workspace as a graph you can 
 ```bash
 pip install -e .            # from a clone
 # once published:
-# pip install second-brain
+# pip install second-brain-graph
 ```
 
 Requires Python 3.10+. Runtime dependencies: **none** (standard library only).
@@ -148,7 +148,7 @@ connections — never file contents). An optional **MCP server** exposes the sam
 MCP-aware assistants:
 
 ```bash
-pip install "second-brain[mcp]"
+pip install "second-brain-graph[mcp]"
 second-brain-mcp .      # serves map / find / neighbors / subgraph / health over stdio
 ```
 
