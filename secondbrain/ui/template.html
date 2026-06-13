@@ -87,7 +87,7 @@
   <div id="graphwrap">
     <div id="graph"></div>
     <button id="toggle">&#9776;</button>
-    <div class="hint">left-drag orbit · wheel zoom · click focus · double-click details</div>
+    <div class="hint">left-drag orbit · wheel zoom · double-click for details</div>
     <div id="error"><div><b>3D library could not be loaded.</b><br>
       The viewer fetches <code>3d-force-graph</code> from a CDN and needs network access on first open.</div></div>
   </div>
@@ -206,13 +206,11 @@
 
   function refresh(){ G.graphData(visibleData()); applyCluster(); }
 
-  // ---- click vs double-click ----
+  // ---- double-click opens details; clicks never move the camera (no zoom in/out churn) ----
   let last = { id:null, t:0 };
-  function focusNode(n){ const d = Math.hypot(n.x||0,n.y||0,n.z||0)||1, r=1+140/d;
-    G.cameraPosition({x:(n.x||0)*r,y:(n.y||0)*r,z:(n.z||0)*r}, n, 700); }
   function handleClick(n){ const now = Date.now();
     if (last.id === n.id && now - last.t < 350){ last={id:null,t:0}; openDetail(n); }
-    else { last = {id:n.id, t:now}; focusNode(n); } }
+    else { last = {id:n.id, t:now}; } }
 
   // ---- clustering force ----
   let anchors = {};
@@ -325,7 +323,7 @@
     html += '<div class="sec"><h5>Incoming ('+inc.length+')</h5>'+ (inc.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
     $('dbody').innerHTML = html;
     $('dbody').querySelectorAll('.conn').forEach(el=> el.addEventListener('click', ()=>{
-      const o = byId[el.getAttribute('data-id')]; if(o){ if(o.x!=null) focusNode(o); openDetail(o); } }));
+      const o = byId[el.getAttribute('data-id')]; if(o){ openDetail(o); } }));
     $('detail').classList.add('open');
   }
 
