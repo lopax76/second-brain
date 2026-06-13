@@ -1,6 +1,7 @@
 # Second Brain (SB)
 
 [![CI](https://github.com/lopax76/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/lopax76/second-brain/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/second-brain-graph.svg)](https://pypi.org/project/second-brain-graph/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Runtime deps](https://img.shields.io/badge/dipendenze%20runtime-nessuna-success.svg)](pyproject.toml)
@@ -116,12 +117,14 @@ Il layer di import-codice di Second Brain rende l'intero workspace come un grafo
 ## Installazione
 
 ```bash
-pip install -e .            # da un clone
-# una volta pubblicato:
-# pip install second-brain-graph
+pip install second-brain-graph              # da PyPI
+pip install "second-brain-graph[mcp]"       # + server MCP opzionale
+pip install -e .                            # oppure da un clone
 ```
 
-Richiede Python 3.10+. Dipendenze runtime: **nessuna** (solo libreria standard).
+[Su PyPI](https://pypi.org/project/second-brain-graph/). Richiede Python 3.10+. Dipendenze
+runtime: **nessuna** (solo libreria standard). Il pacchetto installa il comando `second-brain`
+e il modulo di import `second_brain`.
 
 ## Avvio rapido
 
