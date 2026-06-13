@@ -201,7 +201,13 @@
     .onNodeClick(handleClick)
     .graphData(visibleData());
 
-  function refresh(){ G.graphData(visibleData()); applyCluster(); }
+  // Always frame the graph once it settles, so it is never left off-camera (at any size).
+  let _fitted = false;
+  G.onEngineStop(() => { if (!_fitted) { _fitted = true; G.zoomToFit(700, 50); } });
+  setTimeout(() => G.zoomToFit(700, 50), 2500);
+
+  function refresh(){ G.graphData(visibleData()); applyCluster();
+    _fitted = false; setTimeout(() => G.zoomToFit(600, 50), 1200); }
 
   // ---- click vs double-click ----
   let last = { id:null, t:0 };
