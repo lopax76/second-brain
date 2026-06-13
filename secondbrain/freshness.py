@@ -26,10 +26,13 @@ _NORMALIZE_CAP = 8_000_000
 # Files hashed with normalized line endings (CRLF/CR -> LF) to avoid cross-platform churn.
 _TEXT_HASH_EXTS = {
     ".md", ".markdown", ".rst", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",
-    ".toml", ".ini", ".cfg", ".conf", ".yaml", ".yml", ".json", ".jsonl", ".xml", ".html",
+    ".toml", ".ini", ".cfg", ".conf", ".yaml", ".yml", ".html",
     ".htm", ".css", ".sql", ".ps1", ".psm1", ".sh", ".bash", ".go", ".rs", ".java", ".c",
     ".cc", ".cpp", ".h", ".hpp", ".rb", ".php", ".cs",
 }
+# Content-hash text source/docs up to this size; data, binaries and larger files use a cheap
+# size+mtime signature instead (no bytes read) so indexing stays light on data-heavy projects.
+_CONTENT_HASH_CAP = 1_000_000
 
 
 def _ext(name: str) -> str:
@@ -54,10 +57,23 @@ def file_hash(path: Path, *, normalize_newlines: bool = False) -> str:
 
 
 def _hash_rel(root: Path, rel: str) -> str | None:
+    """Freshness signature for a file.
+
+    Source/doc/config text up to ``_CONTENT_HASH_CAP`` is content-hashed with newline
+    normalization (precise and cross-platform stable). Data, binaries and large files use a cheap
+    ``size+mtime`` signature - no bytes are read - so indexing stays fast on data-heavy projects.
+    """
+    p = root / rel
     try:
-        return file_hash(root / rel, normalize_newlines=_ext(rel) in _TEXT_HASH_EXTS)
+        st = p.stat()
     except OSError:
         return None
+    if _ext(rel) in _TEXT_HASH_EXTS and st.st_size <= _CONTENT_HASH_CAP:
+        try:
+            return file_hash(p, normalize_newlines=True)
+        except OSError:
+            return None
+    return f"s{st.st_size}:m{int(st.st_mtime)}"
 
 
 def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:

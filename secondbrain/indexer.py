@@ -249,12 +249,18 @@ def build_graph(
     py_files = [r for r in rels if _ext(r) == ".py"]
     module_map = _python_module_map(py_files)
 
-    # 3. Edges from file contents.
+    # 3. Edges from file contents. Only code (imports) and docs (references) are ever READ;
+    #    data/config/binaries are never opened - the graph needs only their type/size/area.
+    #    This is what keeps indexing light on data-heavy projects (no reading huge JSON/CSV/logs).
     for rel in rels:
+        ext = _ext(rel)
+        is_code = ext == ".py" or ext in _JS_EXTS
+        is_doc = ext in _DOC_REF_EXTS
+        if not (is_code or is_doc):
+            continue
         text = _read_text(root_p / rel)
         if text is None:
             continue
-        ext = _ext(rel)
         if ext == ".py":
             for imp in python_imports(text):
                 for tgt in _resolve_py(imp, rel, module_map):
