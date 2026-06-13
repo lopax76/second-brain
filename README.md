@@ -1,32 +1,110 @@
 # Second Brain (SB)
 
+[![CI](https://github.com/lopax76/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/lopax76/second-brain/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Runtime deps](https://img.shields.io/badge/runtime%20deps-none-success.svg)](pyproject.toml)
+
 **A living, always-fresh, low-token map of every project** — files, links, areas and
-mechanics — that an AI assistant can query instead of re-reading everything, and that a
+mechanics — that an AI assistant can **query** instead of re-reading everything, and that a
 human can explore in a navigable **3D graph**.
 
-> Not "another place to store stuff". It's the canonical, per-project picture that stays
-> in sync with your files so you never lose track: no forgotten pieces, no "we discussed
-> that three chats ago", no stale docs.
+🇮🇹 [Leggi in italiano →](README.it.md)
 
-## Why
+> Not "another place to store stuff". It's the canonical, per-project picture that stays in
+> sync with your files so you never lose track: no forgotten pieces, no "we discussed that
+> three chats ago", no stale docs.
 
-To understand a project's state, assistants today **re-read and search files every session**.
-That is slow, incomplete, and **burns tokens** — repeatedly, and worse as the project grows.
+![Second Brain 3D viewer — anonymized backbone of a real multi-project workspace](docs/assets/ui-suite.png)
 
-Second Brain builds the project's graph once and keeps it fresh incrementally (outside the
-model, at near-zero token cost). The assistant **queries** it and gets compact answers; the
-human opens a **3D view** and sees the whole project at a glance.
+<sub>The offline 3D viewer on a real, multi-project workspace (names anonymized): nodes colored
+by type, grouped here by type, with a click-through detail panel.</sub>
 
-- **Read-only** on your sources — it indexes, it never modifies your files.
-- **Files are the truth**, the graph is derived (in `.secondbrain/`) and regenerable.
-- **Per-project**, zero runtime dependencies, fully local, **$0** — no cloud, no API, no lock-in.
-- **Anti-drift gate** — refuses to call things "fine" while something is stale, orphaned or broken.
+---
+
+## Why this exists
+
+A project gets more complex over time. Files drift, some go orphaned or quietly broken, the
+mental model of "what's where and how it connects" gets fuzzier, and an AI assistant **loses
+the thread between one chat and the next** — so every session starts by re-reading and
+re-searching files. That is slow, incomplete, and **burns tokens repeatedly** — and it only
+gets worse as the project grows.
+
+Second Brain builds the project's graph **once** and keeps it fresh incrementally (outside the
+model, at near-zero token cost). The assistant **queries** it and gets compact answers; a human
+opens the **3D view** and sees the whole project at a glance.
+
+It is **not a RAG system**: no embeddings, no vector store, no LLM needed to build the graph.
+It maps the *structural* relationships between files, which makes it complementary to RAG and
+purpose-built for one thing: **situational awareness at a very low token cost.**
+
+## What makes it different
+
+- **Read-only on your sources** — it indexes, it never modifies your files. Run it on anything
+  without risk.
+- **Files are the truth** — the graph is derived (in `.secondbrain/`) and always regenerable;
+  contents are never duplicated into it.
+- **Zero runtime dependencies** — the core runs on the Python standard library alone. No
+  conflicts, instant install, works in CI / containers / air-gapped boxes.
+- **Low token cost by design** — queries return ids, types, sizes and connections, never file
+  contents, so orienting an assistant costs a few hundred tokens, not tens of thousands.
+- **Anti-drift gate** — refuses to call the graph "fine" while something is stale, orphaned, or
+  broken.
+- **Offline 3D viewer** — the data is inlined and the 3D library is vendored next to the page;
+  the viewer works fully offline, no CDN, nothing for a script blocker to break.
+- **Optional MCP server** — exposes the same low-token queries to MCP-aware assistants, behind
+  an optional extra so the core stays dependency-free.
+
+## See it on a real project (anonymized)
+
+A **read-only** measurement on a mature, multi-repo project (identity withheld): ~1,800
+knowledge files across 17 top-level areas, indexed in **2.5 s** (index `graph.json` = 0.91 MB).
+
+Three ways to answer the same four questions about the project — *what's here, list every
+recorded decision, which files are truncated/empty, the most-connected files* — in three
+separate clean chats:
+
+| Metric | NOTHING (manual) | TODAY (manual) | WITH Second Brain |
+|---|---|---|---|
+| Time | ~8.5 min | ~9 min | **~3–4 min** |
+| Working tokens | opaque | opaque | **~3–4k, self-measured** |
+| **Decisions found** | 112 (wrong) | 131 (wrong) | **117 (exact)** |
+| **Truncated files** | 3 | 0 (missed) | **2 (exact)** |
+| Files counted | 2,174 | 2,174 | **1,684 (exact)** |
+| Reproducible / verifiable | no | no | **yes** |
+
+Two things stand out. (1) The two manual runs **disagree with each other** — 112 vs 131
+decisions, 3 vs 0 truncated files (the second missed them entirely): the by-hand method is
+non-deterministic and unverifiable. (2) Second Brain returns the **exact, identical answer
+every run**, with far fewer tokens and in less than half the time.
+
+Just to *orient* an assistant on the whole project — something you pay for **every session** —
+reading the curated source-of-truth docs costs **~229,000 tokens**; the `secondbrain map`
+digest costs **~270 tokens**: **~800× less**, and roughly constant as the project grows (the
+full index is queried, never loaded into context).
+
+<p align="center">
+  <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuracy: manual runs disagree (112 / 131), Second Brain is exact (117)">
+  <img src="docs/assets/chart-time.png" width="48%" alt="Time to answer: ~8.5 / ~9 min manual vs ~3–4 min with Second Brain; index build ~1.3 s once">
+</p>
+
+And it surfaces what even curated docs miss: genuinely **truncated/corrupted files** (with
+UTF-16/encoding false positives excluded), **~45 empty files**, **~1,390 orphan files (~80%)**,
+**117 decisions** and **~626 cross-references** now explicit and queryable, plus **13 files
+already stale within seconds** of indexing (a live system constantly writing) — which is
+exactly why the map has to update itself.
+
+### The same structure, the code layer
+
+Second Brain's code-import layer renders the whole workspace as a graph you can actually read:
+
+![Graphify view of the workspace code graph](docs/assets/graphify-suite.png)
 
 ## Install
 
 ```bash
-pip install -e .          # from a clone
-# or, once published:
+pip install -e .            # from a clone
+# once published:
 # pip install second-brain
 ```
 
@@ -37,70 +115,99 @@ Requires Python 3.10+. Runtime dependencies: **none** (standard library only).
 ```bash
 secondbrain build  .          # index a project -> .secondbrain/graph.json
 secondbrain gate   .          # anti-drift check: broken refs, stale files, orphans
-secondbrain view   .          # write the 3D viewer (data inlined) -> .secondbrain/view.html
+secondbrain view   .          # write the offline 3D viewer -> .secondbrain/view.html
 secondbrain stats  .          # quick counts by node/edge type
 secondbrain map    .          # compact digest: areas, sizes, most-connected files
 secondbrain find   util .     # find nodes by name or path
 secondbrain neighbors secondbrain/model.py .   # a node and its connections
+secondbrain assess .          # one-shot before/after report: problems + token savings
 ```
 
-Open `.secondbrain/view.html` in a browser: the project title sits at the top, nodes are
-colored by **type** (structure, program, report, design, data, memory, decision, config,
-area), edges by **link type** (imports, doc-reference, belongs-to-area). Hover a node for a
-description; filter by type or show only orphans. The graph data is inlined in the file (no
-server, no CORS); the 3D library is fetched from a CDN, so the first open needs network access.
+**Drill down** by pointing the tool at a subfolder — `secondbrain view ./src/api` renders just
+that area in full detail, while the top-level view stays light via *backbone* mode (areas +
+the knowledge-connected core; isolated data files are summarized on their area node).
+
+Open `.secondbrain/view.html` in a browser (double-click — no server needed): the data is
+inlined and the 3D library is vendored next to the page, so **it works fully offline**.
 
 ## Query layer (for AI assistants)
 
-The point of Second Brain is that an assistant **queries** the graph instead of re-reading
-files. `secondbrain map`, `find`, and `neighbors` return compact, budgeted answers (ids,
-types, sizes, connections - never file contents), so situational awareness costs a few
-hundred to a couple thousand tokens, not tens of thousands.
-
-An optional **MCP server** exposes these same queries to MCP-aware assistants:
+`secondbrain map`, `find`, and `neighbors` return compact, budgeted answers (ids, types, sizes,
+connections — never file contents). An optional **MCP server** exposes the same queries to
+MCP-aware assistants:
 
 ```bash
 pip install "second-brain[mcp]"
 secondbrain-mcp .      # serves map / find / neighbors / subgraph / health over stdio
 ```
 
-The MCP server is an optional extra - the core stays dependency-free.
+See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
 
 ## How it works
 
 1. **Index** — walk the project, classify each file into a typed node, and extract edges:
-   Python imports (via `ast`), documentation references (markdown links, `[[wikilinks]]`, and
-   **plain path mentions in prose** — the part standard tools miss), and area membership.
+   Python imports (via `ast`), JS/TS imports, documentation references (markdown links,
+   `[[wikilinks]]`, and **plain path mentions in prose** — the part standard tools miss), and
+   area membership. Operational nodes (decisions found in the docs, sessions from git commits)
+   are added too.
 2. **Stay fresh** — content-hash diffing rebuilds only what changed (outside the model).
-3. **Query / view** — the human gets the 3D view; an MCP query layer for assistants lands next.
+3. **Query / view** — a human gets the 3D view; an assistant queries the low-token layer.
 
-## Node & edge types
+**On false positives:** plain path mentions in prose are inherently noisy. Second Brain handles
+this asymmetrically — markdown links and wikilinks are intentional (an unresolved one is
+reported as *broken*), but a plain prose mention is used **only if it resolves** to a real file;
+otherwise it is dropped as noise and never creates a broken reference. Deep import parsing is
+Python and JS/TS today; other languages contribute via documentation links.
 
-| Node type | Meaning | Edge type | Meaning |
-|---|---|---|---|
-| `structure` | PROGETTO/README/ADR/foundation | `imports` | code A uses B |
-| `program` | source code | `references` | A cites B (link/wikilink/path) |
-| `report` | reports / analyses | `belongs_to` | node belongs to an area |
-| `design` | designs / plans / specs | | |
-| `data` | databases / datasets | | |
-| `memory` | persistent memory files | | |
-| `decision` | recorded decisions | | |
-| `config` | configuration files | | |
-| `area` | logical cluster | | |
+The full node/edge taxonomy, the `graph.json` schema, and the classification rules are
+documented in [`docs/graph-format.md`](docs/graph-format.md).
 
-## Status
+## Try the before/after yourself
 
-Alpha (v0.1). Core graph + anti-drift gate + 3D viewer + a low-token query layer
-(`map`/`find`/`neighbors`) and an optional MCP server. Operational nodes
-(decisions/sessions) come next.
+Run these in **separate clean chats** (read-only), then compare the answers and the token/time
+cost. Replace `/path/to/project` with a real project.
+
+**TODAY (your current method):**
+
+```
+READ-ONLY: do not modify, create, delete or move any file. On the project at
+/path/to/project, work with your NORMAL method (reference docs, memory, the tools you
+usually use). Give me a COMPLETE, ACCURATE picture answering these 4 questions:
+1) how many files (excluding images, venvs, caches, .git) and the breakdown by type;
+2) list ALL decisions recorded in the docs (D-XXX, ADR-N, RFC-N);
+3) which files are truncated/corrupted (null-byte) or empty (zero-byte);
+4) the 10 most-connected files. When done, tell me the time and tokens you used.
+```
+
+**WITH Second Brain** (index already built — query it, don't re-read files):
+
+```
+READ-ONLY. Second Brain's index is already built — only query it. Use ONLY:
+  python -m secondbrain map   "/path/to/project"
+  python -m secondbrain stats "/path/to/project"
+  python -m secondbrain find <text> "/path/to/project"
+and read /path/to/project/.secondbrain/assessment.md. Answer the same 4 questions, then
+tell me the time and tokens you used.
+```
+
+## Status & roadmap
+
+Alpha (v0.1). Working today: the typed graph, the anti-drift gate, the offline 3D viewer, the
+low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
+(decisions/sessions), and the optional MCP server. Next: richer reference resolution and a PyPI
+release.
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-pytest          # run the test suite
-ruff check .    # lint
+pip install -e ".[dev,mcp]"
+ruff check secondbrain tests
+pytest -q
 ```
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[design principles](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
+zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.md).
 
 ## License
 
