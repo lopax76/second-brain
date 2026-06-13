@@ -26,6 +26,7 @@ _DOC_TYPES = {
     NodeType.STRUCTURE, NodeType.REPORT, NodeType.DESIGN, NodeType.DECISION, NodeType.MEMORY,
 }
 _SCAN_CAP = 2_000_000
+_LIST_CAP = 50  # how many truncated/empty file names to record in the report
 
 
 def _ext(name: str) -> str:
@@ -140,6 +141,8 @@ def assess(root: str | os.PathLike[str]) -> dict:
         "sessions": m["node_types"].get("session", 0),
         "orphans": m["orphans"], "orphans_pct": orphans_pct, "broken_refs": m["broken_refs"],
         "empty": len(integ["empty"]), "truncated": len(integ["truncated"]),
+        "empty_files": integ["empty"][:_LIST_CAP],
+        "truncated_files": integ["truncated"][:_LIST_CAP],
         "most_connected": m["most_connected"], "by_area": m["by_area"],
         "tokens_inventory": _tok(inventory_chars),
         "tokens_read_all_docs": _tok(doc_bytes),
@@ -147,6 +150,14 @@ def assess(root: str | os.PathLike[str]) -> dict:
         "tokens_digest": _tok(digest_chars),
         "graph_bytes": graph_bytes,
     }
+
+
+def _file_lines(names: list[str], total: int) -> list[str]:
+    """Indented bullets listing file names, with an '...and N more' when capped."""
+    out = [f"  - `{n}`" for n in names]
+    if total > len(names):
+        out.append(f"  - ...and {total - len(names)} more")
+    return out
 
 
 def render_markdown(r: dict) -> str:
@@ -175,7 +186,9 @@ def render_markdown(r: dict) -> str:
         "## What was hidden (before Second Brain)",
         "",
         f"- **{r['truncated']}** truncated/corrupted files (null bytes)",
+        *_file_lines(r.get("truncated_files", []), r["truncated"]),
         f"- **{r['empty']}** empty files (zero bytes)",
+        *_file_lines(r.get("empty_files", []), r["empty"]),
         f"- **{r['orphans']}** orphan files (~{r['orphans_pct']}%) - linked to nothing",
         f"- **{r['broken_refs']}** broken references",
         f"- **{r['decisions']}** decisions scattered in docs - now queryable nodes",

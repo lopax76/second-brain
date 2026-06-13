@@ -26,6 +26,17 @@ def test_render_markdown():
     assert "What was hidden" in md
 
 
+def test_assess_lists_problem_file_names(tmp_path):
+    """The report names the truncated/empty files, not just their counts."""
+    (tmp_path / "bad.txt").write_bytes(b"text\n" + b"\x00" * 64)
+    (tmp_path / "empty.txt").write_bytes(b"")
+    r = assess.assess(tmp_path)
+    assert "bad.txt" in r["truncated_files"]
+    assert "empty.txt" in r["empty_files"]
+    md = assess.render_markdown(r)
+    assert "`bad.txt`" in md and "`empty.txt`" in md
+
+
 def test_utf16_not_truncated_but_corruption_is(tmp_path):
     from secondbrain.indexer import build_graph
 
