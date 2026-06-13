@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
-from secondbrain.viewer import _TEMPLATE, render_view
+from secondbrain.viewer import _TEMPLATE, render_view, write_view
 
 
 def _tiny_graph() -> Graph:
@@ -29,3 +29,27 @@ def test_template_does_not_claim_a_cdn_dependency() -> None:
     assert "from a CDN" not in text
     # render stays robust when the page is opened in a background tab/window
     assert "visibilitychange" in text
+
+
+def test_write_view_emits_offline_assets(tmp_path) -> None:
+    write_view(tmp_path, _tiny_graph())
+    d = tmp_path / ".secondbrain"
+    assert (d / "view.html").is_file()
+    # the vendored 3D library is copied next to the page -> the viewer works offline
+    assert (d / "3d-force-graph.min.js").is_file()
+    assert "__SB_DATA__" not in (d / "view.html").read_text(encoding="utf-8")
+
+
+def test_render_view_escapes_script_breakout() -> None:
+    g = Graph(project="x")
+    g.add_node(
+        Node(
+            id="a.py",
+            type=NodeType.PROGRAM,
+            label="a</script><script>alert(1)</script>",
+            path="a.py",
+        )
+    )
+    html = render_view(g)
+    # every "<" in the data is escaped (<), so a hostile label cannot break out of the block
+    assert "</script><script>" not in html

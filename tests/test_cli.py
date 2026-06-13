@@ -46,3 +46,22 @@ def test_view_is_self_contained(tmp_path):
 def test_stats_runs(tmp_path):
     proj = _project(tmp_path)
     assert main(["stats", str(proj)]) == 0
+
+
+def test_query_commands_run(tmp_path):
+    proj = _project(tmp_path)
+    assert main(["build", str(proj)]) == 0
+    assert main(["map", str(proj)]) == 0
+    assert main(["find", "util", str(proj)]) == 0
+    assert main(["neighbors", "src/app.py", str(proj)]) == 0
+    assert main(["assess", str(proj)]) == 0
+    assert main(["view", "--backbone", str(proj)]) == 0
+
+
+def test_gate_passes_on_clean_project(tmp_path):
+    proj = tmp_path / "clean"
+    proj.mkdir()
+    (proj / "README.md").write_text("# clean project\nno links here\n", encoding="utf-8")
+    (proj / "app.py").write_text("x = 1\n", encoding="utf-8")
+    assert main(["build", str(proj)]) == 0
+    assert main(["gate", str(proj)]) == 0
