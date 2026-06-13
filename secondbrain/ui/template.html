@@ -89,7 +89,9 @@
     <button id="toggle">&#9776;</button>
     <div class="hint">left-drag orbit · wheel zoom · double-click for details</div>
     <div id="error"><div><b>3D library could not be loaded.</b><br>
-      The viewer fetches <code>3d-force-graph</code> from a CDN and needs network access on first open.</div></div>
+      The viewer loads <code>3d-force-graph.min.js</code> from this same folder &mdash; it works fully
+      offline, no network needed. If you see this, that file is missing next to the page;
+      re-run <code>secondbrain view</code> to regenerate it.</div></div>
   </div>
 
   <aside id="detail">
@@ -199,6 +201,15 @@
     .onEngineStop(() => G.zoomToFit(700, 50))
     .graphData(visibleData());
   window.G = G;  // exposed for scripting / debugging
+
+  // If the page is opened in a background tab/window, the WebGL loop is throttled and the
+  // one-shot fit (onEngineStop -> zoomToFit) may run before anything is on screen, leaving a
+  // blank-looking graph. Re-fit the first time the page actually becomes visible/focused.
+  let _fitted = false;
+  function _refit(){ if (_fitted) return; _fitted = true;
+    try { G.d3ReheatSimulation(); G.zoomToFit(700, 50); } catch (e) {} }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) _refit(); });
+  window.addEventListener('focus', _refit);
 
   function refresh(){ G.graphData(visibleData()); applyCluster(); }
 
