@@ -137,9 +137,9 @@
   // so big files and well-connected hubs stand out without swamping the scene.
   function nodeVal(n){
     const kb = ((n.meta && n.meta.size) || 0) / 1024;
-    const sizeComp = Math.min(12, Math.sqrt(kb));
-    const impComp = Math.min(18, 2 * (kdeg[n.id] || 0));
-    return 1 + sizeComp + impComp;
+    const sizeComp = Math.min(4, Math.sqrt(kb) / 3);
+    const impComp = Math.min(6, (kdeg[n.id] || 0) * 0.7);
+    return 0.5 + sizeComp + impComp;
   }
 
   function dirParts(n){ const p = n.path || ''; const a = p.split('/'); return a.slice(0, -1); }
@@ -181,23 +181,19 @@
 
   const G = ForceGraph3D()($('graph'))
     .backgroundColor('#0b1020')
-    .nodeResolution(14)
+    .nodeResolution(12)
+    .nodeRelSize(3)
     .nodeColor(nodeColor)
     .nodeVal(nodeVal)
-    .nodeOpacity(0.9)
+    .nodeOpacity(0.85)
     .nodeLabel(n => '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 9px;'
       + 'max-width:300px;color:#e2e8f0;font-size:12px"><b>' + esc(n.label) + '</b> '
       + '<span style="color:' + nodeColor(n) + '">&#9679; ' + esc(n.type) + '</span>'
       + (n.meta && n.meta.size!=null ? ' · ' + fmtSize(n.meta.size) : '') + '<br>'
       + '<span style="color:#94a3b8">double-click for details</span></div>')
     .linkColor(edgeColor)
-    .linkOpacity(0.26)
-    .linkWidth(l => knowledge(l) ? 0.8 : 0.35)
-    .linkDirectionalParticles(l => knowledge(l) ? 2 : 0)
-    .linkDirectionalParticleWidth(1.1)
-    .linkDirectionalParticleSpeed(0.005)
-    .linkDirectionalArrowLength(l => knowledge(l) ? 2.4 : 0)
-    .linkDirectionalArrowRelPos(1)
+    .linkOpacity(0.16)
+    .linkWidth(l => knowledge(l) ? 0.5 : 0.2)
     .onNodeClick(handleClick)
     .cooldownTicks(150)
     .onEngineStop(() => G.zoomToFit(700, 50))
