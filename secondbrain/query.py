@@ -9,7 +9,7 @@ tens of thousands. Pure functions over a :class:`~secondbrain.model.Graph`; no I
 
 from __future__ import annotations
 
-from secondbrain.model import EdgeType, Graph, NodeType
+from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
 
@@ -116,6 +116,38 @@ def neighbors(graph: Graph, node_id: str) -> dict | None:
         "outgoing": out,
         "incoming": inc,
     }
+
+
+def backbone(graph: Graph, *, keep_decisions: bool = True) -> Graph:
+    """Return a compact 'backbone' of a large graph, light enough to render.
+
+    Keeps area nodes, every file with a knowledge edge (imports/references), and decisions.
+    Isolated data/config files (no knowledge edge) are dropped from the render but counted on
+    their area node (``meta['hidden']``) — so the whole project is still represented at a glance,
+    and you drill into a sub-area's full detail by pointing the tool at that subfolder.
+    """
+    deg = _degrees(graph)
+    keep: set[str] = set()
+    for n in graph.nodes.values():
+        is_dec = keep_decisions and n.type is NodeType.DECISION
+        if n.type is NodeType.AREA or deg.get(n.id) or is_dec:
+            keep.add(n.id)
+    out = Graph(project=graph.project)
+    hidden: dict[str, int] = {}
+    for n in graph.nodes.values():
+        if n.id in keep:
+            out.add_node(Node(id=n.id, type=n.type, label=n.label, path=n.path,
+                              description=n.description, meta=dict(n.meta)))
+        elif n.path is not None:
+            aid = f"area:{_area_of(n.path)}"
+            hidden[aid] = hidden.get(aid, 0) + 1
+    for aid, cnt in hidden.items():
+        if aid in out.nodes:
+            out.nodes[aid].meta["hidden"] = cnt
+    for e in graph.edges:
+        if e.source in keep and e.target in keep:
+            out.add_edge(Edge(e.source, e.target, e.type))
+    return out
 
 
 def subgraph(graph: Graph, node_id: str, *, hops: int = 1) -> dict:

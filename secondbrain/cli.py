@@ -57,8 +57,16 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 0 if rep.ok else 1
 
 
+_BACKBONE_AUTO = 8000  # graphs bigger than this auto-render as a backbone to stay light
+
+
 def cmd_view(args: argparse.Namespace) -> int:
     g, _ = _build(args.path)
+    full = len(g.nodes)
+    if args.backbone or full > _BACKBONE_AUTO:
+        g = query.backbone(g)
+        print(f"backbone: rendering {len(g.nodes)} of {full} nodes "
+              "(isolated data files summarized on their area)")
     out = write_view(args.path, g)
     print(f"view written: {out}")
     print("open it in a browser (double-click).")
@@ -145,7 +153,6 @@ def main(argv: list[str] | None = None) -> int:
     for name, fn, help_text in [
         ("build", cmd_build, "index the project -> .secondbrain/graph.json"),
         ("gate", cmd_gate, "anti-drift check (broken refs, stale files, orphans)"),
-        ("view", cmd_view, "write a self-contained 3D viewer -> .secondbrain/view.html"),
         ("stats", cmd_stats, "quick counts by node/edge type"),
         ("map", cmd_map, "compact project digest (areas, sizes, most connected)"),
         ("assess", cmd_assess, "one-shot before/after report: problems + token savings"),
@@ -153,6 +160,12 @@ def main(argv: list[str] | None = None) -> int:
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
         sp.set_defaults(func=fn)
+
+    sp = sub.add_parser("view", help="write a self-contained 3D viewer -> .secondbrain/view.html")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--backbone", action="store_true",
+                    help="render only areas + knowledge-connected files (auto for huge graphs)")
+    sp.set_defaults(func=cmd_view)
 
     sp = sub.add_parser("find", help="find nodes by name or path substring")
     sp.add_argument("query", help="substring to search for")

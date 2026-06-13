@@ -51,6 +51,16 @@ def test_subgraph_ignores_dangling_edge():
     assert {n["id"] for n in sg["nodes"]} == {"a.py"}
 
 
+def test_backbone_keeps_connected_and_summarizes_isolated():
+    g = build_graph(FIXTURE)
+    bb = query.backbone(g)
+    assert len(bb.nodes) < len(g.nodes)                       # isolated files dropped
+    assert any(n.type is NodeType.AREA for n in bb.nodes.values())
+    assert "src/app.py" in bb.nodes and "src/util.py" in bb.nodes  # connected code kept
+    hidden = sum(n.meta.get("hidden", 0) for n in bb.nodes.values())
+    assert hidden >= 1                                         # e.g. data/store.csv summarized
+
+
 def test_find_is_deterministic_and_id_sorted():
     """find() returns the same id-sorted result regardless of node insertion order."""
     ids = [f"src/m{i}_util.py" for i in (5, 1, 9, 3, 7)]
