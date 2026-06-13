@@ -27,9 +27,11 @@ and any other official channel — and when an individual is representing the pr
 
 ## Enforcement
 
-Violations may be reported privately to the maintainer via GitHub
-(use **Report a vulnerability / contact** under the repository's **Security** tab, or open a
-direct message channel where available). Reports will be reviewed and handled confidentially.
+Violations may be reported privately to the maintainer by contacting them through their GitHub
+profile (e.g. a direct message), or — if you are comfortable doing so — by opening an issue and
+asking for it to be handled confidentially. (Please do **not** use the Security tab's "Report a
+vulnerability" flow for conduct issues; that channel is for security vulnerabilities only.)
+Reports will be reviewed and handled confidentially.
 Maintainers may remove, edit, or reject contributions, comments, and other interactions that
 violate this Code of Conduct, and may temporarily or permanently ban any contributor for
 behavior they deem inappropriate.

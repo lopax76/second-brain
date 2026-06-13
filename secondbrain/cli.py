@@ -131,7 +131,7 @@ def cmd_assess(args: argparse.Namespace) -> int:
     out = store.store_dir(args.path)
     out.mkdir(parents=True, exist_ok=True)
     p = out / "assessment.md"
-    p.write_text(assess.render_markdown(r), encoding="utf-8")
+    p.write_text(assess.render_markdown(r), encoding="utf-8", newline="\n")
     print(f"{r['project']}: {r['files']} files, {r['areas']} areas, {r['links']} links")
     print(f"  hidden: {r['truncated']} truncated, {r['empty']} empty, "
           f"{r['orphans']} orphans (~{r['orphans_pct']}%), {r['broken_refs']} broken, "

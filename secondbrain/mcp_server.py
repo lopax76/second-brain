@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any
 
 from secondbrain import gate, query, store
 from secondbrain.freshness import build_manifest, index
+from secondbrain.model import Graph
 
 try:  # pragma: no cover - import-guard
     from mcp.server.fastmcp import FastMCP
@@ -28,7 +30,7 @@ except ImportError:
 _NO_MCP = "The MCP server needs the optional 'mcp' extra: pip install second-brain[mcp]"
 
 
-def _graph(project: str):
+def _graph(project: str) -> Graph:
     return store.load_graph(project) or index(project)[0]
 
 
@@ -39,30 +41,30 @@ def build_server(project: str):
     server = FastMCP("second-brain")
 
     @server.tool()
-    def project_map() -> dict:
+    def project_map() -> dict[str, Any]:
         """Compact project digest: areas with file counts/sizes/types, type and edge
         tallies, the most-connected files, and orphan/broken counts. Cheap to load first."""
         return query.project_map(_graph(project))
 
     @server.tool()
-    def find(text: str) -> list:
+    def find(text: str) -> list[dict[str, Any]]:
         """Find files/nodes whose name or path contains ``text`` (case-insensitive)."""
         return query.find(_graph(project), text)
 
     @server.tool()
-    def neighbors(node_id: str) -> dict:
+    def neighbors(node_id: str) -> dict[str, Any]:
         """A node and its incoming/outgoing connections (imports, references, area membership)."""
         # Distinct error for an unknown node, so an assistant can tell "no edges" from "no node".
         res = query.neighbors(_graph(project), node_id)
         return res if res is not None else {"error": "node not found", "id": node_id}
 
     @server.tool()
-    def subgraph(node_id: str, hops: int = 1) -> dict:
+    def subgraph(node_id: str, hops: int = 1) -> dict[str, Any]:
         """A small subgraph (nodes + edges) around ``node_id`` within ``hops``."""
         return query.subgraph(_graph(project), node_id, hops=hops)
 
     @server.tool()
-    def health() -> dict:
+    def health() -> dict[str, Any]:
         """Anti-drift status: broken references, stale files vs the last build, orphan count."""
         g = store.load_graph(project)
         old = store.load_manifest(project)

@@ -51,7 +51,7 @@ def write_view(root: str | os.PathLike[str], graph: Graph) -> Path:
     d = store_dir(root)
     d.mkdir(parents=True, exist_ok=True)
     out = d / "view.html"
-    out.write_text(render_view(graph), encoding="utf-8")
+    out.write_text(render_view(graph), encoding="utf-8", newline="\n")
     if _LIB.is_file():  # vendored library, referenced relatively by the viewer (works offline)
         shutil.copyfile(_LIB, d / _LIB.name)
     return out

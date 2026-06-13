@@ -9,6 +9,8 @@ tens of thousands. Pure functions over a :class:`~secondbrain.model.Graph`; no I
 
 from __future__ import annotations
 
+from typing import Any
+
 from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -31,7 +33,7 @@ def _degrees(graph: Graph) -> dict[str, int]:
     return deg
 
 
-def project_map(graph: Graph, *, top: int = 8) -> dict:
+def project_map(graph: Graph, *, top: int = 8) -> dict[str, Any]:
     """Compact project digest — the cheap thing to load when work starts.
 
     Returns areas (with file counts, total size, dominant types), type/edge tallies, the
@@ -47,7 +49,7 @@ def project_map(graph: Graph, *, top: int = 8) -> dict:
         e["size"] += sz
         e["types"][n.type.value] = e["types"].get(n.type.value, 0) + sz
 
-    def _area_row(name: str, e: dict) -> dict:
+    def _area_row(name: str, e: dict[str, Any]) -> dict[str, Any]:
         # Tie-break by name so equal-size types order deterministically (not by insertion).
         types = sorted(e["types"].items(), key=lambda kv: (-kv[1], kv[0]))[:3]
         return {"area": name, "files": e["files"], "size": e["size"],
@@ -83,7 +85,7 @@ def project_map(graph: Graph, *, top: int = 8) -> dict:
     }
 
 
-def find(graph: Graph, query: str, *, limit: int = 25) -> list[dict]:
+def find(graph: Graph, query: str, *, limit: int = 25) -> list[dict[str, Any]]:
     """Return file/entity nodes whose label or path contains ``query`` (case-insensitive)."""
     q = query.lower().strip()
     if not q:
@@ -96,13 +98,13 @@ def find(graph: Graph, query: str, *, limit: int = 25) -> list[dict]:
     return [{"id": n.id, "type": n.type.value, "path": n.path} for n in hits[:limit]]
 
 
-def neighbors(graph: Graph, node_id: str) -> dict | None:
+def neighbors(graph: Graph, node_id: str) -> dict[str, Any] | None:
     """Return a node and its incoming/outgoing connections (compact). None if unknown."""
     n = graph.nodes.get(node_id)
     if n is None:
         return None
 
-    def _row(other: str, etype: str) -> dict:
+    def _row(other: str, etype: str) -> dict[str, Any]:
         t = graph.nodes[other].type.value if other in graph.nodes else "?"
         return {"id": other, "type": t, "edge": etype}
 
@@ -150,7 +152,7 @@ def backbone(graph: Graph, *, keep_decisions: bool = True) -> Graph:
     return out
 
 
-def subgraph(graph: Graph, node_id: str, *, hops: int = 1) -> dict:
+def subgraph(graph: Graph, node_id: str, *, hops: int = 1) -> dict[str, Any]:
     """Return a small subgraph around ``node_id`` within ``hops`` (nodes + edges, compact)."""
     if node_id not in graph.nodes:
         return {"nodes": [], "edges": []}

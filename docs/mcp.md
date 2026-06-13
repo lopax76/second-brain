@@ -28,7 +28,7 @@ The server lazily loads the stored graph (or builds it on first use), so it star
 | `find` | `text` | Files/nodes whose name or path contains `text` (case-insensitive): `id`, `type`, `path`. |
 | `neighbors` | `node_id` | A node and its incoming/outgoing connections (imports, references, area membership), size, description, and any broken refs. Returns `{ "error": "node not found", ... }` for an unknown id, so an assistant can tell "no edges" from "no node". |
 | `subgraph` | `node_id`, `hops` (default 1) | A small subgraph (nodes + edges) within `hops` of `node_id`. |
-| `health` | – | Anti-drift status: broken-reference count, stale-file count vs the last build, and orphan count. |
+| `health` | – | Anti-drift status: `ok` (bool), `broken` (list of `[source, target]` pairs), `stale` (`{added, removed, changed}` lists vs the last build), and `orphans` (count). |
 
 All responses are plain JSON-able structures. None of them include file contents.
 
@@ -58,6 +58,19 @@ All responses are plain JSON-able structures. None of them include file contents
   "incoming": [ { "id": "src/cli.py", "type": "program", "edge": "imports" } ]
 }
 ```
+
+`health` (abridged) — note `broken` is a list and `stale` is a dict of lists, not scalar counts:
+
+```json
+{
+  "ok": false,
+  "broken": [ ["docs/guide.md", "notes/missing.md"] ],
+  "stale": { "added": ["src/new.py"], "removed": [], "changed": ["README.md"] },
+  "orphans": 12
+}
+```
+
+(If no graph has been built yet, `health` returns `{"status": "no-baseline", "hint": "run 'secondbrain build' first"}`.)
 
 ## Wiring it into an assistant
 

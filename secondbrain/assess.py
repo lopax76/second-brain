@@ -14,7 +14,7 @@ from pathlib import Path
 
 from secondbrain import query
 from secondbrain.freshness import index
-from secondbrain.model import NodeType
+from secondbrain.model import Graph, NodeType
 
 _TEXT_EXTS = {
     ".md", ".markdown", ".rst", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".json", ".jsonl",
@@ -64,7 +64,7 @@ def _is_corrupt(chunk: bytes) -> bool:
     return not _looks_utf16(chunk)
 
 
-def scan_integrity(root: str | os.PathLike[str], graph) -> dict[str, list[str]]:
+def scan_integrity(root: str | os.PathLike[str], graph: Graph) -> dict[str, list[str]]:
     """Find empty (zero-byte) and truncated/corrupted (null-byte) files among indexed nodes.
 
     Empty ``__init__.py`` files are excluded - they are conventionally empty, not a problem.

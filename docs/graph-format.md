@@ -148,3 +148,25 @@ positives.
   no longer matches the tree) → rebuild needed.
 - **orphans** (info) — file nodes with no import/reference edge. Often legitimate (a truly
   standalone file), so orphans are reported but never fail the gate.
+
+## Known limitations
+
+Classification and reference extraction are deliberately simple, fast heuristics. Known
+trade-offs you should expect (and can work around by drilling into a subfolder or relying on
+the explicit links/imports):
+
+- **Directory names influence type.** The decision/design/report keyword checks look at the
+  whole relative path, so a file under `design/`, `adr/`, or `reports/` is typed accordingly
+  even if its own name is neutral. This is intentional (folder intent is a strong signal) but
+  can over-type files in such folders.
+- **`.json` is treated as config.** Domain data or fixtures stored as `.json` are counted as
+  `config`, not `data`, so the `data` tally understates JSON datasets.
+- **Keyword/date heuristics are language- and pattern-specific.** Both English and Italian
+  keywords are recognized (e.g. `design`/`disegno`, `plan`/`piano`), which can occasionally
+  match an unrelated word; a year-month like `2026-06` in a filename marks it as a `report`.
+- **Ambiguous references are dropped silently.** If a link/wikilink target matches two or more
+  files by basename/stem, it is not resolved and not reported as broken (to avoid guessing).
+  Use a path-qualified target to disambiguate.
+- **Deep import parsing is Python + JS/TS only.** Other languages contribute through
+  documentation links, not code-import edges. A `src/`-layout package whose modules are
+  imported as top-level names may not resolve every internal import.
