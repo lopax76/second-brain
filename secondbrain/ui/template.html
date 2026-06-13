@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Second Brain</title>
+<style>
+  :root{--bg:#0b1020;--panel:rgba(15,23,42,.92);--line:#1e293b;--ink:#e2e8f0;--mut:#94a3b8;--dim:#64748b}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+            font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+  #app{position:fixed;inset:0;display:flex}
+  #side{width:300px;flex:0 0 300px;background:var(--panel);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;z-index:10}
+  #side.collapsed{width:0;flex-basis:0;overflow:hidden}
+  #side header{padding:14px 16px 8px}
+  #side header .title{font-size:18px;font-weight:800}
+  #side header .counts{font-size:12px;color:var(--mut);margin-top:2px}
+  #side .scroll{overflow-y:auto;padding:0 16px 16px;flex:1}
+  .blk{margin-top:14px}
+  .blk h4{margin:0 0 7px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+  input,select{width:100%;background:#0f172a;border:1px solid var(--line);color:var(--ink);
+        border-radius:8px;padding:7px 9px;font-size:13px;outline:none}
+  input:focus,select:focus{border-color:#3b82f6}
+  label.ck{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px;color:var(--ink)}
+  .row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;user-select:none;
+       padding:4px 6px;border-radius:7px}
+  .row:hover{background:#0f172a}
+  .row.off{opacity:.35}
+  .row.active{background:#13213f;outline:1px solid #2a3c63}
+  .row .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+  .row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  .row .ct{color:var(--dim);font-size:11.5px}
+  .row .sz{color:var(--mut);font-size:11px;min-width:54px;text-align:right}
+  .bar{display:flex;height:4px;border-radius:3px;overflow:hidden;margin:3px 0 2px}
+  .bar span{height:100%}
+  .muted{color:var(--mut);font-size:12px}
+  .reset{font-size:12px;color:#60a5fa;cursor:pointer}
+  #graphwrap{position:relative;flex:1}
+  #graph{position:absolute;inset:0}
+  #toggle{position:absolute;top:12px;left:12px;z-index:11;background:var(--panel);border:1px solid var(--line);
+          color:var(--ink);border-radius:8px;padding:6px 9px;font-size:13px;cursor:pointer}
+  .hint{position:absolute;right:14px;bottom:12px;z-index:11;font-size:11.5px;color:var(--dim)}
+  #detail{width:330px;flex:0 0 330px;background:var(--panel);border-left:1px solid var(--line);
+          display:none;flex-direction:column;z-index:10}
+  #detail.open{display:flex}
+  #detail .dhead{padding:14px 16px;border-bottom:1px solid var(--line)}
+  #detail .dclose{float:right;cursor:pointer;color:var(--mut);font-size:18px;line-height:1}
+  #detail .dname{font-size:15px;font-weight:700;word-break:break-word}
+  #detail .dmeta{font-size:12px;color:var(--mut);margin-top:6px;word-break:break-all}
+  #detail .dscroll{overflow-y:auto;padding:12px 16px}
+  #detail .sec{margin-top:12px}
+  #detail .sec h5{margin:0 0 6px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+  #detail .conn{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  #detail .conn:hover{background:#0f172a}
+  #detail .conn .et{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  #error{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
+         padding:40px;z-index:20;background:var(--bg)}
+  #error div{max-width:520px;color:#cbd5e1;font-size:15px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <header><div class="title" id="title"></div><div class="counts" id="counts"></div></header>
+    <div class="scroll">
+      <div class="blk"><h4>Search</h4><input id="search" placeholder="filter by name or path…" autocomplete="off"></div>
+      <div class="blk"><h4>Group by</h4>
+        <select id="groupby">
+          <option value="area">Area (top folder)</option>
+          <option value="folder">Sub-folder (2 levels)</option>
+          <option value="type">Type</option>
+          <option value="none">None</option>
+        </select>
+        <label class="ck"><input type="checkbox" id="cluster" checked> cluster in 3D space</label>
+        <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
+      </div>
+      <div class="blk"><h4 id="groups-h">Groups</h4>
+        <div id="groups"></div>
+        <div class="reset" id="reset" style="display:none">↺ show all groups</div>
+      </div>
+      <div class="blk"><h4>Node types</h4><div id="legend"></div></div>
+      <div class="blk"><h4>Totals</h4><div class="muted" id="totals"></div></div>
+    </div>
+  </aside>
+
+  <div id="graphwrap">
+    <div id="graph"></div>
+    <button id="toggle">&#9776;</button>
+    <div class="hint">left-drag orbit · wheel zoom · click focus · double-click details</div>
+    <div id="error"><div><b>3D library could not be loaded.</b><br>
+      The viewer fetches <code>3d-force-graph</code> from a CDN and needs network access on first open.</div></div>
+  </div>
+
+  <aside id="detail">
+    <div class="dhead"><span class="dclose" id="dclose">&times;</span>
+      <div class="dname" id="dname"></div><div class="dmeta" id="dmeta"></div></div>
+    <div class="dscroll" id="dbody"></div>
+  </aside>
+</div>
+
+<script type="application/json" id="sb-data">__SB_DATA__</script>
+<script src="https://unpkg.com/3d-force-graph@1"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  let SB;
+  try { SB = JSON.parse(document.getElementById('sb-data').textContent); }
+  catch (err) {
+    $('error').style.display = 'flex';
+    $('error').textContent = 'Graph data is corrupted: ' + err.message;
+    return;
+  }
+  const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
+
+  $('title').textContent = SB.project || 'Second Brain';
+  $('counts').textContent = SB.nodes.length + ' nodes · ' + SB.links.length + ' links';
+
+  const byId = {}; for (const n of SB.nodes) byId[n.id] = n;
+  const lid = e => (e && e.id !== undefined ? e.id : e);
+  const nodeColor = n => SB.nodeColors[n.type] || '#94a3b8';
+  const edgeColor = l => SB.edgeColors[l.type] || '#475569';
+
+  // adjacency + knowledge degree
+  const outAdj = {}, inAdj = {}, kdeg = {};
+  for (const l of SB.links) {
+    const s = lid(l.source), t = lid(l.target);
+    (outAdj[s] = outAdj[s] || []).push({other:t, type:l.type});
+    (inAdj[t] = inAdj[t] || []).push({other:s, type:l.type});
+    if (l.type === 'imports' || l.type === 'references') { kdeg[s]=(kdeg[s]||0)+1; kdeg[t]=(kdeg[t]||0)+1; }
+  }
+  const isOrphan = n => n.type !== 'area' && !kdeg[n.id];
+
+  function dirParts(n){ const p = n.path || ''; const a = p.split('/'); return a.slice(0, -1); }
+  function groupOf(n, mode){
+    if (mode === 'type') return n.type;
+    if (n.type === 'area') return n.label;
+    const d = dirParts(n);
+    if (mode === 'area') return d[0] || '(root)';
+    if (mode === 'folder') return d.slice(0,2).join('/') || '(root)';
+    return null;
+  }
+  // stable color for a group name (area/folder mode)
+  function groupColor(name, mode){
+    if (mode === 'type') return SB.nodeColors[name] || '#94a3b8';
+    let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % 360;
+    return 'hsl(' + h + ',55%,60%)';
+  }
+
+  // ---- state ----
+  let mode = 'area', clusterOn = true, onlyOrphans = false, query = '', groupFilter = null;
+  const hiddenTypes = new Set();
+
+  function matches(n){ if(!query) return true; const q=query;
+    return (n.label||'').toLowerCase().includes(q) || (n.path||'').toLowerCase().includes(q); }
+  function visible(n){
+    if (hiddenTypes.has(n.type)) return false;
+    if (onlyOrphans && !isOrphan(n)) return false;
+    if (groupFilter !== null && groupOf(n, mode) !== groupFilter && n.type !== 'area') return false;
+    return true;
+  }
+  function visibleData(){
+    const nodes = SB.nodes.filter(visible);
+    const ids = new Set(nodes.map(n => n.id));
+    const links = SB.links.filter(l => ids.has(lid(l.source)) && ids.has(lid(l.target)));
+    return { nodes, links };
+  }
+
+  if (typeof ForceGraph3D === 'undefined') { $('error').style.display = 'flex'; return; }
+
+  const G = ForceGraph3D()($('graph'))
+    .backgroundColor('#0b1020')
+    .nodeColor(nodeColor)
+    .nodeVal(n => 1 + Math.min(8, kdeg[n.id]||0))
+    .nodeOpacity(0.95)
+    .nodeLabel(n => '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 9px;'
+      + 'max-width:300px;color:#e2e8f0;font-size:12px"><b>' + esc(n.label) + '</b> '
+      + '<span style="color:' + nodeColor(n) + '">&#9679; ' + esc(n.type) + '</span>'
+      + (n.meta && n.meta.size!=null ? ' · ' + fmtSize(n.meta.size) : '') + '<br>'
+      + '<span style="color:#94a3b8">double-click for details</span></div>')
+    .linkColor(edgeColor).linkOpacity(0.4).linkWidth(0.6)
+    .linkDirectionalArrowLength(2.5).linkDirectionalArrowRelPos(1)
+    .onNodeClick(handleClick)
+    .graphData(visibleData());
+
+  function refresh(){ G.graphData(visibleData()); applyCluster(); }
+
+  // ---- click vs double-click ----
+  let last = { id:null, t:0 };
+  function focusNode(n){ const d = Math.hypot(n.x||0,n.y||0,n.z||0)||1, r=1+140/d;
+    G.cameraPosition({x:(n.x||0)*r,y:(n.y||0)*r,z:(n.z||0)*r}, n, 700); }
+  function handleClick(n){ const now = Date.now();
+    if (last.id === n.id && now - last.t < 350){ last={id:null,t:0}; openDetail(n); }
+    else { last = {id:n.id, t:now}; focusNode(n); } }
+
+  // ---- clustering force ----
+  let anchors = {};
+  function computeAnchors(){
+    anchors = {};
+    if (mode === 'none' || !clusterOn) return;
+    const groups = [...new Set(SB.nodes.filter(visible).map(n => groupOf(n, mode)))];
+    if (!groups.length) return;            // no visible groups -> no anchors (avoid /0 = NaN)
+    const R = 60 + groups.length * 18;
+    groups.forEach((g,i)=>{ const a = (i/groups.length)*2*Math.PI;
+      anchors[g] = { x: R*Math.cos(a), y: R*Math.sin(a), z: 0 }; });
+  }
+  function clusterForce(alpha){
+    if (mode === 'none' || !clusterOn) return;
+    for (const n of G.graphData().nodes){ const a = anchors[groupOf(n, mode)]; if(!a) continue;
+      const s = 0.12 * alpha; n.vx += (a.x-n.x)*s; n.vy += (a.y-n.y)*s; n.vz += (a.z-n.z)*s; }
+  }
+  const _force = a => clusterForce(a); _force.initialize = ()=>{};
+  G.d3Force('cluster', _force);
+  function applyCluster(){ computeAnchors(); G.d3ReheatSimulation(); }
+
+  // ---- search (dim non-matches) ----
+  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase();
+    G.nodeOpacity(n => (query && !matches(n)) ? 0.07 : 0.95); });
+
+  // ---- controls ----
+  $('groupby').addEventListener('change', e => { mode = e.target.value; groupFilter = null;
+    $('reset').style.display='none'; renderGroups(); refresh(); });
+  $('cluster').addEventListener('change', e => { clusterOn = e.target.checked; applyCluster(); });
+  $('only-orphans').addEventListener('change', e => { onlyOrphans = e.target.checked; renderGroups(); refresh(); });
+  $('toggle').addEventListener('click', ()=> $('side').classList.toggle('collapsed'));
+  $('reset').addEventListener('click', ()=>{ groupFilter=null; $('reset').style.display='none';
+    document.querySelectorAll('#groups .row').forEach(r=>r.classList.remove('active')); refresh(); });
+  $('dclose').addEventListener('click', ()=> $('detail').classList.remove('open'));
+
+  // ---- groups list + stats ----
+  function groupStats(){
+    const m = (mode === 'none') ? 'area' : mode;
+    const st = {};
+    for (const n of SB.nodes){ if (!n.path) continue; if (onlyOrphans && !isOrphan(n)) continue;
+      const g = groupOf(n, m); const sz = (n.meta && n.meta.size) || 0;
+      const e = st[g] || (st[g] = {count:0,size:0,types:{}});
+      e.count++; e.size += sz;
+      const t = e.types[n.type] || (e.types[n.type]={count:0,size:0}); t.count++; t.size += sz; }
+    return { m, st };
+  }
+  function renderGroups(){
+    const {m, st} = groupStats();
+    $('groups-h').textContent = 'Groups · by ' + m;
+    const names = Object.keys(st).sort((a,b)=> st[b].size - st[a].size);
+    const box = $('groups'); box.innerHTML = '';
+    for (const g of names){
+      const e = st[g];
+      const row = document.createElement('div'); row.className = 'row';
+      if (groupFilter === g) row.classList.add('active');
+      const types = Object.keys(e.types).sort((a,b)=> e.types[b].size - e.types[a].size);
+      const bar = types.map(t => '<span style="width:' + (100*e.types[t].size/(e.size||1)) + '%;background:'
+        + (SB.nodeColors[t]||'#64748b') + '" title="' + esc(t) + ': ' + e.types[t].count + ' · '
+        + fmtSize(e.types[t].size) + '"></span>').join('');
+      row.innerHTML = '<span class="sw" style="background:' + groupColor(g, m) + '"></span>'
+        + '<span class="nm" title="' + esc(g) + '">' + esc(g) + '</span>'
+        + '<span class="ct">' + e.count + '</span><span class="sz">' + fmtSize(e.size) + '</span>';
+      const barEl = document.createElement('div'); barEl.className='bar'; barEl.innerHTML = bar;
+      const wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(barEl);
+      row.addEventListener('click', ()=>{ groupFilter = (groupFilter === g) ? null : g; mode = (mode==='none')?m:mode;
+        $('groupby').value = mode; $('reset').style.display = groupFilter? 'block':'none'; renderGroups(); refresh(); });
+      box.appendChild(wrap);
+    }
+  }
+
+  // ---- legend (type filters) ----
+  function renderLegend(){
+    const counts = {}; for (const n of SB.nodes) counts[n.type]=(counts[n.type]||0)+1;
+    const box = $('legend'); box.innerHTML='';
+    Object.keys(SB.nodeColors).filter(t=>counts[t]).sort().forEach(t=>{
+      const row=document.createElement('div'); row.className='row'+(hiddenTypes.has(t)?' off':'');
+      row.innerHTML='<span class="sw" style="background:'+SB.nodeColors[t]+'"></span>'
+        +'<span class="nm">'+esc(t)+'</span><span class="ct">'+counts[t]+'</span>';
+      row.addEventListener('click', ()=>{ if(hiddenTypes.has(t)){hiddenTypes.delete(t);row.classList.remove('off');}
+        else{hiddenTypes.add(t);row.classList.add('off');} renderGroups(); refresh(); });
+      box.appendChild(row);
+    });
+  }
+
+  // ---- totals ----
+  function renderTotals(){
+    let files=0, size=0; const byType={};
+    for (const n of SB.nodes){ if(!n.path) continue; files++; const sz=(n.meta&&n.meta.size)||0; size+=sz;
+      byType[n.type]=(byType[n.type]||0)+sz; }
+    const top = Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).slice(0,4)
+      .map(t=> esc(t)+' '+fmtSize(byType[t])).join(' · ');
+    $('totals').innerHTML = '<b>'+files+'</b> files · <b>'+fmtSize(size)+'</b><br><span style="color:var(--dim)">'+top+'</span>';
+  }
+
+  // ---- detail panel ----
+  function connRow(c){
+    const o = byId[c.other]; if(!o) return '';
+    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="width:9px;height:9px;border-radius:50%;'
+      +'background:'+nodeColor(o)+'"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;'
+      +'white-space:nowrap">'+esc(o.label)+'</span><span class="et">'+esc(c.type)+'</span></div>';
+  }
+  function openDetail(n){
+    $('dname').innerHTML = '<span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;'
+      +'background:'+nodeColor(n)+';margin-right:6px"></span>'+esc(n.label);
+    $('dmeta').innerHTML = esc(n.type) + (n.meta&&n.meta.size!=null? ' · '+fmtSize(n.meta.size):'')
+      + (n.path? '<br>'+esc(n.path):'');
+    const out = (outAdj[n.id]||[]), inc = (inAdj[n.id]||[]);
+    let html = '<div class="muted">'+esc(n.description||'')+'</div>';
+    html += '<div class="sec"><h5>Outgoing ('+out.length+')</h5>'+ (out.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
+    html += '<div class="sec"><h5>Incoming ('+inc.length+')</h5>'+ (inc.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
+    $('dbody').innerHTML = html;
+    $('dbody').querySelectorAll('.conn').forEach(el=> el.addEventListener('click', ()=>{
+      const o = byId[el.getAttribute('data-id')]; if(o){ if(o.x!=null) focusNode(o); openDetail(o); } }));
+    $('detail').classList.add('open');
+  }
+
+  renderLegend(); renderGroups(); renderTotals(); applyCluster();
+})();
+</script>
+</body>
+</html>

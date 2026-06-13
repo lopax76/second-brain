@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "second-brain"
+dynamic = ["version"]
+description = "A living, always-fresh, low-token map of every project: files, links, areas and mechanics, with a navigable 3D view."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Lopax", email = "lopax76@users.noreply.github.com" }]
+keywords = ["knowledge-graph", "memory", "ai-agents", "documentation", "code-graph"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+mcp = ["mcp>=1.2"]
+
+[project.scripts]
+secondbrain = "secondbrain.cli:main"
+secondbrain-mcp = "secondbrain.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/lopax76/second-brain"
+Repository = "https://github.com/lopax76/second-brain"
+
+[tool.setuptools]
+packages = ["secondbrain"]
+
+[tool.setuptools.dynamic]
+version = { attr = "secondbrain.__version__" }
+
+[tool.setuptools.package-data]
+secondbrain = ["ui/*.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

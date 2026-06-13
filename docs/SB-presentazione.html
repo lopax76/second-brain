@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Second Brain - La memoria viva di ogni progetto</title>
+<style>
+  :root{
+    --navy:#1E3A8A; --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+    --green:#16A34A; --amber:#D97706; --violet:#7C3AED; --teal:#0D9488; --magenta:#DB2777;
+    --red:#DC2626; --orange:#EA580C; --gray:#6B7280; --bronze:#92400E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
+  .wrap{max-width:980px;margin:0 auto;padding:0 24px}
+  .hero{background:linear-gradient(135deg,#1E3A8A 0%,#3730A3 60%,#5B21B6 100%);color:#fff;padding:64px 0 56px}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+         background:rgba(255,255,255,.16);padding:6px 12px;border-radius:999px;margin-bottom:18px}
+  h1{font-size:44px;line-height:1.1;margin:0 0 12px;font-weight:800}
+  .tag{font-size:20px;opacity:.95;max-width:680px;margin:0;color:#fff}
+  .sub{font-size:15px;opacity:.92;margin-top:14px;max-width:720px;color:#fff}
+  section{padding:48px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin:0 0 18px;font-weight:700}
+  h3{font-size:22px;margin:0 0 10px}
+  p{margin:0 0 14px;color:var(--muted)}
+  .lead{font-size:18px;color:var(--ink)}
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:760px){.g3,.g2{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h3{font-size:17px;display:flex;align-items:center;gap:10px}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto}
+  .card p{font-size:14px;margin:0}
+  /* token bars */
+  .bars{margin-top:8px}
+  .barrow{margin:18px 0}
+  .barlab{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px}
+  .barlab b{color:var(--ink)}
+  .track{background:#eef2f7;border-radius:8px;height:30px;overflow:hidden;border:1px solid var(--line)}
+  .fill{height:100%;display:flex;align-items:center;color:#fff;font-size:13px;font-weight:700;padding:0 12px;white-space:nowrap}
+  .fill.big{background:linear-gradient(90deg,#b91c1c,#ef4444)}
+  .fill.small{background:linear-gradient(90deg,#15803d,#22c55e)}
+  .stat{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+  .stat .s{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;flex:1;min-width:150px}
+  .stat .n{font-size:30px;font-weight:800;color:var(--navy);line-height:1}
+  .stat .t{font-size:13px;color:var(--muted);margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f1f5f9;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  td.y{color:var(--green);font-weight:700}
+  td.n{color:#b91c1c;font-weight:700}
+  td.p{color:var(--amber);font-weight:700}
+  .steps{counter-reset:s}
+  .step{display:flex;gap:14px;padding:12px 0;align-items:flex-start}
+  .step .num{counter-increment:s;flex:0 0 auto;width:30px;height:30px;border-radius:50%;
+       background:var(--navy);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .step .num::before{content:counter(s)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:14px;font-size:13px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:7px}
+  .note{font-size:12.5px;color:#94a3b8;margin-top:18px;border-left:3px solid var(--line);padding-left:14px}
+  footer{padding:34px 0 60px;color:var(--muted);font-size:13px}
+  .pill{display:inline-block;background:#eef2ff;color:var(--navy);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin-right:6px}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <span class="badge">Second Brain &middot; SB</span>
+    <h1>La memoria viva di ogni progetto</h1>
+    <p class="tag">Una mappa astratta ma precisa di tutti i file, i collegamenti, le aree e le meccaniche di un progetto &mdash; sempre aggiornata, interrogabile, e a costo di token quasi nullo.</p>
+    <p class="sub">Non &egrave; "un altro posto dove immagazzinare roba". &Egrave; il quadro canonico che l'AI consulta per avere <b>sempre</b> chiara la situazione: mai pi&ugrave; pezzi dimenticati, mai pi&ugrave; "ne avevamo parlato tre chat fa", mai pi&ugrave; file non aggiornati.</p>
+  </div>
+</div>
+
+<section><div class="wrap">
+  <h2>Il problema</h2>
+  <h3>Oggi l'AI ricostruisce il contesto rileggendo i file. Ogni volta.</h3>
+  <p class="lead">Senza una mappa viva del progetto, a ogni sessione (o a ogni dubbio) l'assistente deve <b>cercare e rileggere</b> i documenti per capire dov'eravamo: il file sorgente-di-verit&agrave;, le note, i rapporti, il codice. &Egrave; lento, &egrave; incompleto &mdash; e <b>brucia token</b> a ripetizione.</p>
+  <p>Il documento sorgente-di-verit&agrave; di un progetto maturo pu&ograve; pesare <b>~180.000 token</b> da rileggere per intero. Aggiungi memorie e scansioni mirate del codice e una ricostruzione "a freddo" del contesto costa facilmente <b>decine o centinaia di migliaia di token</b> &mdash; che si ripetono sessione dopo sessione e crescono col progetto.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>La soluzione</h2>
+  <h3>Un cervello per progetto, sempre fresco, interrogabile a query mirate.</h3>
+  <p class="lead">SB costruisce una volta il grafo del progetto e lo mantiene aggiornato a ogni passo (in automatico, fuori dal modello). L'AI non rilegge tutto: <b>interroga</b> e riceve risposte compatte. L'umano apre un'<b>UI 3D navigabile</b> e vede l'intero progetto a colpo d'occhio.</p>
+  <div class="grid g3" style="margin-top:18px">
+    <div class="card"><h3><span class="dot" style="background:var(--green)"></span>Sempre aggiornato</h3><p>Hook + diff incrementale: il grafo &egrave; sempre allineato ai file. Un gate anti-deriva blocca "a posto" se resta qualcosa di stantio o orfano.</p></div>
+    <div class="card"><h3><span class="dot" style="background:var(--navy)"></span>Read-only &amp; sicuro</h3><p>Indicizza, non tocca mai i file del progetto. Applicabile anche a progetti vivi senza alcun rischio.</p></div>
+    <div class="card"><h3><span class="dot" style="background:var(--violet)"></span>Per-progetto</h3><p>Ogni progetto ha il suo cervello dedicato, caricato all'apertura. Il titolo del progetto &egrave; in cima all'UI.</p></div>
+    <div class="card"><h3><span class="dot" style="background:var(--teal)"></span>UI 3D navigabile</h3><p>Nodi colorati per tipologia, archi colorati per tipo di legame, descrizioni chiare. Aree e collegamenti a colpo d'occhio.</p></div>
+    <div class="card"><h3><span class="dot" style="background:var(--amber)"></span>Costo-token quasi nullo</h3><p>Mai il grafo intero nel contesto. Bootstrap compatto + query mirate. L'UI ricca &egrave; nel browser: zero token per l'AI.</p></div>
+    <div class="card"><h3><span class="dot" style="background:var(--magenta)"></span>$0 e locale</h3><p>Nessun cloud, nessuna API a pagamento, nessun lock-in. I file restano la verit&agrave;; il grafo &egrave; derivato e rigenerabile.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>La prova &middot; risparmio di token</h2>
+  <h3>Stessa consapevolezza del progetto, una frazione del costo.</h3>
+  <p>Confronto su una singola apertura/aggiornamento di contesto. <b>Senza SB</b>: ricostruzione a freddo rileggendo sorgente + memorie + scansione mirata. <b>Con SB</b>: digest di avvio + poche query mirate.</p>
+  <div class="bars">
+    <div class="barrow">
+      <div class="barlab"><span>Senza SB &mdash; ricostruzione a freddo (rileggere/cercare)</span><b>~150.000 token</b></div>
+      <div class="track"><div class="fill big" style="width:100%">rilettura ripetuta, cresce col progetto</div></div>
+    </div>
+    <div class="barrow">
+      <div class="barlab"><span>Con SB &mdash; digest di avvio + query mirate</span><b>~5.000 token</b></div>
+      <div class="track"><div class="fill small" style="width:3.4%">&nbsp;</div></div>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="s"><div class="n">~30&times;</div><div class="t">meno token su un'apertura di contesto (stima illustrativa)</div></div>
+    <div class="s"><div class="n">&minus;77%</div><div class="t">token con il pattern code-execution su MCP (Anthropic, 2025)</div></div>
+    <div class="s"><div class="n">~14&times;</div><div class="t">costo del "full-context dump" vs memoria selettiva (studi 2026)</div></div>
+    <div class="s"><div class="n">~6,8&times;</div><div class="t">riduzione token con memoria a grafo su task di review (OSS 2026)</div></div>
+  </div>
+  <p style="margin-top:18px">E c'&egrave; un effetto composto: le letture di SB restano <b>~costanti</b> mentre il progetto cresce, mentre la rilettura "a freddo" diventa sempre pi&ugrave; cara. Pi&ugrave; il progetto &egrave; grande e longevo, pi&ugrave; SB conviene.</p>
+  <p class="note"><b>Nota metodologica.</b> Le cifre "Senza/Con SB" sono una stima illustrativa, ancorata a un dato reale (un file sorgente-di-verit&agrave; misurato a ~180.000 token) e ai benchmark pubblici citati in basso. L'ordine di grandezza &egrave; conservativo; i risparmi assoluti crescono con la dimensione e la longevit&agrave; del progetto. I numeri esatti saranno validati in Fase 1 sui budget reali di SB (bootstrap &le; ~500 token, query tipica &le; ~1-2k).</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>SB vs. gli altri strumenti</h2>
+  <table>
+    <tr><th>Capacit&agrave;</th><th>Note/PKM (Obsidian)</th><th>RAG vettoriale</th><th>Grafo di solo-codice</th><th>Second Brain</th></tr>
+    <tr><td>Codice + documenti + decisioni in un unico quadro</td><td class="n">parziale</td><td class="p">solo testo</td><td class="n">solo codice</td><td class="y">s&igrave;</td></tr>
+    <tr><td>Cattura i riferimenti "path nella prosa"</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">s&igrave;</td></tr>
+    <tr><td>Si mantiene fresco da solo (anti-deriva)</td><td class="n">manuale</td><td class="p">re-index</td><td class="p">parziale</td><td class="y">hook + gate</td></tr>
+    <tr><td>Costo-token per l'AI</td><td class="p">medio</td><td class="p">medio</td><td class="y">basso</td><td class="y">molto basso</td></tr>
+    <tr><td>UI 3D navigabile con tipi/colori</td><td class="p">grafo 2D</td><td class="n">no</td><td class="p">a volte</td><td class="y">s&igrave;</td></tr>
+    <tr><td>$0, locale, nessuna API</td><td class="y">s&igrave;</td><td class="n">spesso no</td><td class="y">s&igrave;</td><td class="y">s&igrave;</td></tr>
+  </table>
+  <p class="note">SB non sostituisce: <b>integra</b>. Riusa un grafo-codice AST esistente per il livello-codice e prende i pattern migliori (file-come-verit&agrave;, indice locale, MCP), aggiungendo i pezzi che mancano: riferimenti documentali nella prosa, nodi di decisione/sessione, anti-deriva e UI 3D.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Come funziona</h2>
+  <div class="steps">
+    <div class="step"><div class="num"></div><div><h3 style="font-size:17px">Indicizza (una volta)</h3><p>Scansiona il progetto e costruisce il grafo: file tipizzati + entit&agrave; di codice + riferimenti documentali + decisioni e aree.</p></div></div>
+    <div class="step"><div class="num"></div><div><h3 style="font-size:17px">Resta fresco (a ogni passo)</h3><p>Hook + diff incrementale rigenerano solo ci&ograve; che cambia, fuori dal modello: costo-token zero.</p></div></div>
+    <div class="step"><div class="num"></div><div><h3 style="font-size:17px">L'AI interroga</h3><p>Bootstrap compatto all'avvio, poi query mirate via MCP: niente rilettura di interi file, niente grafo nel contesto.</p></div></div>
+    <div class="step"><div class="num"></div><div><h3 style="font-size:17px">L'umano vede</h3><p>UI 3D navigabile: titolo del progetto in testa, nodi e archi colorati per tipo, descrizioni, aree a colpo d'occhio.</p></div></div>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--navy)"></span>struttura</span>
+    <span><span class="dot" style="background:var(--green)"></span>programma</span>
+    <span><span class="dot" style="background:var(--amber)"></span>rapporto</span>
+    <span><span class="dot" style="background:var(--violet)"></span>design</span>
+    <span><span class="dot" style="background:var(--teal)"></span>dati/database</span>
+    <span><span class="dot" style="background:var(--magenta)"></span>memoria</span>
+    <span><span class="dot" style="background:var(--red)"></span>decisione</span>
+    <span><span class="dot" style="background:var(--orange)"></span>config</span>
+    <span><span class="dot" style="background:var(--gray)"></span>area</span>
+    <span><span class="dot" style="background:var(--bronze)"></span>sessione</span>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <p><span class="pill">In sviluppo</span> <span class="pill">Locale &amp; $0</span> <span class="pill">Licenza MIT (prevista)</span></p>
+  <p style="margin-top:10px"><b>Second Brain (SB)</b> &mdash; la memoria persistente, fresca e a basso costo di token di ogni progetto.</p>
+  <p style="font-size:12px;color:#94a3b8;margin-top:14px">Fonti dei benchmark: Anthropic "Code execution with MCP" (riduzione token ~77%); studi 2026 su memoria selettiva vs full-context (LoCoMo / LongMemEval, costo ~14&times;); progetto OSS code-review-graph (memoria a grafo, ~6,8&times;). Dato di riferimento interno: file sorgente-di-verit&agrave; misurato a ~180.000 token.</p>
+</div></footer>
+
+</body>
+</html>

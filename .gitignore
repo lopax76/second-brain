@@ -1,0 +1,27 @@
+# Second Brain output store (derived, regenerable)
+.secondbrain/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Internal / personal (kept locally, never published)
+PROGETTO.md
+docs/SB-design-brief.md
+docs/baseline-measurement.md
+docs/cold-experiment-prompt.md
+docs/logo-candidates/

@@ -1,0 +1,2 @@
+# Test fixtures are sample data, not project knowledge.
+tests/fixtures/*
