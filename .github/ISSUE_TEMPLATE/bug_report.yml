@@ -1,5 +1,5 @@
 name: Bug report
-description: Something went wrong with secondbrain build / view / gate / query or the MCP server.
+description: Something went wrong with second-brain build / view / gate / query or the MCP server.
 labels: ["bug"]
 body:
   - type: markdown
@@ -18,7 +18,7 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      description: The exact command(s) you ran, e.g. `secondbrain build .`
+      description: The exact command(s) you ran, e.g. `second-brain build .`
       placeholder: |
         1. project layout (or a link to a minimal repo)
         2. command run
@@ -29,7 +29,7 @@ body:
     id: version
     attributes:
       label: Second Brain version
-      description: Output of `secondbrain --version`
+      description: Output of `second-brain --version`
     validations:
       required: false
   - type: input

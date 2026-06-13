@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from secondbrain.ignore import is_ignored_dir, is_ignored_file
+from second_brain.ignore import is_ignored_dir, is_ignored_file
 
 
 def test_default_extensions_and_names():
@@ -29,7 +29,7 @@ def test_patterns_are_case_sensitive_cross_platform():
     assert is_ignored_file("src/app.py", "app.py", ["src/*"])
 
 
-def test_secondbrainignore_is_not_indexed():
+def test_second_brainignore_is_not_indexed():
     assert is_ignored_file(".secondbrainignore", ".secondbrainignore", [])
 
 

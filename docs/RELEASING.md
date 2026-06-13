@@ -21,8 +21,8 @@ python -m twine check dist/*
 ```
 
 Both artifacts must report `PASSED`. They already include the vendored 3D viewer
-(`secondbrain/ui/3d-force-graph.min.js` + `template.html`) in both the wheel and the sdist, so
-`secondbrain view` works offline after a plain `pip install`.
+(`second_brain/ui/3d-force-graph.min.js` + `template.html`) in both the wheel and the sdist, so
+`second-brain view` works offline after a plain `pip install`.
 
 ## Dry run on TestPyPI (recommended for the first release)
 
@@ -31,7 +31,7 @@ python -m twine upload --repository testpypi dist/*
 # then, in a fresh venv, verify it installs and runs:
 pip install --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ "second-brain[mcp]"
-secondbrain --version
+second-brain --version
 ```
 
 ## Publish to PyPI
@@ -42,7 +42,7 @@ python -m twine upload dist/*
 
 ## Cutting a new version
 
-1. Bump `__version__` in `secondbrain/__init__.py` (the single source of truth; `pyproject.toml`
+1. Bump `__version__` in `second_brain/__init__.py` (the single source of truth; `pyproject.toml`
    reads it dynamically).
 2. Commit, then tag: `git tag v<ver> && git push --tags`.
 3. Build, check, and upload as above.

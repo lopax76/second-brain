@@ -13,9 +13,9 @@ import hashlib
 import os
 from pathlib import Path
 
-from secondbrain.ignore import load_ignore_patterns
-from secondbrain.indexer import build_graph, iter_files
-from secondbrain.model import Graph
+from second_brain.ignore import load_ignore_patterns
+from second_brain.indexer import build_graph, iter_files
+from second_brain.model import Graph
 
 _CHUNK = 65536
 # Above this size a text file is hashed raw instead of normalized: it bounds memory, and a
@@ -101,7 +101,7 @@ def index(
     rels = iter_files(root_p, load_ignore_patterns(root_p))
     graph = build_graph(root_p, _rels=rels)
     if operational:
-        from secondbrain.operational import enrich
+        from second_brain.operational import enrich
         enrich(graph, root_p)
     manifest: dict[str, str] = {}
     for rel in rels:

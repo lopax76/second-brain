@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from secondbrain.pycode import js_imports, python_imports
+from second_brain.pycode import js_imports, python_imports
 
 
 def test_python_imports_absolute_and_aliases() -> None:

@@ -13,8 +13,8 @@ import os
 import shutil
 from pathlib import Path
 
-from secondbrain.model import EDGE_COLORS, NODE_COLORS, Graph
-from secondbrain.store import store_dir
+from second_brain.model import EDGE_COLORS, NODE_COLORS, Graph
+from second_brain.store import store_dir
 
 _UI_DIR = Path(__file__).parent / "ui"
 _TEMPLATE = _UI_DIR / "template.html"

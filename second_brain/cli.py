@@ -9,10 +9,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from secondbrain import __version__, assess, gate, query, store
-from secondbrain.freshness import build_manifest, index
-from secondbrain.model import Graph
-from secondbrain.viewer import write_view
+from second_brain import __version__, assess, gate, query, store
+from second_brain.freshness import build_manifest, index
+from second_brain.model import Graph
+from second_brain.viewer import write_view
 
 
 def _human(n: int) -> str:
@@ -48,7 +48,7 @@ def cmd_gate(args: argparse.Namespace) -> int:
     g = store.load_graph(args.path)
     old = store.load_manifest(args.path)
     if g is None or old is None:
-        print("no graph found \u2014 run 'secondbrain build' first", file=sys.stderr)
+        print("no graph found \u2014 run 'second-brain build' first", file=sys.stderr)
         return 2
     rep = gate.evaluate(g, old, build_manifest(args.path))
     print(rep.summary())
@@ -144,7 +144,7 @@ def cmd_assess(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="secondbrain",
+        prog="second-brain",
         description="Second Brain \u2014 a living, low-token map of a project.",
     )
     parser.add_argument("--version", action="version", version=f"second-brain {__version__}")

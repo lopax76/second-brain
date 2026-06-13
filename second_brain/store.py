@@ -11,7 +11,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from secondbrain.model import Graph
+from second_brain.model import Graph
 
 STORE_DIRNAME = ".secondbrain"
 

@@ -4,14 +4,14 @@ The whole point of Second Brain is that an assistant *queries* the graph and get
 budgeted answers — instead of re-reading whole files. Every function here returns a small,
 plain-data structure (ids, types, short labels, counts, sizes) — never file contents — so a
 session bootstrap or a targeted question costs a few hundred to a couple thousand tokens, not
-tens of thousands. Pure functions over a :class:`~secondbrain.model.Graph`; no I/O, no deps.
+tens of thousands. Pure functions over a :class:`~second_brain.model.Graph`; no I/O, no deps.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
 

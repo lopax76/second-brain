@@ -30,7 +30,7 @@ jobs:
           pip install -e ".[dev,mcp]"
 
       - name: Lint (ruff)
-        run: ruff check secondbrain tests
+        run: ruff check second_brain tests
 
       - name: Test (pytest)
         run: pytest -q

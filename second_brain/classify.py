@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 
-from secondbrain.model import NodeType
+from second_brain.model import NodeType
 
 _PROGRAM_EXTS = {
     ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",

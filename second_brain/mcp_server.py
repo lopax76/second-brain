@@ -4,7 +4,7 @@ This is the piece that lets an assistant *query* the project instead of re-readi
 an OPTIONAL extra so the core stays dependency-free:
 
     pip install second-brain[mcp]
-    secondbrain-mcp [PROJECT_PATH]      # defaults to the current directory
+    second-brain-mcp [PROJECT_PATH]      # defaults to the current directory
 
 Read-only on your sources. Exposes a handful of small, budgeted tools (map / find /
 neighbors / subgraph / health) over stdio.
@@ -16,9 +16,9 @@ import os
 import sys
 from typing import Any
 
-from secondbrain import gate, query, store
-from secondbrain.freshness import build_manifest, index
-from secondbrain.model import Graph
+from second_brain import gate, query, store
+from second_brain.freshness import build_manifest, index
+from second_brain.model import Graph
 
 try:  # pragma: no cover - import-guard
     from mcp.server.fastmcp import FastMCP
@@ -69,7 +69,7 @@ def build_server(project: str):
         g = store.load_graph(project)
         old = store.load_manifest(project)
         if g is None or old is None:
-            return {"status": "no-baseline", "hint": "run 'secondbrain build' first"}
+            return {"status": "no-baseline", "hint": "run 'second-brain build' first"}
         rep = gate.evaluate(g, old, build_manifest(project))
         return {"ok": rep.ok, "broken": rep.broken, "stale": rep.stale,
                 "orphans": len(rep.orphans)}

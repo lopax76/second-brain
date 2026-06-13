@@ -81,7 +81,7 @@ run**, con molti meno token e in meno della metà del tempo.
 
 Solo per *orientare* un assistente sull'intero progetto — cosa che paghi **ogni sessione** —
 rileggere i documenti curati sorgente-di-verità costa **~229.000 token**; il digest
-`secondbrain map` costa **~270 token**: **~800× in meno**, e ~costante mentre il progetto cresce
+`second-brain map` costa **~270 token**: **~800× in meno**, e ~costante mentre il progetto cresce
 (l'indice completo si interroga, non entra mai nel contesto).
 
 <p align="center">
@@ -126,17 +126,17 @@ Richiede Python 3.10+. Dipendenze runtime: **nessuna** (solo libreria standard).
 ## Avvio rapido
 
 ```bash
-secondbrain build  .          # indicizza un progetto -> .secondbrain/graph.json
-secondbrain gate   .          # check anti-deriva: ref rotte, file stantii, orfani
-secondbrain view   .          # scrive il viewer 3D offline -> .secondbrain/view.html
-secondbrain stats  .          # conteggi rapidi per tipo nodo/arco
-secondbrain map    .          # digest compatto: aree, dimensioni, file più connessi
-secondbrain find   util .     # trova nodi per nome o path
-secondbrain neighbors secondbrain/model.py .   # un nodo e le sue connessioni
-secondbrain assess .          # report prima/dopo: problemi + risparmio token
+second-brain build  .          # indicizza un progetto -> .secondbrain/graph.json
+second-brain gate   .          # check anti-deriva: ref rotte, file stantii, orfani
+second-brain view   .          # scrive il viewer 3D offline -> .secondbrain/view.html
+second-brain stats  .          # conteggi rapidi per tipo nodo/arco
+second-brain map    .          # digest compatto: aree, dimensioni, file più connessi
+second-brain find   util .     # trova nodi per nome o path
+second-brain neighbors second_brain/model.py .   # un nodo e le sue connessioni
+second-brain assess .          # report prima/dopo: problemi + risparmio token
 ```
 
-**Drill-down** puntando lo strumento su una sottocartella — `secondbrain view ./src/api`
+**Drill-down** puntando lo strumento su una sottocartella — `second-brain view ./src/api`
 renderizza solo quell'area in pieno dettaglio, mentre la vista d'insieme resta leggera grazie alla
 modalità *backbone* (aree + nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul
 nodo-area).
@@ -146,13 +146,13 @@ libreria 3D è bundlata accanto alla pagina, quindi **funziona completamente off
 
 ## Layer di query (per gli assistenti AI)
 
-`secondbrain map`, `find` e `neighbors` restituiscono risposte compatte e budgettate (id, tipi,
+`second-brain map`, `find` e `neighbors` restituiscono risposte compatte e budgettate (id, tipi,
 dimensioni, connessioni — mai il contenuto dei file). Un **server MCP** opzionale espone le stesse
 query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain[mcp]"
-secondbrain-mcp .      # serve map / find / neighbors / subgraph / health su stdio
+second-brain-mcp .      # serve map / find / neighbors / subgraph / health su stdio
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -199,9 +199,9 @@ strumenti che usi di solito). Dammi un quadro COMPLETO e ACCURATO rispondendo a 
 
 ```
 SOLO LETTURA. L'indice di Second Brain è già costruito — va solo interrogato. Usa SOLO:
-  python -m secondbrain map   "/path/al/progetto"
-  python -m secondbrain stats "/path/al/progetto"
-  python -m secondbrain find <testo> "/path/al/progetto"
+  python -m second_brain map   "/path/al/progetto"
+  python -m second_brain stats "/path/al/progetto"
+  python -m second_brain find <testo> "/path/al/progetto"
 e leggi /path/al/progetto/.secondbrain/assessment.md. Rispondi alle stesse 4 domande, poi
 dimmi tempo e token consumati.
 ```
@@ -216,7 +216,7 @@ server MCP opzionale. Prossimi passi: risoluzione dei riferimenti più ricca e u
 
 ```bash
 pip install -e ".[dev,mcp]"
-ruff check secondbrain tests
+ruff check second-brain tests
 pytest -q
 ```
 

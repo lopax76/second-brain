@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from secondbrain.mcp_server import build_server  # noqa: E402
+from second_brain.mcp_server import build_server  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 

@@ -6,7 +6,7 @@ reference an integrator (or an AI assistant) needs to consume the graph directly
 
 ## What's on disk: `.secondbrain/`
 
-`secondbrain build` writes a single, regenerable store next to the project (never touching
+`second-brain build` writes a single, regenerable store next to the project (never touching
 your sources). Writes are atomic (temp file + `os.replace`), so a crash can't leave a
 half-written graph.
 
@@ -73,7 +73,7 @@ A directed `source → target` between node ids, de-duplicated by `(source, targ
 | `meta` | object |
 
 > **Colors are not stored.** They are derived from `type` (single source of truth in
-> `secondbrain/model.py`), keeping the store small and drift-free.
+> `second_brain/model.py`), keeping the store small and drift-free.
 
 > **Viewer payload differs slightly.** Inside `view.html` the data is inlined with edges
 > renamed to **`links`** and two extra maps, `nodeColors` / `edgeColors` (so the page is
@@ -106,7 +106,7 @@ A directed `source → target` between node ids, de-duplicated by `(source, targ
 
 ## How files are classified
 
-Classification is a documented, conservative heuristic (`secondbrain/classify.py`); order
+Classification is a documented, conservative heuristic (`second_brain/classify.py`); order
 matters — more specific signals win:
 
 1. **memory** — path contains a `memory` segment, or name starts with `memory.`
@@ -122,7 +122,7 @@ import scan. Other languages contribute via documentation links rather than code
 
 ## How references are extracted (and why prose mentions don't add noise)
 
-Three kinds are recognized (`secondbrain/references.py`):
+Three kinds are recognized (`second_brain/references.py`):
 
 - **Markdown links** `[label](target)`
 - **Wikilinks** `[[Name]]` / `[[Name|alias]]`
@@ -141,7 +141,7 @@ positives.
 
 ## Anti-drift gate
 
-`secondbrain gate` refuses to call the graph "fine" while it is out of date, by three signals:
+`second-brain gate` refuses to call the graph "fine" while it is out of date, by three signals:
 
 - **broken** (error) — a link/wikilink points inside the project but the target is missing.
 - **stale** (error) — files were added / removed / changed since the last build (the manifest

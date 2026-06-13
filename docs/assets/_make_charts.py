@@ -1,6 +1,6 @@
 """Generate the README charts (PNG) from the measured experiment data. Run once.
 
-Data sources: the three cold-chat runs (NIENTE / ADESSO / DOPO) and the `secondbrain assess`
+Data sources: the three cold-chat runs (NIENTE / ADESSO / DOPO) and the `second_brain assess`
 measurement on a real multi-repo project (~1,684 indexed files). Token = bytes/4 heuristic.
 """
 

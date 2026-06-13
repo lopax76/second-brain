@@ -12,7 +12,7 @@ unlikely to be merged:
   scans. Everything it writes lives under `.secondbrain/`.
 - **Files are the truth.** The graph is derived and always regenerable. Never duplicate file
   contents into the graph.
-- **Zero runtime dependencies in the core.** `secondbrain/` (everything except the optional
+- **Zero runtime dependencies in the core.** `second_brain/` (everything except the optional
   MCP server) must run on the Python standard library alone. Optional features go behind an
   extra (e.g. `[mcp]`).
 - **Low token cost.** Query results return ids, types, sizes and connections — never file
@@ -33,7 +33,7 @@ pip install -e ".[dev,mcp]"
 Run the same checks CI runs — both must be green:
 
 ```bash
-ruff check secondbrain tests
+ruff check second-brain tests
 pytest -q
 ```
 

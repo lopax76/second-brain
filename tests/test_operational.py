@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from secondbrain import operational
-from secondbrain.freshness import index
-from secondbrain.indexer import build_graph
-from secondbrain.model import EdgeType, NodeType
+from second_brain import operational
+from second_brain.freshness import index
+from second_brain.indexer import build_graph
+from second_brain.model import EdgeType, NodeType
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 

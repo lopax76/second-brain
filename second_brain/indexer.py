@@ -15,16 +15,16 @@ import os
 import posixpath
 from pathlib import Path
 
-from secondbrain.classify import classify
-from secondbrain.ignore import (
+from second_brain.classify import classify
+from second_brain.ignore import (
     DEFAULT_IGNORE_DIRS,
     is_ignored_dir,
     is_ignored_file,
     load_ignore_patterns,
 )
-from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
-from secondbrain.pycode import PyImport, js_imports, python_imports
-from secondbrain.references import extract_references_tagged
+from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain.pycode import PyImport, js_imports, python_imports
+from second_brain.references import extract_references_tagged
 
 _TEXT_EXTS = {
     ".md", ".markdown", ".rst", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",
@@ -211,7 +211,7 @@ def build_graph(
     """Index the project at ``root`` and return its graph. Never modifies the project.
 
     ``_rels`` lets a caller pass a precomputed file list to avoid walking the tree twice
-    (see :func:`secondbrain.freshness.index`).
+    (see :func:`second_brain.freshness.index`).
     """
     root_p = Path(root).resolve()
     if not root_p.is_dir():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from secondbrain.references import extract_references
+from second_brain.references import extract_references
 
 
 def test_markdown_link():

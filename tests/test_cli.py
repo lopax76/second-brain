@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from secondbrain.cli import main
+from second_brain.cli import main
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from secondbrain import gate
-from secondbrain.freshness import build_manifest, index
+from second_brain import gate
+from second_brain.freshness import build_manifest, index
 
 
 def test_no_baseline_reports_no_stale(tmp_path) -> None:

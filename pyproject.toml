@@ -32,8 +32,8 @@ dev = ["pytest>=7", "ruff>=0.4"]
 mcp = ["mcp>=1.2"]
 
 [project.scripts]
-secondbrain = "secondbrain.cli:main"
-secondbrain-mcp = "secondbrain.mcp_server:main"
+second-brain = "second_brain.cli:main"
+second-brain-mcp = "second_brain.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/lopax76/second-brain"
@@ -42,13 +42,13 @@ Issues = "https://github.com/lopax76/second-brain/issues"
 Documentation = "https://github.com/lopax76/second-brain#readme"
 
 [tool.setuptools]
-packages = ["secondbrain"]
+packages = ["second_brain"]
 
 [tool.setuptools.dynamic]
-version = { attr = "secondbrain.__version__" }
+version = { attr = "second_brain.__version__" }
 
 [tool.setuptools.package-data]
-secondbrain = ["ui/*.html", "ui/*.js", "py.typed"]
+second_brain = ["ui/*.html", "ui/*.js", "py.typed"]
 
 [tool.ruff]
 line-length = 100

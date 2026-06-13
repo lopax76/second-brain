@@ -5,7 +5,7 @@ offline (no CDN, no network access required).
 
 ## 3d-force-graph
 
-- File: `secondbrain/ui/3d-force-graph.min.js`
+- File: `second_brain/ui/3d-force-graph.min.js`
 - Version: 1.80.0
 - Author: Vasco Asturiano
 - License: MIT

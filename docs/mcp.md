@@ -14,8 +14,8 @@ The server is an **optional extra**, keeping the core dependency-free.
 pip install "second-brain[mcp]"
 
 # build the graph once (read-only on your sources), then run the server over stdio:
-secondbrain build /path/to/project
-secondbrain-mcp /path/to/project        # defaults to the current directory
+second-brain build /path/to/project
+second-brain-mcp /path/to/project        # defaults to the current directory
 ```
 
 The server lazily loads the stored graph (or builds it on first use), so it starts instantly.
@@ -70,18 +70,18 @@ All responses are plain JSON-able structures. None of them include file contents
 }
 ```
 
-(If no graph has been built yet, `health` returns `{"status": "no-baseline", "hint": "run 'secondbrain build' first"}`.)
+(If no graph has been built yet, `health` returns `{"status": "no-baseline", "hint": "run 'second-brain build' first"}`.)
 
 ## Wiring it into an assistant
 
-Point your MCP-capable client at the `secondbrain-mcp` command with the project path as its
+Point your MCP-capable client at the `second-brain-mcp` command with the project path as its
 argument (stdio transport). For example, a generic client config entry:
 
 ```json
 {
   "mcpServers": {
     "second-brain": {
-      "command": "secondbrain-mcp",
+      "command": "second-brain-mcp",
       "args": ["/path/to/project"]
     }
   }

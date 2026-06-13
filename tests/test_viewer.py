@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
-from secondbrain.viewer import _TEMPLATE, render_view, write_view
+from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain.viewer import _TEMPLATE, render_view, write_view
 
 
 def _tiny_graph() -> Graph:

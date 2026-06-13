@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from secondbrain import query
-from secondbrain.indexer import build_graph
-from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain import query
+from second_brain.indexer import build_graph
+from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 

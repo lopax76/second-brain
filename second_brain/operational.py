@@ -13,7 +13,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from secondbrain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 _DOC_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
 DECISION_RE = re.compile(r"\b(?:D-[A-Z]{1,8}-\d{1,5}|ADR-\d{1,5}|RFC-\d{1,5})\b")

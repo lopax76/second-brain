@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from secondbrain.freshness import diff_manifest
-from secondbrain.model import EdgeType, Graph
+from second_brain.freshness import diff_manifest
+from second_brain.model import EdgeType, Graph
 
 
 @dataclass

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from secondbrain import assess
+from second_brain import assess
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 
@@ -38,7 +38,7 @@ def test_assess_lists_problem_file_names(tmp_path):
 
 
 def test_utf16_not_truncated_but_corruption_is(tmp_path):
-    from secondbrain.indexer import build_graph
+    from second_brain.indexer import build_graph
 
     # Valid UTF-16 text (BOM + alternating nulls) must NOT be flagged as truncated.
     (tmp_path / "u.txt").write_bytes("hello world\nsecond line\n".encode("utf-16"))
@@ -62,7 +62,7 @@ def test_report_counts_all_files_not_just_docs(tmp_path):
 
 def test_utf16_with_zerofill_tail_is_flagged(tmp_path):
     """A UTF-16-shaped head followed by a contiguous null run is truncation, not encoding."""
-    from secondbrain.indexer import build_graph
+    from second_brain.indexer import build_graph
 
     head = "hello world this is text".encode("utf-16")
     (tmp_path / "mix.txt").write_bytes(head + b"\x00" * 64)
@@ -72,8 +72,8 @@ def test_utf16_with_zerofill_tail_is_flagged(tmp_path):
 
 def test_zerofill_past_scan_cap_caught_by_tail(tmp_path, monkeypatch):
     """Zero-fill beyond the head scan cap is still caught by the tail scan."""
-    from secondbrain import assess as a
-    from secondbrain.indexer import build_graph
+    from second_brain import assess as a
+    from second_brain.indexer import build_graph
 
     monkeypatch.setattr(a, "_SCAN_CAP", 1024)
     (tmp_path / "big.txt").write_bytes(b"x" * 4096 + b"\x00" * 256)  # hole is past the cap

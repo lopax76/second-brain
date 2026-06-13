@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from secondbrain import gate, store
-from secondbrain.freshness import build_manifest, diff_manifest, file_hash
-from secondbrain.indexer import build_graph
+from second_brain import gate, store
+from second_brain.freshness import build_manifest, diff_manifest, file_hash
+from second_brain.indexer import build_graph
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 
@@ -106,7 +106,7 @@ def test_text_hash_ignores_crlf_vs_lf(tmp_path):
 def test_index_single_walk_returns_graph_and_matching_manifest(tmp_path):
     import shutil
 
-    from secondbrain.freshness import index
+    from second_brain.freshness import index
 
     proj = tmp_path / "proj"
     shutil.copytree(FIXTURE, proj)

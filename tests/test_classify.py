@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from secondbrain.classify import classify
-from secondbrain.model import NodeType
+from second_brain.classify import classify
+from second_brain.model import NodeType
 
 
 def test_decision_design_report_memory() -> None:

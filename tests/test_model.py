@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from secondbrain.model import (
+from second_brain.model import (
     EDGE_COLORS,
     NODE_COLORS,
     Edge,
