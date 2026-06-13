@@ -57,8 +57,8 @@ purpose-built for one thing: **situational awareness at a very low token cost.**
 
 ## See it on a real project (anonymized)
 
-A **read-only** measurement on a mature, multi-repo project (identity withheld): ~1,800
-knowledge files across 17 top-level areas, indexed in **2.5 s** (index `graph.json` = 0.91 MB).
+A **read-only** measurement on a mature, multi-repo project (identity withheld): ~1,684
+knowledge files across 17 top-level areas, indexed in **~1.3 s** (index `graph.json` = 0.91 MB).
 
 Three ways to answer the same four questions about the project — *what's here, list every
 recorded decision, which files are truncated/empty, the most-connected files* — in three
@@ -84,6 +84,10 @@ digest costs **~270 tokens**: **~800× less**, and roughly constant as the proje
 full index is queried, never loaded into context).
 
 <p align="center">
+  <img src="docs/assets/chart-tokens.png" width="90%" alt="Tokens to orient (log scale): ~26.7M to read everything, ~4.09M all docs, ~229,000 today's curated docs, ~270 the Second Brain digest">
+</p>
+
+<p align="center">
   <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuracy: manual runs disagree (112 / 131), Second Brain is exact (117)">
   <img src="docs/assets/chart-time.png" width="48%" alt="Time to answer: ~8.5 / ~9 min manual vs ~3–4 min with Second Brain; index build ~1.3 s once">
 </p>
@@ -93,6 +97,13 @@ UTF-16/encoding false positives excluded), **~45 empty files**, **~1,390 orphan 
 **117 decisions** and **~626 cross-references** now explicit and queryable, plus **13 files
 already stale within seconds** of indexing (a live system constantly writing) — which is
 exactly why the map has to update itself.
+
+<p align="center">
+  <img src="docs/assets/chart-memory.png" width="72%" alt="Illustrative: across many chats a hand-kept project map drifts while a queryable graph stays current">
+</p>
+
+<sub>Illustrative — the continuity problem SB removes: over many sessions a hand-kept map
+drifts as orphans and stale files pile up, while a queryable graph stays current.</sub>
 
 ### The same structure, the code layer
 

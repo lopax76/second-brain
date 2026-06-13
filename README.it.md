@@ -59,8 +59,8 @@ cosa sola: **consapevolezza del contesto a costo di token bassissimo.**
 
 ## Visto su un progetto reale (anonimizzato)
 
-Misura **read-only** su un progetto maturo multi-repo (identità non rivelata): ~1.800 file di
-conoscenza in 17 aree di primo livello, indicizzato in **2,5 s** (indice `graph.json` = 0,91 MB).
+Misura **read-only** su un progetto maturo multi-repo (identità non rivelata): ~1.684 file di
+conoscenza in 17 aree di primo livello, indicizzato in **~1,3 s** (indice `graph.json` = 0,91 MB).
 
 Tre modi di rispondere alle stesse quattro domande sul progetto — *cosa c'è, elenca ogni decisione
 registrata, quali file sono troncati/vuoti, i file più collegati* — in tre chat pulite separate:
@@ -85,6 +85,10 @@ rileggere i documenti curati sorgente-di-verità costa **~229.000 token**; il di
 (l'indice completo si interroga, non entra mai nel contesto).
 
 <p align="center">
+  <img src="docs/assets/chart-tokens.png" width="90%" alt="Token per orientarsi (scala log): ~26,7M per leggere tutto, ~4,09M tutti i documenti, ~229.000 i documenti curati di oggi, ~270 il digest di Second Brain">
+</p>
+
+<p align="center">
   <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuratezza: i run manuali non concordano (112 / 131), Second Brain è esatto (117)">
   <img src="docs/assets/chart-time.png" width="48%" alt="Tempo per rispondere: ~8,5 / ~9 min manuale vs ~3–4 min con Second Brain; build indice ~1,3 s una-tantum">
 </p>
@@ -94,6 +98,14 @@ troncati/corrotti** (esclusi i falsi positivi UTF-16/encoding), **~45 file vuoti
 orfani (~80%)**, **117 decisioni** e **~626 riferimenti incrociati** ora espliciti e interrogabili,
 più **13 file già stantii a pochi secondi** dall'indicizzazione (un sistema vivo che riscrive di
 continuo) — ed è proprio per questo che la mappa deve aggiornarsi da sola.
+
+<p align="center">
+  <img src="docs/assets/chart-memory.png" width="72%" alt="Illustrativo: nel corso di molte chat una mappa tenuta a mano deriva, mentre un grafo interrogabile resta aggiornato">
+</p>
+
+<sub>Illustrativo — il problema di continuità che SB elimina: nel corso di molte sessioni una
+mappa tenuta a mano deriva (orfani e file stantii si accumulano), mentre un grafo interrogabile
+resta sempre aggiornato.</sub>
 
 ### La stessa struttura, il layer di codice
 

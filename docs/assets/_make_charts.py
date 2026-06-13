@@ -47,8 +47,11 @@ def _bar_labels(ax, bars, fmt):
 
 def chart_tokens():
     fig, ax = plt.subplots(figsize=(7.2, 4.0))
-    labels = ["Read every\nfile", "Read the\ndocs", "Manual cold\nexploration", "Second Brain\ndigest"]
-    vals = [26_752_514, 4_092_482, 100_000, 250]
+    labels = [
+        "Read all\nknowledge files", "Read all\ndocs",
+        "Read today's\ncurated docs", "Second Brain\ndigest",
+    ]
+    vals = [26_752_514, 4_092_482, 229_000, 270]
     colors = [MANUAL, MANUAL, MANUAL, SB]
     bars = ax.bar(labels, vals, color=colors, width=0.62)
     ax.set_yscale("log")
@@ -59,8 +62,8 @@ def chart_tokens():
     ax.grid(axis="y", color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
     _bar_labels(ax, bars, lambda h: f"~{int(h):,}")
-    ax.annotate("~400x less than the docs\n~100,000x less than reading everything",
-                (3, 250), xytext=(2.1, 9000), fontsize=9.5, color=SB, fontweight="bold",
+    ax.annotate("~800x less than today's curated docs\n~100,000x less than reading everything",
+                (3, 270), xytext=(2.1, 9000), fontsize=9.5, color=SB, fontweight="bold",
                 ha="center", arrowprops=dict(arrowstyle="->", color=SB, lw=1.4))
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
@@ -71,7 +74,10 @@ def chart_tokens():
 
 def chart_time():
     fig, ax = plt.subplots(figsize=(7.2, 3.6))
-    labels = ["NIENTE\n(manual)", "ADESSO\n(manual)", "DOPO\n(Second Brain)", "SB index\nbuild (once)"]
+    labels = [
+        "Nothing\n(manual)", "Today\n(manual)",
+        "With Second\nBrain", "SB index\nbuild (once)",
+    ]
     vals = [8.5, 9.0, 3.5, 0.02]
     colors = [MANUAL, MANUAL, SB, "#93c5fd"]
     bars = ax.bar(labels, vals, color=colors, width=0.6)
@@ -89,7 +95,7 @@ def chart_time():
 
 def chart_accuracy():
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
-    labels = ["NIENTE\n(manual)", "ADESSO\n(manual)", "DOPO\n(Second Brain)"]
+    labels = ["Nothing\n(manual)", "Today\n(manual)", "With Second\nBrain"]
     vals = [112, 131, 117]
     colors = [BAD, BAD, GOOD]
     bars = ax.bar(labels, vals, color=colors, width=0.55)
