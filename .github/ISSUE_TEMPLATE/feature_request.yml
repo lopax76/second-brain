@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the use case, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Second Brain to do?
+    validations:
+      required: false
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fit with the design principles
+      description: Second Brain is read-only, zero-runtime-dependency, low-token, deterministic.
+      options:
+        - label: This keeps the core dependency-free (or proposes it behind an optional extra).
+        - label: This does not require pushing file contents / the whole graph into an AI's context.

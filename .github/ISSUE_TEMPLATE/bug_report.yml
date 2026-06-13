@@ -1,0 +1,41 @@
+name: Bug report
+description: Something went wrong with secondbrain build / view / gate / query or the MCP server.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! The single most useful thing you can give us is a **minimal
+        project that reproduces the problem** (a few files is enough).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s) you ran, e.g. `secondbrain build .`
+      placeholder: |
+        1. project layout (or a link to a minimal repo)
+        2. command run
+        3. output / traceback
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Second Brain version
+      description: Output of `secondbrain --version`
+    validations:
+      required: false
+  - type: input
+    id: python
+    attributes:
+      label: Python version & OS
+      placeholder: "e.g. Python 3.12 on Windows 11"
+    validations:
+      required: false
