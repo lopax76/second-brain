@@ -138,8 +138,14 @@ second-brain assess .          # one-shot before/after report: problems + token 
 that area in full detail, while the top-level view stays light via *backbone* mode (areas +
 the knowledge-connected core; isolated data files are summarized on their area node).
 
-Open `.secondbrain/view.html` in a browser (double-click — no server needed): the data is
-inlined and the 3D library is vendored next to the page, so **it works fully offline**.
+### Viewing the 3D graph
+
+1. **Generate the viewer:** `second-brain view .`
+2. **Open it:** double-click the file it writes — `.secondbrain/view.html` — in any browser. No
+   server, no install: the data is inlined and the 3D library is bundled next to the page, so it
+   works fully offline.
+3. **Explore:** left-drag to orbit, scroll to zoom, double-click a node for its details. Use the
+   left panel to search, group by type / area / folder, or show only orphans.
 
 ## Query layer (for AI assistants)
 

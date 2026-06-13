@@ -141,8 +141,15 @@ renderizza solo quell'area in pieno dettaglio, mentre la vista d'insieme resta l
 modalità *backbone* (aree + nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul
 nodo-area).
 
-Apri `.secondbrain/view.html` in un browser (doppio clic — niente server): i dati sono inline e la
-libreria 3D è bundlata accanto alla pagina, quindi **funziona completamente offline**.
+### Aprire il grafo 3D
+
+1. **Genera il viewer:** `second-brain view .`
+2. **Aprilo:** doppio clic sul file creato — `.secondbrain/view.html` — in un browser qualsiasi.
+   Niente server, niente installazione: i dati sono inline e la libreria 3D è inclusa accanto alla
+   pagina, quindi funziona completamente offline.
+3. **Esplora:** trascina col tasto sinistro per orbitare, rotella per lo zoom, doppio clic su un
+   nodo per i dettagli. Dal pannello a sinistra puoi cercare, raggruppare per tipo / area / cartella
+   o mostrare solo gli orfani.
 
 ## Layer di query (per gli assistenti AI)
 
