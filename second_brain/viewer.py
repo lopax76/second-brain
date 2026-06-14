@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 
+from second_brain import communities
 from second_brain.model import EDGE_COLORS, NODE_COLORS, Graph
 from second_brain.store import store_dir
 
@@ -23,10 +24,23 @@ _TOKEN = "__SB_DATA__"
 
 
 def render_view(graph: Graph) -> str:
-    """Return a standalone, single-file HTML document for ``graph``."""
+    """Return a standalone, single-file HTML document for ``graph``.
+
+    Each file node carries its auto-detected ``community`` (the ordinal name from
+    :mod:`second_brain.communities`, e.g. ``"Cluster 1"``) so the viewer can colour and cluster
+    the map by community — the same membership the report and the CLI use.
+    """
+    comm = communities.detect(graph)
+    cnames = communities.names(comm)
+    nodes = []
+    for n in graph.nodes.values():
+        d = n.to_dict()
+        label = comm.get(n.id)
+        d["community"] = cnames.get(label) if label is not None else None
+        nodes.append(d)
     data = {
         "project": graph.project,
-        "nodes": [n.to_dict() for n in graph.nodes.values()],
+        "nodes": nodes,
         "links": [e.to_dict() for e in graph.edges],
         "nodeColors": {k.value: v for k, v in NODE_COLORS.items()},
         "edgeColors": {k.value: v for k, v in EDGE_COLORS.items()},

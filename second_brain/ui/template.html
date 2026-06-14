@@ -67,12 +67,13 @@
       <div class="blk"><h4>Search</h4><input id="search" placeholder="filter by name or path…" autocomplete="off"></div>
       <div class="blk"><h4>Group by</h4>
         <select id="groupby">
+          <option value="community">Community (auto)</option>
           <option value="area">Area (top folder)</option>
           <option value="folder">Sub-folder (2 levels)</option>
           <option value="type">Type</option>
           <option value="none">None</option>
         </select>
-        <label class="ck"><input type="checkbox" id="cluster" checked> cluster in 3D space</label>
+        <label class="ck"><input type="checkbox" id="cluster" checked> cluster into islands</label>
         <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
       </div>
       <div class="blk"><h4 id="groups-h">Groups</h4>
@@ -87,7 +88,7 @@
   <div id="graphwrap">
     <div id="graph"></div>
     <button id="toggle">&#9776;</button>
-    <div class="hint">left-drag orbit · wheel zoom · double-click for details</div>
+    <div class="hint">wheel to zoom · right-drag to pan · double-click a node for details</div>
     <div id="error"><div><b>3D library could not be loaded.</b><br>
       The viewer loads <code>3d-force-graph.min.js</code> from this same folder &mdash; it works fully
       offline, no network needed. If you see this, that file is missing next to the page;
@@ -122,7 +123,16 @@
 
   const byId = {}; for (const n of SB.nodes) byId[n.id] = n;
   const lid = e => (e && e.id !== undefined ? e.id : e);
-  const nodeColor = n => SB.nodeColors[n.type] || '#94a3b8';
+  function communityColor(name){
+    if (!name) return '#64748b';
+    let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % 360;
+    return 'hsl(' + h + ',60%,60%)';
+  }
+  // In community mode (the default) nodes are coloured by their auto-detected community; in the
+  // other group modes they fall back to type colours.
+  function nodeColor(n){
+    return (mode === 'community') ? communityColor(n.community) : (SB.nodeColors[n.type] || '#94a3b8');
+  }
   const edgeColor = l => SB.edgeColors[l.type] || '#475569';
 
   // adjacency + knowledge degree
@@ -146,6 +156,7 @@
 
   function dirParts(n){ const p = n.path || ''; const a = p.split('/'); return a.slice(0, -1); }
   function groupOf(n, mode){
+    if (mode === 'community') return n.community || (n.type === 'area' ? n.label : null);
     if (mode === 'type') return n.type;
     if (n.type === 'area') return n.label;
     const d = dirParts(n);
@@ -156,12 +167,13 @@
   // stable color for a group name (area/folder mode)
   function groupColor(name, mode){
     if (mode === 'type') return SB.nodeColors[name] || '#94a3b8';
+    if (mode === 'community') return communityColor(name);
     let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % 360;
     return 'hsl(' + h + ',55%,60%)';
   }
 
   // ---- state ----
-  let mode = 'area', clusterOn = true, onlyOrphans = false, query = '', groupFilter = null;
+  let mode = 'community', clusterOn = true, onlyOrphans = false, query = '', groupFilter = null;
   const hiddenTypes = new Set();
 
   function matches(n){ if(!query) return true; const q=query;
@@ -183,6 +195,7 @@
 
   const G = ForceGraph3D()($('graph'))
     .backgroundColor('#0b1020')
+    .numDimensions(2)
     .nodeResolution(12)
     .nodeRelSize(3)
     .nodeColor(nodeColor)
@@ -201,6 +214,10 @@
     .onEngineStop(() => fit())
     .graphData(visibleData());
   window.G = G;  // exposed for scripting / debugging
+
+  // 2D map feel: lock camera rotation so the graph reads as a flat, pannable/zoomable map
+  // (the community islands laid out in the z=0 plane), instead of an orbiting 3D cloud.
+  try { const _ctl = G.controls && G.controls(); if (_ctl) _ctl.noRotate = true; } catch (e) {}
 
   // ForceGraph3D sizes its canvas to the WINDOW by default, ignoring the #graph container — so
   // in this sidebar layout the aspect ratio is wrong. Pin the canvas to the container's real
@@ -358,6 +375,38 @@
     $('totals').innerHTML = '<b>'+files+'</b> files · <b>'+fmtSize(size)+'</b><br><span style="color:var(--dim)">'+top+'</span>';
   }
 
+  // ---- impact (depth-2 BFS over imports/references/mentions, mirrors `second-brain impact`) ----
+  const IMPACT_TYPES = new Set(['imports','references','mentions']);
+  function impactBFS(startId, adj){
+    const seen = new Set([startId]); let frontier = [startId]; const layers = [];
+    for (let d=1; d<=2; d++){
+      const next = [];
+      for (const id of frontier){ for (const e of (adj[id]||[])){
+        if (!IMPACT_TYPES.has(e.type) || seen.has(e.other)) continue;
+        seen.add(e.other); next.push(e.other);
+      }}
+      if (next.length) layers.push({depth:d, ids:next});
+      frontier = next; if (!frontier.length) break;
+    }
+    return layers;
+  }
+  function nodeRow(id){
+    const o = byId[id]; if(!o) return '';
+    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="width:9px;height:9px;'
+      +'border-radius:50%;background:'+nodeColor(o)+'"></span><span style="flex:1;overflow:hidden;'
+      +'text-overflow:ellipsis;white-space:nowrap">'+esc(o.label)+'</span></div>';
+  }
+  function impactSection(title, layers){
+    let h = '<div class="sec"><h5>'+title+'</h5>';
+    if (!layers.length){ h += '<div class="muted">none</div>'; }
+    else { for (const L of layers){
+      h += '<div class="muted" style="margin-top:4px">depth '+L.depth+' · '+L.ids.length+'</div>';
+      h += L.ids.slice(0,15).map(nodeRow).join('');
+      if (L.ids.length > 15) h += '<div class="muted">…and '+(L.ids.length-15)+' more</div>';
+    }}
+    return h + '</div>';
+  }
+
   // ---- detail panel ----
   function connRow(c){
     const o = byId[c.other]; if(!o) return '';
@@ -374,6 +423,8 @@
     let html = '<div class="muted">'+esc(n.description||'')+'</div>';
     html += '<div class="sec"><h5>Outgoing ('+out.length+')</h5>'+ (out.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
     html += '<div class="sec"><h5>Incoming ('+inc.length+')</h5>'+ (inc.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
+    html += impactSection('Impact · upstream (what breaks if changed)', impactBFS(n.id, inAdj));
+    html += impactSection('Impact · downstream (what it depends on)', impactBFS(n.id, outAdj));
     $('dbody').innerHTML = html;
     $('dbody').querySelectorAll('.conn').forEach(el=> el.addEventListener('click', ()=>{
       const o = byId[el.getAttribute('data-id')]; if(o){ openDetail(o); } }));
