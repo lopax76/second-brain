@@ -55,8 +55,8 @@ def test_query_commands_run(tmp_path):
     assert main(["find", "util", str(proj)]) == 0
     assert main(["neighbors", "src/app.py", str(proj)]) == 0
     assert main(["impact", "src/app.py", str(proj)]) == 0
-    assert main(["impact", "src/app.py", "--up", str(proj)]) == 0
-    assert main(["impact", "src/app.py", "--down", "--depth", "1", str(proj)]) == 0
+    assert main(["impact", "src/app.py", str(proj), "--up"]) == 0
+    assert main(["impact", "src/app.py", str(proj), "--down", "--depth", "1"]) == 0
     assert main(["assess", str(proj)]) == 0
     assert main(["view", "--backbone", str(proj)]) == 0
 
@@ -74,11 +74,11 @@ def test_find_prints_true_total_when_capped(tmp_path, capsys):
     for i in range(60):
         (proj / f"util_{i:02d}.py").write_text("x = 1\n", encoding="utf-8")
     assert main(["build", str(proj)]) == 0
-    assert main(["find", "util", "--limit", "5", str(proj)]) == 0
+    assert main(["find", "util", str(proj), "--limit", "5"]) == 0
     out = capsys.readouterr().out
     assert "60 matches" in out and "showing 5" in out
     capsys.readouterr()
-    assert main(["find", "util", "--all", str(proj)]) == 0
+    assert main(["find", "util", str(proj), "--all"]) == 0
     assert capsys.readouterr().out.count("util_") >= 60
 
 
