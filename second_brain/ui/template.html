@@ -98,12 +98,32 @@
   var nodesDS = new vis.DataSet(RAW_NODES.map(function (n) {
     return { id: n.id, label: n.label, color: n.color, size: n.size, font: n.font, title: n.title,
       community: n.community, _community_name: n.community_name, _source_file: n.source_file,
-      _file_type: n.file_type, _degree: n.degree };
+      _file_type: n.file_type, _degree: n.degree,
+      _bytes: n.bytes, _description: n.description, _broken: n.broken };
   }));
   var edgesDS = new vis.DataSet(RAW_EDGES.map(function (e, i) {
     return { id: i, from: e.from, to: e.to, title: e.title, dashes: e.dashes, width: e.width,
       color: e.color, arrows: { to: { enabled: true, scaleFactor: 0.5 } } };
   }));
+
+  // Adjacency (direction + edge type) for the inspect panel, from the rendered edges.
+  var outAdj = {}, inAdj = {};
+  RAW_EDGES.forEach(function (e) {
+    (outAdj[e.from] = outAdj[e.from] || []).push({ other: e.to, type: e.title });
+    (inAdj[e.to] = inAdj[e.to] || []).push({ other: e.from, type: e.title });
+  });
+  function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
+  var IMPACT_TYPES = { imports:1, references:1, mentions:1 };
+  function impactBFS(startId, adj){
+    var seen = {}; seen[startId] = 1; var frontier = [startId], layers = [];
+    for (var d=1; d<=2; d++){ var next = [];
+      for (var i=0;i<frontier.length;i++){ var arr = adj[frontier[i]] || [];
+        for (var j=0;j<arr.length;j++){ var o = arr[j];
+          if (!IMPACT_TYPES[o.type] || seen[o.other]) continue; seen[o.other] = 1; next.push(o.other); } }
+      if (next.length) layers.push({ depth:d, ids:next }); frontier = next; if (!frontier.length) break; }
+    return layers;
+  }
 
   var container = document.getElementById('graph');
   var network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
@@ -124,22 +144,42 @@
     network.setOptions({ physics: { enabled: false } });
   });
 
+  function connRow(other, type) {
+    var nb = nodesDS.get(other);
+    var color = nb ? nb.color.background : '#555';
+    var et = type ? ' <span style="color:#666;font-size:10px">' + esc(type) + '</span>' : '';
+    return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(other) + ')">' + esc(nb ? nb.label : other) + et + '</span>';
+  }
+  function connList(arr) {
+    if (!arr.length) return '<div style="color:#555;font-size:11px">none</div>';
+    return '<div style="max-height:160px;overflow-y:auto;margin-top:2px">' +
+      arr.map(function (c) { return connRow(c.other, c.type); }).join('') + '</div>';
+  }
+  function impactRows(layers) {
+    if (!layers.length) return '<div style="color:#555;font-size:11px">none</div>';
+    return layers.map(function (L) {
+      return '<div style="color:#777;font-size:10px;margin-top:3px">depth ' + L.depth + ' · ' + L.ids.length + '</div>' +
+        L.ids.slice(0, 12).map(function (id) { return connRow(id, ''); }).join('') +
+        (L.ids.length > 12 ? '<div style="color:#555;font-size:11px">…and ' + (L.ids.length - 12) + ' more</div>' : '');
+    }).join('');
+  }
   function showInfo(nodeId) {
     var n = nodesDS.get(nodeId);
     if (!n) return;
-    var neighborIds = network.getConnectedNodes(nodeId);
-    var neighborItems = neighborIds.map(function (nid) {
-      var nb = nodesDS.get(nid);
-      var color = nb ? nb.color.background : '#555';
-      return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(nid) + ')">' + esc(nb ? nb.label : nid) + '</span>';
-    }).join('');
-    document.getElementById('info-content').innerHTML =
-      '<div class="field"><b>' + esc(n.label) + '</b></div>' +
+    var out = outAdj[nodeId] || [], inc = inAdj[nodeId] || [];
+    var h = '<div class="field"><b>' + esc(n.label) + '</b></div>' +
       '<div class="field">Type: ' + esc(n._file_type || 'unknown') + '</div>' +
       '<div class="field">Community: ' + esc(n._community_name) + '</div>' +
-      '<div class="field">Source: ' + esc(n._source_file || '-') + '</div>' +
+      (n._source_file ? '<div class="field">Path: ' + esc(n._source_file) + '</div>' : '') +
+      (n._bytes ? '<div class="field">Size: ' + fmtSize(n._bytes) + '</div>' : '') +
       '<div class="field">Degree: ' + n._degree + '</div>' +
-      (neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (' + neighborIds.length + ')</div><div id="neighbors-list">' + neighborItems + '</div>' : '');
+      (n._description ? '<div class="field" style="color:#9aa">' + esc(n._description) + '</div>' : '') +
+      (n._broken && n._broken.length ? '<div class="field" style="color:#e0857f">Broken refs: ' + esc(n._broken.join(', ')) + '</div>' : '') +
+      '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Outgoing (' + out.length + ')</div>' + connList(out) +
+      '<div class="field" style="margin-top:6px;color:#aaa;font-size:11px">Incoming (' + inc.length + ')</div>' + connList(inc) +
+      '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Impact · upstream (what breaks if changed)</div>' + impactRows(impactBFS(nodeId, inAdj)) +
+      '<div class="field" style="margin-top:6px;color:#aaa;font-size:11px">Impact · downstream (what it depends on)</div>' + impactRows(impactBFS(nodeId, outAdj));
+    document.getElementById('info-content').innerHTML = h;
   }
   window.showInfo = showInfo;
 

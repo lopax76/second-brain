@@ -96,6 +96,10 @@ def _build_payload(graph: Graph) -> dict:
             "source_file": n.path or "",
             "file_type": n.type.value,
             "degree": d,
+            # richer file info for the inspect panel (does not affect the graph rendering)
+            "bytes": int(n.meta.get("size", 0) or 0),
+            "description": n.description or "",
+            "broken": list(n.meta.get("broken_refs", []) or []),
         })
 
     vis_edges = []
