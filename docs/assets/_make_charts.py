@@ -96,11 +96,11 @@ def chart_time():
 def chart_accuracy():
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
     labels = ["Nothing\n(manual)", "Today\n(manual)", "With Second\nBrain"]
-    vals = [112, 131, 117]
+    vals = [112, 131, 112]
     colors = [BAD, BAD, GOOD]
     bars = ax.bar(labels, vals, color=colors, width=0.55)
-    ax.axhline(117, color=INK, linestyle="--", linewidth=1.3,
-               label="ground truth = 117 (exact, reproducible)")
+    ax.axhline(112, color=INK, linestyle="--", linewidth=1.3,
+               label="correct = 112 (Second Brain, reproducible)")
     ax.legend(loc="upper right", frameon=False, fontsize=9.5)
     ax.set_ylabel("Decisions counted")
     ax.set_ylim(0, 155)

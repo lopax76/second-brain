@@ -69,15 +69,17 @@ separate clean chats:
 |---|---|---|---|
 | Time | ~8.5 min | ~9 min | **~3–4 min** |
 | Working tokens | opaque | opaque | **~3–4k, self-measured** |
-| **Decisions found** | 112 (wrong) | 131 (wrong) | **117 (exact)** |
+| **Decisions found** | 112 | 131 | **112 (exact, every run)** |
 | **Truncated files** | 3 | 0 (missed) | **2 (exact)** |
 | Files counted | 2,174 | 2,174 | **1,684 (exact)** |
 | Reproducible / verifiable | no | no | **yes** |
 
 Two things stand out. (1) The two manual runs **disagree with each other** — 112 vs 131
-decisions, 3 vs 0 truncated files (the second missed them entirely): the by-hand method is
-non-deterministic and unverifiable. (2) Second Brain returns the **exact, identical answer
-every run**, with far fewer tokens and in less than half the time.
+decisions, 3 vs 0 truncated files (the second missed them entirely) — so the by-hand method is
+non-deterministic and unverifiable: you can't tell the right answer (112) from a wrong one
+(131). (2) Second Brain returns the **same answer every run** — 112, the correct count — with
+far fewer tokens and in less than half the time. The win isn't a number nobody else could
+reach; it's an exact, reproducible, queryable one instead of a coin-flip.
 
 Just to *orient* an assistant on the whole project — something you pay for **every session** —
 reading the curated source-of-truth docs costs **~229,000 tokens**; the `second-brain map`
@@ -89,13 +91,13 @@ full index is queried, never loaded into context).
 </p>
 
 <p align="center">
-  <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuracy: manual runs disagree (112 / 131), Second Brain is exact (117)">
+  <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuracy: the two manual runs disagree (112 / 131); Second Brain returns the correct 112 on every run">
   <img src="docs/assets/chart-time.png" width="48%" alt="Time to answer: ~8.5 / ~9 min manual vs ~3–4 min with Second Brain; index build ~1.3 s once">
 </p>
 
 And it surfaces what even curated docs miss: genuinely **truncated/corrupted files** (with
 UTF-16/encoding false positives excluded), **~45 empty files**, **~1,390 orphan files (~80%)**,
-**117 decisions** and **~626 cross-references** now explicit and queryable, plus **13 files
+**112 decisions** and **~626 cross-references** now explicit and queryable, plus **13 files
 already stale within seconds** of indexing (a live system constantly writing) — which is
 exactly why the map has to update itself.
 

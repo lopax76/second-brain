@@ -70,15 +70,17 @@ registrata, quali file sono troncati/vuoti, i file più collegati* — in tre ch
 |---|---|---|---|
 | Tempo | ~8,5 min | ~9 min | **~3–4 min** |
 | Token di lavoro | opachi | opachi | **~3–4k, auto-misurabili** |
-| **Decisioni trovate** | 112 (errato) | 131 (errato) | **117 (esatto)** |
+| **Decisioni trovate** | 112 | 131 | **112 (esatto, ogni volta)** |
 | **File troncati** | 3 | 0 (mancati) | **2 (esatto)** |
 | File contati | 2.174 | 2.174 | **1.684 (esatto)** |
 | Riproducibile / verificabile | no | no | **sì** |
 
 Due cose saltano all'occhio. (1) I due run manuali **non concordano tra loro** — 112 vs 131
-decisioni, 3 vs 0 troncati (il secondo li ha mancati del tutto): il metodo a mano è
-non-deterministico e non verificabile. (2) Second Brain dà la **risposta esatta e identica a ogni
-run**, con molti meno token e in meno della metà del tempo.
+decisioni, 3 vs 0 troncati (il secondo li ha mancati del tutto) — quindi il metodo a mano è
+non-deterministico e non verificabile: non sai distinguere la risposta giusta (112) da una
+sbagliata (131). (2) Second Brain dà la **stessa risposta a ogni run** — 112, il conteggio
+corretto — con molti meno token e in meno della metà del tempo. Il vantaggio non è un numero
+che a mano non raggiungi, ma uno esatto, riproducibile e interrogabile invece di un terno al lotto.
 
 Solo per *orientare* un assistente sull'intero progetto — cosa che paghi **ogni sessione** —
 rileggere i documenti curati sorgente-di-verità costa **~229.000 token**; il digest
@@ -90,13 +92,13 @@ rileggere i documenti curati sorgente-di-verità costa **~229.000 token**; il di
 </p>
 
 <p align="center">
-  <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuratezza: i run manuali non concordano (112 / 131), Second Brain è esatto (117)">
+  <img src="docs/assets/chart-accuracy.png" width="48%" alt="Accuratezza: i due run manuali non concordano (112 / 131); Second Brain dà il 112 corretto a ogni run">
   <img src="docs/assets/chart-time.png" width="48%" alt="Tempo per rispondere: ~8,5 / ~9 min manuale vs ~3–4 min con Second Brain; build indice ~1,3 s una-tantum">
 </p>
 
 E fa emergere ciò che persino i documenti curati non vedono: file **realmente
 troncati/corrotti** (esclusi i falsi positivi UTF-16/encoding), **~45 file vuoti**, **~1.390 file
-orfani (~80%)**, **117 decisioni** e **~626 riferimenti incrociati** ora espliciti e interrogabili,
+orfani (~80%)**, **112 decisioni** e **~626 riferimenti incrociati** ora espliciti e interrogabili,
 più **13 file già stantii a pochi secondi** dall'indicizzazione (un sistema vivo che riscrive di
 continuo) — ed è proprio per questo che la mappa deve aggiornarsi da sola.
 
