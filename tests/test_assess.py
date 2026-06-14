@@ -50,6 +50,17 @@ def test_utf16_not_truncated_but_corruption_is(tmp_path):
     assert "bad.txt" in integ["truncated"]
 
 
+def test_mixed_utf8_utf16_log_is_not_truncated(tmp_path):
+    """A log mixing a UTF-8 line and a UTF-16LE section (no BOM, no contiguous null run) is valid
+    text, not truncation. Regression 0.1.2: such PowerShell trigger logs were false-positived."""
+    from second_brain.indexer import build_graph
+
+    content = b"2026-06-08 23:05:00  avvio\r\n" + "[accordatore] x\n".encode("utf-16-le")
+    (tmp_path / "trigger.log").write_bytes(content)
+    g = build_graph(tmp_path)
+    assert "trigger.log" not in assess.scan_integrity(tmp_path, g)["truncated"]
+
+
 def test_report_counts_all_files_not_just_docs(tmp_path):
     """On a code-only project the 'without SB' number must reflect all files, not ~0 docs."""
     (tmp_path / "a.py").write_text("x = 1\n" * 50)

@@ -36,32 +36,18 @@ def _ext(name: str) -> str:
 _NULL_RUN = b"\x00" * 16  # a contiguous null run this long = zero-fill/truncation, not encoding
 
 
-def _looks_utf16(chunk: bytes) -> bool:
-    """True if the null bytes are explained by UTF-16 encoding (valid text, not corruption).
-
-    UTF-16 text has a BOM, or null bytes concentrated on alternating positions (the high byte
-    of mostly-ASCII codepoints). A contiguous run of nulls is never normal UTF-16 text (it would
-    be consecutive U+0000), so that case is handled separately by ``_is_corrupt``.
-    """
-    if chunk[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        return True
-    if len(chunk) < 4:
-        return False
-    even = chunk[0::2]
-    odd = chunk[1::2]
-    even_nulls, odd_nulls = even.count(0), odd.count(0)
-    return (odd_nulls > 0.4 * len(odd) and even_nulls < 0.05 * len(even)) or (
-        even_nulls > 0.4 * len(even) and odd_nulls < 0.05 * len(odd)
-    )
-
-
 def _is_corrupt(chunk: bytes) -> bool:
-    """True if a chunk shows genuine truncation/corruption (null bytes not explained by UTF-16)."""
-    if b"\x00" not in chunk:
-        return False
-    if _NULL_RUN in chunk:  # contiguous zero-fill, regardless of text encoding
-        return True
-    return not _looks_utf16(chunk)
+    """True only on a CONTIGUOUS run of null bytes (zero-fill) — the unambiguous signature of a
+    truncated / zero-filled file.
+
+    Scattered or alternating null bytes are an ENCODING artifact (UTF-16, or files that mix
+    UTF-8 and UTF-16 sections — e.g. trigger logs written by PowerShell), i.e. valid text, and
+    are never flagged. Fix 0.1.2: the previous heuristic false-positived on such short
+    mixed-encoding logs when their UTF-16 portion fell below the alternating-null ratio it
+    looked for; a contiguous null run cannot occur in any text encoding, so it is the only
+    safe signal of real truncation.
+    """
+    return _NULL_RUN in chunk
 
 
 def scan_integrity(root: str | os.PathLike[str], graph: Graph) -> dict[str, list[str]]:

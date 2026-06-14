@@ -11,7 +11,7 @@ The server is an **optional extra**, keeping the core dependency-free.
 ## Install & run
 
 ```bash
-pip install "second-brain[mcp]"
+pip install "second-brain-graph[mcp]"
 
 # build the graph once (read-only on your sources), then run the server over stdio:
 second-brain build /path/to/project

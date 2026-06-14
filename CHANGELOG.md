@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-06-14
+
+### Fixed
+
+- **Truncation detector: false positives on mixed-encoding files.** A file is now reported
+  truncated/corrupted only when it contains a *contiguous* run of null bytes (zero-fill) — the
+  unambiguous signature of truncation. Files that mix UTF-8 and UTF-16 sections (for example
+  trigger logs written by PowerShell), whose scattered/alternating null bytes are valid text,
+  are no longer flagged.
+- **Decision count no longer double-counts.** `NodeType.DECISION` is reserved for decision
+  *identifier* nodes (`D-XXX` / `ADR-N` / `RFC-N`) extracted from document text. Decision
+  *documents* (ADR files, "decisioni" docs) now classify as design documents, so they are no
+  longer added to the decision total alongside their own identifier. The reported number of
+  decisions reflects distinct decision identifiers only.
+- **MCP install hint used the wrong package name** in `docs/mcp.md`
+  (`second-brain[mcp]` → `second-brain-graph[mcp]`). Thanks @galimar (#1).
+
 ## [0.1.1] - 2026-06-14
 
 ### Fixed

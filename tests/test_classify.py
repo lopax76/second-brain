@@ -7,7 +7,11 @@ from second_brain.model import NodeType
 
 
 def test_decision_design_report_memory() -> None:
-    assert classify("adr-0001.md") is NodeType.DECISION
+    # A decision *file* (an ADR or a "decisioni" doc) classifies as a DESIGN document, NOT a
+    # DECISION node: NodeType.DECISION is reserved for the D-XXX/ADR-N/RFC-N identifiers created
+    # from document text (see test_operational). Fix 0.1.2 — avoids double-counting decisions.
+    assert classify("adr-0001.md") is NodeType.DESIGN
+    assert classify("docs/cryptobot-decisioni.md") is NodeType.DESIGN
     assert classify("docs/design-blueprint.md") is NodeType.DESIGN
     assert classify("notes/report-2026-01-01.md") is NodeType.REPORT
     assert classify("memory/notes.md") is NodeType.MEMORY

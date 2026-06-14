@@ -31,10 +31,14 @@ _STRUCTURE_NAMES = {
     "license.txt", "authors", "notice",
 }
 
-_DECISION_RE = re.compile(r"(?i)(?:^|[-_/])(?:adr|decision|decisione|decisioni)(?:[-_/.]|$)")
+# NodeType.DECISION is reserved for decision IDENTIFIER nodes (D-XXX / ADR-N / RFC-N) created by
+# ``operational.add_decisions`` from document text. A *file* is never a decision — it is a
+# document that may define one — so ADR/decision files classify as DESIGN. (Fix 0.1.2:
+# classifying decision FILES as DECISION double-counted them with their ids and inflated the
+# "decisions" headline, e.g. ADR-0021 the id + 0021-....md the file.)
 _DESIGN_RE = re.compile(
     r"(?i)(?:^|[-_/])(?:disegno|design|piano|plan|roadmap|spec|blueprint|brief|"
-    r"architettura|architecture)(?:[-_/.]|$)"
+    r"architettura|architecture|adr|decision|decisione|decisioni)(?:[-_/.]|$)"
 )
 _REPORT_RE = re.compile(
     r"(?i)(?:^|[-_/])(?:report|rapporto|collaudo|diagnosi|revisione|readiness|analisi|analysis|audit|verifica|backtest|indagine|strumentazione)(?:[-_/.]|$)"
@@ -74,8 +78,6 @@ def classify(rel_posix: str) -> NodeType:
 
     # 4. Document sub-typing by keyword / date (only for document-like files)
     if ext in _DOC_EXTS or ext == "":
-        if _DECISION_RE.search(rel_posix):
-            return NodeType.DECISION
         if _DESIGN_RE.search(rel_posix):
             return NodeType.DESIGN
         if _REPORT_RE.search(rel_posix) or _DATE_RE.search(name):
