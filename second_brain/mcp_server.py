@@ -70,6 +70,16 @@ def build_server(project: str):
         return query.subgraph(_graph(project), node_id, hops=hops)
 
     @server.tool()
+    def impact(node_id: str, direction: str = "both", max_depth: int = 2) -> dict[str, Any]:
+        """Impact radius of a node, grouped by depth.
+
+        ``direction`` in {up, down, both}: ``upstream`` = who depends on ``node_id`` (what breaks
+        if you change it), ``downstream`` = what ``node_id`` depends on. Use before editing a file
+        to see the blast radius without reading every dependent.
+        """
+        return query.impact(_graph(project), node_id, direction=direction, max_depth=max_depth)
+
+    @server.tool()
     def health() -> dict[str, Any]:
         """Anti-drift status: broken references, stale files vs the last build, orphan count."""
         g = store.load_graph(project)

@@ -130,6 +130,35 @@ def cmd_neighbors(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_impact(args: argparse.Namespace) -> int:
+    direction = "up" if args.up else ("down" if args.down else "both")
+    res = query.impact(_load_or_build(args.path), args.node,
+                       direction=direction, max_depth=args.depth)
+    if not res.get("exists"):
+        print(f"node not found: {args.node}", file=sys.stderr)
+        return 1
+    print(f"{res['id']} ({res['type']})")
+
+    def _emit(title: str, groups: dict, truncated: bool) -> None:
+        print(f"{title}:")
+        if not groups:
+            print("  (none)")
+            return
+        for depth in sorted(groups):
+            for r in groups[depth]:
+                print(f"  d{depth}  -{r['edge']}- {r['id']} ({r['type']})")
+        if truncated:
+            print("  ...(capped)")
+
+    if "upstream" in res:
+        _emit("upstream (who depends on this)",
+              res["upstream"], res.get("upstream_truncated", False))
+    if "downstream" in res:
+        _emit("downstream (what this depends on)",
+              res["downstream"], res.get("downstream_truncated", False))
+    return 0
+
+
 def cmd_assess(args: argparse.Namespace) -> int:
     r = assess.assess(args.path)
     out = store.store_dir(args.path)
@@ -200,6 +229,15 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("node", help="node id (relative path)")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.set_defaults(func=cmd_neighbors)
+
+    sp = sub.add_parser("impact", help="impact radius: who depends on a node / what it depends on")
+    sp.add_argument("node", help="node id (relative path or decision:ID)")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    grp = sp.add_mutually_exclusive_group()
+    grp.add_argument("--up", action="store_true", help="only upstream (who depends on it)")
+    grp.add_argument("--down", action="store_true", help="only downstream (what it depends on)")
+    sp.add_argument("--depth", type=int, default=2, help="max BFS depth (default: 2)")
+    sp.set_defaults(func=cmd_impact)
 
     sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")
     sp.add_argument("file", help="path to a .py file")

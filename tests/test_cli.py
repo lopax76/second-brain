@@ -54,8 +54,17 @@ def test_query_commands_run(tmp_path):
     assert main(["map", str(proj)]) == 0
     assert main(["find", "util", str(proj)]) == 0
     assert main(["neighbors", "src/app.py", str(proj)]) == 0
+    assert main(["impact", "src/app.py", str(proj)]) == 0
+    assert main(["impact", "src/app.py", "--up", str(proj)]) == 0
+    assert main(["impact", "src/app.py", "--down", "--depth", "1", str(proj)]) == 0
     assert main(["assess", str(proj)]) == 0
     assert main(["view", "--backbone", str(proj)]) == 0
+
+
+def test_impact_unknown_node_returns_1(tmp_path):
+    proj = _project(tmp_path)
+    main(["build", str(proj)])
+    assert main(["impact", "does/not/exist", str(proj)]) == 1
 
 
 def test_find_prints_true_total_when_capped(tmp_path, capsys):

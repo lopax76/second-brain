@@ -16,6 +16,11 @@ from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
 
+# Relations that count as a real dependency for impact analysis. BELONGS_TO (area membership)
+# and TOUCHES (git sessions) are deliberately excluded: they would make every file "depend on"
+# its area / every commit, drowning the signal.
+IMPACT_RELATIONS = (EdgeType.IMPORTS, EdgeType.REFERENCES, EdgeType.MENTIONS)
+
 
 def _area_of(path: str | None) -> str:
     if not path:
@@ -184,3 +189,95 @@ def subgraph(graph: Graph, node_id: str, *, hops: int = 1) -> dict[str, Any]:
     edges = [{"source": e.source, "target": e.target, "type": e.type.value}
              for e in graph.edges if e.source in seen and e.target in seen]
     return {"nodes": nodes, "edges": edges}
+
+
+def _impact_walk(
+    graph: Graph,
+    start: str,
+    *,
+    incoming: bool,
+    max_depth: int,
+    relations: tuple[EdgeType, ...],
+    cap: int,
+) -> tuple[dict[int, list[dict[str, Any]]], bool]:
+    """BFS the dependency graph from ``start``, grouping reached nodes by depth.
+
+    ``incoming=True`` walks edges *into* nodes (upstream: who depends on start); ``incoming=False``
+    walks edges *out of* nodes (downstream: what start depends on). Deterministic (each level is
+    id/edge-sorted) and capped per depth — the cap bounds both the output and the next frontier.
+    """
+    adj: dict[str, list[tuple[str, str]]] = {}
+    for e in graph.edges:
+        if e.type not in relations:
+            continue
+        if incoming:
+            adj.setdefault(e.target, []).append((e.source, e.type.value))
+        else:
+            adj.setdefault(e.source, []).append((e.target, e.type.value))
+
+    seen = {start}
+    frontier = [start]
+    groups: dict[int, list[dict[str, Any]]] = {}
+    truncated = False
+    depth = 1
+    while frontier and depth <= max(1, max_depth):
+        level: dict[str, dict[str, Any]] = {}
+        for node in frontier:
+            for other, etype in adj.get(node, ()):
+                if other in seen or other in level:
+                    continue
+                n = graph.nodes.get(other)
+                level[other] = {
+                    "depth": depth, "id": other,
+                    "type": n.type.value if n else "?",
+                    "path": n.path if n else None,
+                    "edge": etype, "via": node,
+                }
+        entries = sorted(level.values(), key=lambda r: (r["id"], r["edge"]))
+        if len(entries) > cap:
+            entries = entries[:cap]
+            truncated = True
+        for r in entries:
+            seen.add(r["id"])
+        groups[depth] = entries
+        frontier = [r["id"] for r in entries]
+        depth += 1
+    return groups, truncated
+
+
+def impact(
+    graph: Graph,
+    node_id: str,
+    *,
+    direction: str = "both",
+    max_depth: int = 2,
+    relations: tuple[EdgeType, ...] = IMPACT_RELATIONS,
+    cap: int = 200,
+) -> dict[str, Any]:
+    """Impact radius of a node: what breaks if you touch it, and what it depends on.
+
+    ``direction`` in {``up``, ``down``, ``both``}. ``upstream`` = nodes that depend on ``node_id``
+    (incoming edges; depth 1 is the direct blast radius). ``downstream`` = nodes ``node_id``
+    depends on (outgoing edges). Results are grouped by ``depth`` and capped per depth for safety.
+    Returns ``{"exists": False}`` for an unknown node so a caller can distinguish it from "no deps".
+    """
+    if direction not in ("up", "down", "both"):
+        raise ValueError(f"direction must be 'up', 'down' or 'both' (got {direction!r})")
+    n = graph.nodes.get(node_id)
+    if n is None:
+        return {"id": node_id, "exists": False}
+    out: dict[str, Any] = {
+        "id": node_id, "exists": True, "type": n.type.value, "path": n.path,
+        "direction": direction, "max_depth": max_depth,
+    }
+    if direction in ("up", "both"):
+        groups, trunc = _impact_walk(graph, node_id, incoming=True,
+                                     max_depth=max_depth, relations=relations, cap=cap)
+        out["upstream"] = groups
+        out["upstream_truncated"] = trunc
+    if direction in ("down", "both"):
+        groups, trunc = _impact_walk(graph, node_id, incoming=False,
+                                     max_depth=max_depth, relations=relations, cap=cap)
+        out["downstream"] = groups
+        out["downstream_truncated"] = trunc
+    return out
