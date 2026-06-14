@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from second_brain import communities
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -70,6 +71,7 @@ def project_map(graph: Graph, *, top: int = 8) -> dict[str, Any]:
     counts = graph.counts()
     broken = sum(len(n.meta.get("broken_refs", [])) for n in graph.nodes.values())
     orphans = sum(1 for n in files if not deg.get(n.id))
+    n_communities = len(set(communities.detect(graph).values()))
     return {
         "project": graph.project,
         "files": len(files),
@@ -78,6 +80,7 @@ def project_map(graph: Graph, *, top: int = 8) -> dict[str, Any]:
         "size": sum(int(n.meta.get("size", 0)) for n in files),
         "node_types": counts["nodes"],
         "edge_types": counts["edges"],
+        "communities": n_communities,
         "by_area": area_rows,
         "most_connected": most_connected,
         "orphans": orphans,
