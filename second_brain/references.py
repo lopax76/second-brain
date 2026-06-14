@@ -35,6 +35,20 @@ _PATH_RE = re.compile(
     r"(?<![\w./\\-])([A-Za-z0-9_][A-Za-z0-9_\-./\\]*\.(?:" + _REF_EXTS + r"))\b"
 )
 
+# Code spans: fenced blocks ``` ``` / ~~~ ~~~ and inline `code`. Documentation that SHOWS
+# link/wikilink SYNTAX as an example (e.g. `[label](target)`) must NOT become a real link.
+# Stripped only for link/wikilink extraction; path-in-prose still runs on the full text,
+# because file paths written in backticks (e.g. `src/app.py`) ARE genuine references — the
+# core thing Second Brain is meant to catch. (Regression 2026-06-14: graph-format.md -> target.)
+_FENCE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"`+[^`\n]*`+")
+
+
+def _blank_code(text: str) -> str:
+    """Replace code spans with spaces of equal length (offsets/lines stay stable)."""
+    text = _FENCE_RE.sub(lambda m: " " * len(m.group(0)), text)
+    return _INLINE_CODE_RE.sub(lambda m: " " * len(m.group(0)), text)
+
 
 def _clean(target: str) -> str:
     t = target.strip().strip("`").strip()
@@ -65,9 +79,12 @@ def extract_references_tagged(text: str) -> list[tuple[str, str]]:
         seen.add(t)
         found.append((t, kind))
 
-    for m in _MD_LINK_RE.finditer(text):
+    # Links/wikilinks: skip code spans (example syntax in `code` is not a real link).
+    # Paths: full text (a file path in backticks is a genuine prose reference).
+    no_code = _blank_code(text)
+    for m in _MD_LINK_RE.finditer(no_code):
         _add(m.group(1), "link")
-    for m in _WIKILINK_RE.finditer(text):
+    for m in _WIKILINK_RE.finditer(no_code):
         _add(m.group(1), "wikilink")
     for m in _PATH_RE.finditer(text):
         _add(m.group(1), "path")

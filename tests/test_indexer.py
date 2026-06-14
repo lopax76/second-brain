@@ -76,6 +76,45 @@ def test_prose_example_is_not_broken():
     assert "example/ghost.md" not in broken
 
 
+def test_link_to_existing_unindexed_asset_is_not_broken(tmp_path):
+    # A markdown image/link pointing at a REAL file we do not index as a node
+    # (image/binary asset) must NOT be reported broken: the file exists on disk.
+    # Regression: the gate flagged README->docs/assets/*.png on a clean published repo.
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00")
+    (tmp_path / "README.md").write_text("![logo](assets/logo.png)\n", encoding="utf-8")
+    g = build_graph(tmp_path)
+    broken = g.get_node("README.md").meta.get("broken_refs") or []
+    assert "assets/logo.png" not in broken
+
+
+def test_link_to_missing_file_is_still_broken(tmp_path):
+    # The fix must NOT mask genuine dead links: a link to a file that does not
+    # exist on disk is still reported broken.
+    (tmp_path / "README.md").write_text("[dead](docs/ghost.md)\n", encoding="utf-8")
+    g = build_graph(tmp_path)
+    broken = g.get_node("README.md").meta.get("broken_refs") or []
+    assert "docs/ghost.md" in broken
+
+
+def test_link_syntax_inside_code_span_is_not_broken(tmp_path):
+    # Docs that SHOW markdown link syntax in backticks (e.g. `[label](target)`) must not be
+    # treated as a real link (regression: gate flagged graph-format.md -> target).
+    (tmp_path / "doc.md").write_text("Use `[label](target)` to link.\n", encoding="utf-8")
+    g = build_graph(tmp_path)
+    broken = g.get_node("doc.md").meta.get("broken_refs") or []
+    assert "target" not in broken
+
+
+def test_backtick_wrapped_path_still_resolves(tmp_path):
+    # A real file path written in backticks is still a path-in-prose reference (core feature).
+    (tmp_path / "app.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "doc.md").write_text("See `app.py` for the entry point.\n", encoding="utf-8")
+    g = build_graph(tmp_path)
+    refs = {(e.source, e.target) for e in g.edges if e.type is EdgeType.REFERENCES}
+    assert ("doc.md", "app.py") in refs
+
+
 def test_external_url_not_a_reference():
     refs = _edges(_g(), EdgeType.REFERENCES)
     assert all("example.com" not in t for _, t in refs)

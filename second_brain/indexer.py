@@ -160,6 +160,7 @@ def _resolve_ref(
     node_ids: set[str],
     basename_index: dict[str, list[str]],
     stem_index: dict[str, list[str]],
+    root_p: Path,
 ) -> tuple[str | None, bool]:
     """Resolve a documentation reference to a project file.
 
@@ -191,6 +192,13 @@ def _resolve_ref(
         return None, False  # escapes the project root
     if kind == "wikilink" and not ("/" in target or "." in base):
         return None, False  # bare [[Concept]] is a concept link, not a file
+    # The target is not an indexed node, but it may be a REAL file we simply do not
+    # index as a graph node (image/pdf/binary asset). A reference to an existing file
+    # is NOT broken — only a reference to a missing file is. (Regression 2026-06-14:
+    # the gate flagged README -> docs/assets/*.png as broken on a clean published repo.)
+    for cand in (cand_file, cand_root):
+        if cand and not cand.startswith("../") and (root_p / cand).is_file():
+            return None, False
     return None, True
 
 
@@ -274,7 +282,7 @@ def build_graph(
             broken: list[str] = []
             for target, kind in extract_references_tagged(text):
                 resolved, is_broken = _resolve_ref(
-                    target, kind, rel, node_ids, basename_index, stem_index
+                    target, kind, rel, node_ids, basename_index, stem_index, root_p
                 )
                 if resolved:
                     g.add_edge(Edge(rel, resolved, EdgeType.REFERENCES))
