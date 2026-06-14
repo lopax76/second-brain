@@ -1,4 +1,4 @@
-"""Tests for the 3D viewer renderer and its offline/template guarantees."""
+"""Tests for the graph viewer renderer and its offline/template guarantees."""
 
 from __future__ import annotations
 

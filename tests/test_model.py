@@ -14,7 +14,7 @@ from second_brain.model import (
 
 
 def test_every_node_and_edge_type_has_a_color():
-    # Guards against adding a type without a color (the 3D view would break).
+    # Guards against adding a type without a color (the graph viewer would break).
     for nt in NodeType:
         assert nt in NODE_COLORS and NODE_COLORS[nt].startswith("#")
     for et in EdgeType:

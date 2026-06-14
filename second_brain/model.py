@@ -14,7 +14,7 @@ from typing import Any
 
 
 class NodeType(str, Enum):
-    """The typology of a node. Drives the node color in the 3D view."""
+    """The typology of a node. Drives the node color in the graph viewer."""
 
     STRUCTURE = "structure"   # PROGETTO/README/ADR/foundation docs
     PROGRAM = "program"       # source code files
@@ -29,7 +29,7 @@ class NodeType(str, Enum):
 
 
 class EdgeType(str, Enum):
-    """The typology of an edge. Drives the edge color in the 3D view."""
+    """The typology of an edge. Drives the edge color in the graph viewer."""
 
     IMPORTS = "imports"        # code A imports/uses B
     REFERENCES = "references"  # A cites B (markdown link, wikilink or path-in-prose)
@@ -67,7 +67,7 @@ class Node:
 
     ``id`` is stable and unique (the POSIX relative path for files, or ``area:<name>``
     for areas). ``path`` is the POSIX relative path for file-backed nodes, ``None`` for
-    areas. ``description`` is a short human-readable explanation shown in the 3D view.
+    areas. ``description`` is a short human-readable explanation shown in the graph viewer.
     """
 
     id: str
