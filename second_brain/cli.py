@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from second_brain import __version__, assess, gate, query, report, store
+from second_brain import __version__, agent_integration, assess, gate, query, report, store
 from second_brain.freshness import build_manifest, index
 from second_brain.model import Graph
 from second_brain.viewer import write_view
@@ -188,6 +188,39 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_agent(args: argparse.Namespace) -> int:
+    if args.action == "install":
+        ctx = agent_integration.write_context_files(args.path)
+        hook = agent_integration.install_claude_hook(args.path)
+    else:
+        ctx = agent_integration.remove_context_files(args.path)
+        hook = agent_integration.uninstall_claude_hook(args.path)
+    for name, act in ctx.items():
+        print(f"  {name}: {act}")
+    print(f"  .claude/settings.json (PreToolUse hook): {hook}")
+    return 0
+
+
+def cmd_hook(args: argparse.Namespace) -> int:
+    if args.action == "install":
+        res = agent_integration.install_git_hook(args.path)
+    else:
+        res = agent_integration.uninstall_git_hook(args.path)
+    if "error" in res:
+        print(res["error"], file=sys.stderr)
+        return 1
+    for name, act in res.items():
+        print(f"  .git/hooks/{name}: {act}")
+    return 0
+
+
+def cmd_hook_context(args: argparse.Namespace) -> int:
+    out = agent_integration.hook_context(args.path)
+    if out:
+        print(out)
+    return 0
+
+
 def cmd_symbols(args: argparse.Namespace) -> int:
     from pathlib import Path
 
@@ -256,6 +289,22 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")
     sp.add_argument("file", help="path to a .py file")
     sp.set_defaults(func=cmd_symbols)
+
+    sp = sub.add_parser("agent",
+                        help="install/remove SB directive in CLAUDE.md/AGENTS.md + Claude hook")
+    sp.add_argument("action", choices=["install", "uninstall"])
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.set_defaults(func=cmd_agent)
+
+    sp = sub.add_parser("hook",
+                        help="install/remove the git post-commit/post-checkout rebuild hook")
+    sp.add_argument("action", choices=["install", "uninstall"])
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.set_defaults(func=cmd_hook)
+
+    sp = sub.add_parser("hook-context", help="(internal) emit PreToolUse additionalContext JSON")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.set_defaults(func=cmd_hook_context)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

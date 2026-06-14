@@ -82,6 +82,30 @@ def test_find_prints_true_total_when_capped(tmp_path, capsys):
     assert capsys.readouterr().out.count("util_") >= 60
 
 
+def test_report_cli_writes_file(tmp_path):
+    proj = _project(tmp_path)
+    assert main(["build", str(proj)]) == 0
+    assert main(["report", str(proj)]) == 0
+    assert (proj / ".secondbrain" / "GRAPH_REPORT.md").is_file()
+
+
+def test_agent_install_uninstall_cli(tmp_path):
+    proj = _project(tmp_path)
+    assert main(["agent", "install", str(proj)]) == 0
+    assert (proj / "CLAUDE.md").is_file() and (proj / "AGENTS.md").is_file()
+    assert main(["agent", "uninstall", str(proj)]) == 0
+    assert not (proj / "CLAUDE.md").exists()
+
+
+def test_hook_cli_requires_git_then_installs(tmp_path):
+    proj = _project(tmp_path)
+    assert main(["hook", "install", str(proj)]) == 1  # no .git yet
+    (proj / ".git").mkdir()
+    assert main(["hook", "install", str(proj)]) == 0
+    assert (proj / ".git" / "hooks" / "post-commit").is_file()
+    assert main(["hook-context", str(proj)]) == 0
+
+
 def test_gate_passes_on_clean_project(tmp_path):
     proj = tmp_path / "clean"
     proj.mkdir()
