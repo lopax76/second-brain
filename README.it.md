@@ -220,9 +220,11 @@ dimmi tempo e token consumati.
 
 ## Stato & roadmap
 
-Alpha (v0.1). Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer 3D offline, layer di
-query a basso costo (`map`/`find`/`neighbors`/`subgraph`), nodi operativi (decisioni/sessioni) e
-server MCP opzionale. Prossimi passi: risoluzione dei riferimenti più ricca e una release su PyPI.
+Alpha (v0.1, pubblicato su PyPI). Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer 3D
+offline, layer di query a basso costo (`map`/`find`/`neighbors`/`subgraph`), nodi operativi
+(decisioni/sessioni) e server MCP opzionale. Prossimi passi: tassonomia di classificazione
+configurabile (oggi le euristiche a parole-chiave sono in inglese+italiano e tarate sui progetti
+dell'autore), risoluzione dei riferimenti più ricca e un layer di simboli (firme funzioni/classi).
 
 ## Sviluppo
 

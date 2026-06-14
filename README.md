@@ -214,10 +214,11 @@ tell me the time and tokens you used.
 
 ## Status & roadmap
 
-Alpha (v0.1). Working today: the typed graph, the anti-drift gate, the offline 3D viewer, the
-low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
-(decisions/sessions), and the optional MCP server. Next: richer reference resolution and a PyPI
-release.
+Alpha (v0.1, published on PyPI). Working today: the typed graph, the anti-drift gate, the offline
+3D viewer, the low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
+(decisions/sessions), and the optional MCP server. Next: a configurable classification taxonomy
+(today the keyword heuristics are English+Italian and tuned for the author's projects), richer
+reference resolution, and a symbol layer (function/class signatures).
 
 ## Development
 
