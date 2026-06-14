@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from second_brain import __version__, assess, gate, query, store
+from second_brain import __version__, assess, gate, query, report, store
 from second_brain.freshness import build_manifest, index
 from second_brain.model import Graph
 from second_brain.viewer import write_view
@@ -36,11 +36,13 @@ def _load_or_build(path: str) -> Graph:
 def cmd_build(args: argparse.Namespace) -> int:
     g, m = _build(args.path)
     store.save(args.path, g, m)
+    rp = report.write_report(args.path, g)
     c = g.counts()
     print(f"built '{g.project}': {len(g.nodes)} nodes, {len(g.edges)} edges")
     print("  nodes:", c["nodes"])
     print("  edges:", c["edges"])
     print(f"  store: {store.store_dir(args.path)}")
+    print(f"  report: {rp}")
     return 0
 
 
@@ -175,6 +177,17 @@ def cmd_assess(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    g = _load_or_build(args.path)
+    out = report.write_report(args.path, g)
+    m = query.project_map(g)
+    print(f"{m['project']}: {m['files']} files, {m['communities']} communities, "
+          f"{m['node_types'].get('decision', 0)} decisions, "
+          f"{m['orphans']} orphans, {m['broken_refs']} broken refs")
+    print(f"report written: {out}")
+    return 0
+
+
 def cmd_symbols(args: argparse.Namespace) -> int:
     from pathlib import Path
 
@@ -206,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         ("stats", cmd_stats, "quick counts by node/edge type"),
         ("map", cmd_map, "compact project digest (areas, sizes, most connected)"),
         ("assess", cmd_assess, "one-shot before/after report: problems + token savings"),
+        ("report", cmd_report, "write GRAPH_REPORT.md: god nodes, communities, decisions"),
     ]:
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")

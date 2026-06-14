@@ -17,6 +17,7 @@ import sys
 from typing import Any
 
 from second_brain import gate, query, store
+from second_brain import report as _report
 from second_brain.freshness import build_manifest, index
 from second_brain.model import Graph
 
@@ -78,6 +79,12 @@ def build_server(project: str):
         to see the blast radius without reading every dependent.
         """
         return query.impact(_graph(project), node_id, direction=direction, max_depth=max_depth)
+
+    @server.tool()
+    def report() -> str:
+        """The full GRAPH_REPORT.md (god nodes, communities, surprising links, decisions,
+        problems) as Markdown — the cheapest way to orient before grepping the project."""
+        return _report.render_report(_graph(project), root=project)
 
     @server.tool()
     def health() -> dict[str, Any]:
