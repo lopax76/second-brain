@@ -139,6 +139,7 @@ second-brain map    .          # digest compatto: aree, dimensioni, file più co
 second-brain find   util .     # trova nodi per nome o path
 second-brain neighbors second_brain/model.py .   # un nodo e le sue connessioni
 second-brain assess .          # report prima/dopo: problemi + risparmio token
+second-brain symbols second_brain/model.py       # firme funzioni/classi di un file Python
 ```
 
 **Drill-down** puntando lo strumento su una sottocartella — `second-brain view ./src/api`
@@ -220,11 +221,14 @@ dimmi tempo e token consumati.
 
 ## Stato & roadmap
 
-Alpha (v0.1, pubblicato su PyPI). Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer 3D
+Alpha (v0.2, pubblicato su PyPI). Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer 3D
 offline, layer di query a basso costo (`map`/`find`/`neighbors`/`subgraph`), nodi operativi
-(decisioni/sessioni) e server MCP opzionale. Prossimi passi: tassonomia di classificazione
-configurabile (oggi le euristiche a parole-chiave sono in inglese+italiano e tarate sui progetti
-dell'autore), risoluzione dei riferimenti più ricca e un layer di simboli (firme funzioni/classi).
+(decisioni/sessioni), server MCP opzionale, una **tassonomia di classificazione configurabile**
+(un `.secondbrain.json` opzionale tara parole-chiave dei tipi, nomi dei documenti-fondamento e
+prefissi degli ID-decisione per progetto — senza file il comportamento è invariato) e un **layer
+di simboli Python** (`second-brain symbols <file.py>` elenca le firme di funzioni/classi su
+richiesta via `ast`). Prossimi passi: risoluzione dei riferimenti più ricca e layer di simboli
+per altri linguaggi.
 
 ## Sviluppo
 

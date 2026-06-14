@@ -137,6 +137,7 @@ second-brain map    .          # compact digest: areas, sizes, most-connected fi
 second-brain find   util .     # find nodes by name or path
 second-brain neighbors second_brain/model.py .   # a node and its connections
 second-brain assess .          # one-shot before/after report: problems + token savings
+second-brain symbols second_brain/model.py       # function/class signatures in one Python file
 ```
 
 **Drill down** by pointing the tool at a subfolder — `second-brain view ./src/api` renders just
@@ -214,17 +215,19 @@ tell me the time and tokens you used.
 
 ## Status & roadmap
 
-Alpha (v0.1, published on PyPI). Working today: the typed graph, the anti-drift gate, the offline
+Alpha (v0.2, published on PyPI). Working today: the typed graph, the anti-drift gate, the offline
 3D viewer, the low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
-(decisions/sessions), and the optional MCP server. Next: a configurable classification taxonomy
-(today the keyword heuristics are English+Italian and tuned for the author's projects), richer
-reference resolution, and a symbol layer (function/class signatures).
+(decisions/sessions), the optional MCP server, a **configurable classification taxonomy**
+(an optional `.secondbrain.json` tunes the type keywords, foundation-doc names, and decision-ID
+prefixes per project — with no file, behaviour is unchanged), and a **Python symbol layer**
+(`second-brain symbols <file.py>` lists function/class signatures on demand via `ast`). Next:
+richer reference resolution and symbol layers for more languages.
 
 ## Development
 
 ```bash
 pip install -e ".[dev,mcp]"
-ruff check second-brain tests
+ruff check second_brain tests
 pytest -q
 ```
 

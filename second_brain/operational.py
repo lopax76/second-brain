@@ -13,11 +13,22 @@ import re
 import subprocess
 from pathlib import Path
 
+from second_brain.config import load_config
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 _DOC_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
 DECISION_RE = re.compile(r"\b(?:D-[A-Z]{1,8}-\d{1,5}|ADR-\d{1,5}|RFC-\d{1,5})\b")
 _MAX_READ = 5_000_000
+
+
+def _decision_re(extra_prefixes: tuple[str, ...]) -> re.Pattern[str]:
+    """Decision-id matcher. The ``D-FAMILY-N`` form is always recognised; ``ADR``/``RFC`` and any
+    extra ``decision_id_prefixes`` from ``.secondbrain.json`` match the ``PREFIX-N`` form."""
+    extra = [p for p in extra_prefixes if p and p.upper() not in ("ADR", "RFC")]
+    if not extra:
+        return DECISION_RE
+    alts = "|".join(re.escape(p) for p in ("ADR", "RFC", *extra))
+    return re.compile(r"\b(?:D-[A-Z]{1,8}-\d{1,5}|(?:" + alts + r")-\d{1,5})\b")
 
 
 def _ext(name: str) -> str:
@@ -27,6 +38,7 @@ def _ext(name: str) -> str:
 def add_decisions(graph: Graph, root: str | os.PathLike[str]) -> None:
     """Create a decision node per unique decision id found in documents, with mentions edges."""
     root_p = Path(root)
+    rx = _decision_re(load_config(root_p).decision_id_prefixes)
     doc_ids = [n.id for n in list(graph.nodes.values())
                if n.path and _ext(n.path) in _DOC_EXTS]
     for rel in doc_ids:
@@ -38,7 +50,7 @@ def add_decisions(graph: Graph, root: str | os.PathLike[str]) -> None:
         except OSError:
             continue
         seen: set[str] = set()
-        for m in DECISION_RE.finditer(text):
+        for m in rx.finditer(text):
             did = m.group(0)
             if did in seen:
                 continue

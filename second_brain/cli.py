@@ -142,6 +142,23 @@ def cmd_assess(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_symbols(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from second_brain.symbols import extract_symbols, render
+
+    p = Path(args.file)
+    if not p.is_file():
+        print(f"not a file: {p}", file=sys.stderr)
+        return 2
+    if p.suffix.lower() != ".py":
+        print(f"symbols: Python (.py) files only for now (got '{p.suffix}')", file=sys.stderr)
+        return 2
+    syms = extract_symbols(p.read_text(encoding="utf-8", errors="ignore"))
+    print(render(args.file, syms))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="second-brain",
@@ -176,6 +193,10 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("node", help="node id (relative path)")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.set_defaults(func=cmd_neighbors)
+
+    sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")
+    sp.add_argument("file", help="path to a .py file")
+    sp.set_defaults(func=cmd_symbols)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

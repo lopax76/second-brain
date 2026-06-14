@@ -15,7 +15,8 @@ import os
 import posixpath
 from pathlib import Path
 
-from second_brain.classify import classify
+from second_brain.classify import classify, rules_from_config
+from second_brain.config import load_config
 from second_brain.ignore import (
     DEFAULT_IGNORE_DIRS,
     is_ignored_dir,
@@ -227,11 +228,12 @@ def build_graph(
 
     rels = _rels if _rels is not None else iter_files(root_p, load_ignore_patterns(root_p))
     g = Graph(project=project or root_p.name)
+    rules = rules_from_config(load_config(root_p))
 
     # 1. File nodes + areas.
     areas: set[str] = set()
     for rel in rels:
-        ntype = classify(rel)
+        ntype = classify(rel, rules)
         label = rel.rsplit("/", 1)[-1]
         node = Node(id=rel, type=ntype, label=label, path=rel)
         try:

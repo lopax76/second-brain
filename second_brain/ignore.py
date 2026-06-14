@@ -25,8 +25,8 @@ DEFAULT_IGNORE_DIRS: frozenset[str] = frozenset(
 
 # Exact file names skipped.
 DEFAULT_IGNORE_FILES: frozenset[str] = frozenset(
-    {".DS_Store", "Thumbs.db", ".secondbrainignore", "package-lock.json", "poetry.lock",
-     "yarn.lock"}
+    {".DS_Store", "Thumbs.db", ".secondbrainignore", ".secondbrain.json", "package-lock.json",
+     "poetry.lock", "yarn.lock"}
 )
 
 # Binary / noise extensions skipped entirely (not useful as knowledge nodes).

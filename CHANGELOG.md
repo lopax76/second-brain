@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-06-14
+
+### Added
+
+- **Configurable classification taxonomy.** An optional `.secondbrain.json` at the project root
+  tunes the type heuristics per project: extra (or replacement) keywords for `design`/`report`,
+  extra foundation-doc `structure_names`, and extra `decision_id_prefixes` beyond the built-in
+  `D-`/`ADR-`/`RFC-`. With no file present, behaviour is unchanged. The built-in defaults are now
+  generic — project-specific names are no longer baked into the tool.
+- **Python symbol layer.** `second-brain symbols <file.py>` lists a file's functions and classes
+  with full signatures (via the stdlib `ast`), so an assistant can see the signatures a file-level
+  map omits — on demand, without bloating the graph or the token budget.
+
 ## [0.1.2] - 2026-06-14
 
 ### Fixed
