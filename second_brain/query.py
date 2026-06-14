@@ -220,7 +220,7 @@ def _impact_walk(
     groups: dict[int, list[dict[str, Any]]] = {}
     truncated = False
     depth = 1
-    while frontier and depth <= max(1, max_depth):
+    while frontier and depth <= max_depth:
         level: dict[str, dict[str, Any]] = {}
         for node in frontier:
             for other, etype in adj.get(node, ()):
@@ -234,12 +234,15 @@ def _impact_walk(
                     "edge": etype, "via": node,
                 }
         entries = sorted(level.values(), key=lambda r: (r["id"], r["edge"]))
+        # Mark every node reached this level as seen — even ones the cap drops — so a capped
+        # node cannot reappear at a deeper level (each node is reported at its shallowest depth).
+        for nid in level:
+            seen.add(nid)
         if len(entries) > cap:
             entries = entries[:cap]
             truncated = True
-        for r in entries:
-            seen.add(r["id"])
-        groups[depth] = entries
+        if entries:
+            groups[depth] = entries
         frontier = [r["id"] for r in entries]
         depth += 1
     return groups, truncated

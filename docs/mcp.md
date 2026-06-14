@@ -28,6 +28,8 @@ The server lazily loads the stored graph (or builds it on first use), so it star
 | `find` | `text` | Files/nodes whose name or path contains `text` (case-insensitive): `id`, `type`, `path`. |
 | `neighbors` | `node_id` | A node and its incoming/outgoing connections (imports, references, area membership), size, description, and any broken refs. Returns `{ "error": "node not found", ... }` for an unknown id, so an assistant can tell "no edges" from "no node". |
 | `subgraph` | `node_id`, `hops` (default 1) | A small subgraph (nodes + edges) within `hops` of `node_id`. |
+| `impact` | `node_id`, `direction` (`up`/`down`/`both`, default `both`), `max_depth` (default 2) | Blast radius grouped by depth: `upstream` = who depends on `node_id` (what breaks if you change it), `downstream` = what it depends on. |
+| `report` | – | The full `GRAPH_REPORT.md` as Markdown: god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The cheapest way to orient before grepping. |
 | `health` | – | Anti-drift status: `ok` (bool), `broken` (list of `[source, target]` pairs), `stale` (`{added, removed, changed}` lists vs the last build), and `orphans` (count). |
 
 All responses are plain JSON-able structures. None of them include file contents.
@@ -39,7 +41,7 @@ All responses are plain JSON-able structures. None of them include file contents
 ```json
 {
   "project": "my-project",
-  "files": 412, "areas": 6, "links": 938, "size": 10485760,
+  "files": 412, "areas": 6, "communities": 18, "links": 938, "size": 10485760,
   "node_types": { "program": 280, "structure": 40, "report": 18, "config": 30 },
   "edge_types": { "imports": 610, "references": 240, "belongs_to": 88 },
   "by_area": [ { "area": "src", "files": 280, "size": 5242880, "top_types": ["program"] } ],
@@ -88,5 +90,6 @@ argument (stdio transport). For example, a generic client config entry:
 }
 ```
 
-A good first call in any session is `project_map` (cheap, orienting); then drill in with
-`find` / `neighbors` / `subgraph`, and use `health` to confirm the graph isn't stale.
+A good first call in any session is `project_map` (cheap, orienting) or `report` (the full
+one-pager); then drill in with `find` / `neighbors` / `subgraph` / `impact`, and use `health`
+to confirm the graph isn't stale.

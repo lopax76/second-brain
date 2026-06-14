@@ -3,11 +3,11 @@
 This is the piece that lets an assistant *query* the project instead of re-reading it. It is
 an OPTIONAL extra so the core stays dependency-free:
 
-    pip install second-brain[mcp]
+    pip install "second-brain-graph[mcp]"
     second-brain-mcp [PROJECT_PATH]      # defaults to the current directory
 
-Read-only on your sources. Exposes a handful of small, budgeted tools (map / find /
-neighbors / subgraph / health) over stdio.
+Read-only on your sources. Exposes small, budgeted tools (project_map / find / neighbors /
+subgraph / impact / report / health) over stdio.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ except ImportError:
     # FastMCP as None and fail with a friendly message only when the server is actually run.
     FastMCP = None
 
-_NO_MCP = "The MCP server needs the optional 'mcp' extra: pip install second-brain[mcp]"
+_NO_MCP = 'The MCP server needs the optional "mcp" extra: pip install "second-brain-graph[mcp]"'
 
 
 def _graph(project: str) -> Graph:

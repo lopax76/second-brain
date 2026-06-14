@@ -59,7 +59,13 @@ _HOOK_MATCHER = "Glob|Grep"
 # git hook wiring.
 _GIT_START = "# >>> second-brain >>>"
 _GIT_END = "# <<< second-brain <<<"
-_GIT_BODY = "second-brain build . >/dev/null 2>&1 || true"
+# cd to the repo root first (git does not guarantee CWD for hooks across worktrees/subdirs), then
+# rebuild. `|| true` keeps the hook non-blocking. NOTE: `second-brain` must be on PATH when git
+# runs the hook (e.g. the project venv active, or a global install) — see `hook install` warning.
+_GIT_BODY = (
+    'cd "$(git rev-parse --show-toplevel)" 2>/dev/null '
+    "&& second-brain build . >/dev/null 2>&1 || true"
+)
 _GIT_HOOKS = ("post-commit", "post-checkout")
 
 
@@ -101,8 +107,8 @@ def remove_context_files(root: str | os.PathLike[str]) -> dict[str, str]:
             out[name] = "absent"
             continue
         text = p.read_text(encoding="utf-8")
-        if _START not in text or _END not in text:
-            out[name] = "absent"
+        if _START not in text or _END not in text or text.index(_START) >= text.index(_END):
+            out[name] = "absent"  # markers missing or inverted -> don't touch the file
             continue
         pre = text[: text.index(_START)]
         post = text[text.index(_END) + len(_END):]
@@ -131,9 +137,22 @@ def _write_json(path: Path, data: dict) -> None:
 
 
 def install_claude_hook(root: str | os.PathLike[str]) -> str:
-    """Merge a PreToolUse(Glob|Grep) hook into .claude/settings.json (idempotent)."""
+    """Merge a PreToolUse(Glob|Grep) hook into .claude/settings.json (idempotent).
+
+    Refuses (returns an ``error: ...`` status) rather than clobbering a settings.json that is not
+    a valid JSON object, so existing non-dict content is never destroyed.
+    """
     p = Path(root) / ".claude" / "settings.json"
-    data = _load_json(p) if p.is_file() else {}
+    if p.is_file():
+        try:  # ValueError also covers UnicodeDecodeError (binary) and JSONDecodeError
+            parsed = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return "error: .claude/settings.json is not valid JSON — left unchanged"
+        if not isinstance(parsed, dict):
+            return "error: .claude/settings.json is not a JSON object — left unchanged"
+        data: dict = parsed
+    else:
+        data = {}
     hooks = data.get("hooks")
     if not isinstance(hooks, dict):
         hooks = data["hooks"] = {}
@@ -232,8 +251,9 @@ def _uninstall_git_hook_file(hooks_dir: Path, name: str) -> str:
     if not p.is_file():
         return "absent"
     text = p.read_text(encoding="utf-8", errors="ignore")
-    if _GIT_START not in text or _GIT_END not in text:
-        return "absent"
+    if (_GIT_START not in text or _GIT_END not in text
+            or text.index(_GIT_START) >= text.index(_GIT_END)):
+        return "absent"  # markers missing or inverted -> don't touch the file
     pre = text[: text.index(_GIT_START)]
     post = text[text.index(_GIT_END) + len(_GIT_END):]
     new = (pre.rstrip("\n") + "\n" + post.lstrip("\n")).strip("\n")

@@ -77,19 +77,27 @@ def detect(
         if not changed:
             break
 
+    # Communities describe files/modules only — never areas, recorded decisions, or sessions.
+    # We exclude both by missing path (those nodes have none) AND by type, so the guarantee holds
+    # even if such a node ever carried a path.
+    excluded = (NodeType.AREA, NodeType.DECISION, NodeType.SESSION)
     comm: dict[str, str] = {}
     for nid, node in graph.nodes.items():
-        if node.path is None or node.type is NodeType.AREA:
-            continue  # communities describe files/modules, not areas/decisions/sessions
+        if node.path is None or node.type in excluded:
+            continue
         comm[nid] = labels.get(nid, f"area:{_area_of(node.path)}")
     return comm
 
 
 def _knowledge_degree(graph: Graph, relations: tuple[EdgeType, ...]) -> dict[str, int]:
+    """Knowledge degree per node, ignoring self-loops and edges to non-existent nodes."""
     deg: dict[str, int] = defaultdict(int)
     for e in graph.edges:
-        if e.type in relations:
+        if e.type not in relations or e.source == e.target:
+            continue
+        if e.source in graph.nodes:
             deg[e.source] += 1
+        if e.target in graph.nodes:
             deg[e.target] += 1
     return deg
 
@@ -129,7 +137,7 @@ def summarize(
     internal: dict[str, int] = defaultdict(int)
     boundary: dict[str, int] = defaultdict(int)
     for e in graph.edges:
-        if e.type not in relations:
+        if e.type not in relations or e.source == e.target:
             continue
         cs, ct = comm.get(e.source), comm.get(e.target)
         if cs is None and ct is None:

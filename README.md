@@ -16,10 +16,10 @@ human can explore as a navigable **2D community map**.
 > sync with your files so you never lose track: no forgotten pieces, no "we discussed that
 > three chats ago", no stale docs.
 
-![Second Brain 3D viewer — anonymized backbone of a real multi-project workspace](docs/assets/ui-suite.png)
+![Second Brain viewer — anonymized backbone of a real multi-project workspace](docs/assets/ui-suite.png)
 
-<sub>The offline 3D viewer on a real, multi-project workspace (names anonymized): nodes colored
-by type, grouped here by type, with a click-through detail panel.</sub>
+<sub>The offline viewer on a real, multi-project workspace (names anonymized): a flat 2D map with
+files coloured and clustered into auto-detected communities, and a click-through detail panel.</sub>
 
 ---
 
@@ -136,7 +136,7 @@ and the `second_brain` import module.
 ```bash
 second-brain build  .          # index a project -> .secondbrain/graph.json
 second-brain gate   .          # anti-drift check: broken refs, stale files, orphans
-second-brain view   .          # write the offline 3D viewer -> .secondbrain/view.html
+second-brain view   .          # write the offline 2D community-map viewer -> .secondbrain/view.html
 second-brain stats  .          # quick counts by node/edge type
 second-brain map    .          # compact digest: areas, sizes, most-connected files
 second-brain find   util .     # find nodes by name or path
@@ -153,11 +153,11 @@ second-brain hook install .    # git post-commit/post-checkout: keep the graph f
 that area in full detail, while the top-level view stays light via *backbone* mode (areas +
 the knowledge-connected core; isolated data files are summarized on their area node).
 
-### Viewing the 3D graph
+### Viewing the graph
 
 1. **Generate the viewer:** `second-brain view .`
 2. **Open it:** double-click the file it writes — `.secondbrain/view.html` — in any browser. No
-   server, no install: the data is inlined and the 3D library is bundled next to the page, so it
+   server, no install: the data and the rendering library are inlined into the single page, so it
    works fully offline.
 3. **Explore:** the graph is laid out as a flat **2D map**, with files coloured and clustered into
    **communities** (auto-detected from how they link). Scroll to zoom, right-drag to pan,
@@ -173,7 +173,7 @@ same queries to MCP-aware assistants:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .      # serves map / find / neighbors / subgraph / impact / report / health
+second-brain-mcp .      # serves project_map / find / neighbors / subgraph / impact / report / health
 ```
 
 See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
@@ -186,7 +186,7 @@ See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
    area membership. Operational nodes (decisions found in the docs, sessions from git commits)
    are added too.
 2. **Stay fresh** — content-hash diffing rebuilds only what changed (outside the model).
-3. **Query / view** — a human gets the 3D view; an assistant queries the low-token layer.
+3. **Query / view** — a human gets the 2D community map; an assistant queries the low-token layer.
 
 **On false positives:** plain path mentions in prose are inherently noisy. Second Brain handles
 this asymmetrically — markdown links and wikilinks are intentional (an unresolved one is
@@ -228,7 +228,8 @@ tell me the time and tokens you used.
 ## Status & roadmap
 
 Alpha. Working today: the typed graph, the anti-drift gate, the offline **2D community-map**
-viewer, the low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
+viewer, the low-token query layer (`map`/`find`/`neighbors` on the CLI; `subgraph` via MCP),
+operational nodes
 (decisions/sessions), and the optional MCP server. **v0.3** adds **community detection**
 (real modules discovered from how files link), **impact queries** (`impact` — what breaks if you
 change a node), a **`GRAPH_REPORT.md` one-pager** (`report`, regenerated on every build), and

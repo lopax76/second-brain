@@ -7,6 +7,7 @@ under ``.secondbrain/``.
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 
 from second_brain import __version__, agent_integration, assess, gate, query, report, store
@@ -36,7 +37,8 @@ def _load_or_build(path: str) -> Graph:
 def cmd_build(args: argparse.Namespace) -> int:
     g, m = _build(args.path)
     store.save(args.path, g, m)
-    rp = report.write_report(args.path, g)
+    # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
+    rp = report.write_report(args.path, g, scan=False)
     c = g.counts()
     print(f"built '{g.project}': {len(g.nodes)} nodes, {len(g.edges)} edges")
     print("  nodes:", c["nodes"])
@@ -198,6 +200,9 @@ def cmd_agent(args: argparse.Namespace) -> int:
     for name, act in ctx.items():
         print(f"  {name}: {act}")
     print(f"  .claude/settings.json (PreToolUse hook): {hook}")
+    if args.action == "install":
+        print("  note: the Claude Code PreToolUse hook injects context only on "
+              "Claude Code >= 2.1.9.")
     return 0
 
 
@@ -211,6 +216,10 @@ def cmd_hook(args: argparse.Namespace) -> int:
         return 1
     for name, act in res.items():
         print(f"  .git/hooks/{name}: {act}")
+    if args.action == "install" and shutil.which("second-brain") is None:
+        print("  note: 'second-brain' is not on PATH; the git hook can't run until it is "
+              "(activate the project venv, or install second-brain-graph globally).",
+              file=sys.stderr)
     return 0
 
 
@@ -258,7 +267,8 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
         sp.set_defaults(func=fn)
 
-    sp = sub.add_parser("view", help="write a self-contained 3D viewer -> .secondbrain/view.html")
+    sp = sub.add_parser("view",
+                        help="write a self-contained 2D community-map viewer -> view.html")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.add_argument("--backbone", action="store_true",
                     help="render only areas + knowledge-connected files (auto for huge graphs)")

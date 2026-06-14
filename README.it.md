@@ -16,10 +16,10 @@ persona può esplorare come una **mappa 2D a community** navigabile.
 > con i tuoi file così non perdi mai il filo: niente pezzi dimenticati, niente "ne avevamo parlato
 > tre chat fa", niente documenti stantii.
 
-![Viewer 3D di Second Brain — backbone anonimizzato di un workspace multi-progetto reale](docs/assets/ui-suite.png)
+![Viewer di Second Brain — backbone anonimizzato di un workspace multi-progetto reale](docs/assets/ui-suite.png)
 
-<sub>Il viewer 3D offline su un workspace multi-progetto reale (nomi anonimizzati): nodi colorati
-per tipo, qui raggruppati per tipo, con pannello di dettaglio cliccabile.</sub>
+<sub>Il viewer offline su un workspace multi-progetto reale (nomi anonimizzati): una mappa 2D piatta
+con i file colorati e raggruppati in community auto-rilevate, e un pannello di dettaglio cliccabile.</sub>
 
 ---
 
@@ -33,8 +33,8 @@ il progetto cresce.
 
 Second Brain costruisce il grafo del progetto **una volta sola** e lo mantiene fresco in modo
 incrementale (fuori dal modello, a costo di token quasi nullo). L'assistente lo **interroga** e
-ottiene risposte compatte; una persona apre la **vista 3D** e vede l'intero progetto a colpo
-d'occhio.
+ottiene risposte compatte; una persona apre la **mappa 2D a community** e vede l'intero progetto a
+colpo d'occhio.
 
 **Non è un sistema RAG**: niente embedding, niente vector store, nessun LLM per costruire il grafo.
 Mappa le relazioni *strutturali* tra i file, il che lo rende complementare al RAG e mirato a una
@@ -139,7 +139,7 @@ e il modulo di import `second_brain`.
 ```bash
 second-brain build  .          # indicizza un progetto -> .secondbrain/graph.json
 second-brain gate   .          # check anti-deriva: ref rotte, file stantii, orfani
-second-brain view   .          # scrive il viewer 3D offline -> .secondbrain/view.html
+second-brain view   .          # scrive il viewer mappa 2D a community offline -> view.html
 second-brain stats  .          # conteggi rapidi per tipo nodo/arco
 second-brain map    .          # digest compatto: aree, dimensioni, file più connessi
 second-brain find   util .     # trova nodi per nome o path
@@ -157,11 +157,11 @@ renderizza solo quell'area in pieno dettaglio, mentre la vista d'insieme resta l
 modalità *backbone* (aree + nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul
 nodo-area).
 
-### Aprire il grafo 3D
+### Aprire il grafo
 
 1. **Genera il viewer:** `second-brain view .`
 2. **Aprilo:** doppio clic sul file creato — `.secondbrain/view.html` — in un browser qualsiasi.
-   Niente server, niente installazione: i dati sono inline e la libreria 3D è inclusa accanto alla
+   Niente server, niente installazione: i dati e la libreria di rendering sono inline nella singola
    pagina, quindi funziona completamente offline.
 3. **Esplora:** il grafo è disposto come una **mappa 2D** piatta, con i file colorati e raggruppati
    in **community** (rilevate da come si collegano). Rotella per lo zoom, trascina col tasto destro
@@ -177,7 +177,7 @@ opzionale espone le stesse query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .      # serve map / find / neighbors / subgraph / impact / report / health
+second-brain-mcp .      # serve project_map / find / neighbors / subgraph / impact / report / health
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -234,7 +234,8 @@ dimmi tempo e token consumati.
 ## Stato & roadmap
 
 Alpha. Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer **mappa 2D a community**
-offline, layer di query a basso costo (`map`/`find`/`neighbors`/`subgraph`), nodi operativi
+offline, layer di query a basso costo (`map`/`find`/`neighbors` da CLI; `subgraph` via MCP),
+nodi operativi
 (decisioni/sessioni) e server MCP opzionale. **v0.3** aggiunge il **rilevamento delle community**
 (i moduli reali scoperti da come i file si collegano), le **query d'impatto** (`impact` — cosa si
 rompe se tocchi un nodo), il **`GRAPH_REPORT.md` one-pager** (`report`, rigenerato a ogni build) e
