@@ -55,9 +55,11 @@ purpose-built for one thing: **situational awareness at a very low token cost.**
   folders), and answers "what breaks if I change this?" (upstream/downstream impact) in one call.
 - **`GRAPH_REPORT.md` one-pager** — the artifact an agent reads first instead of grepping: god
   nodes, communities, surprising links, decisions, and problems, regenerated on every build.
-- **Offline graph viewer** — a flat 2D map coloured and clustered by community; the data is
-  inlined and the rendering library is vendored next to the page, so it works fully offline, no
-  CDN, nothing for a script blocker to break.
+- **Offline graph viewer** — an interactive force-directed map (vis-network), coloured by
+  community, with search, a click-to-inspect node panel with neighbour navigation, and a
+  per-community show/hide legend. Data and library are inlined in one HTML file, so it works fully
+  offline. The viewer is **adapted from [Graphify](https://github.com/safishamsi/graphify)** (MIT)
+  — see [Acknowledgments](#acknowledgments).
 - **Optional MCP server** — exposes the same low-token queries to MCP-aware assistants, behind
   an optional extra so the core stays dependency-free.
 
@@ -249,6 +251,14 @@ pytest -q
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [design principles](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
 zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.md).
+
+## Acknowledgments
+
+The interactive graph viewer is **adapted from [Graphify](https://github.com/safishamsi/graphify)**
+by Safi Shamsi (MIT License) — its graph viewer is what this one is modelled on, and we're
+grateful for it. The viewer renders with [vis-network](https://github.com/visjs/vis-network)
+(Apache-2.0 OR MIT), bundled offline. Full details and license texts are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## License
 

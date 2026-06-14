@@ -1,320 +1,232 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Second Brain</title>
+<!--
+  Interactive graph viewer adapted from Graphify (https://github.com/safishamsi/graphify),
+  MIT License, Copyright (c) 2026 Safi Shamsi. Rendering library: vis-network (Apache-2.0 OR MIT).
+  Both are bundled offline; see THIRD_PARTY_NOTICES.md. Thanks to the Graphify project.
+-->
+<script src="vis-bundle.min.js"></script>
 <style>
-  :root{--bg:#0b1020;--panel:rgba(15,23,42,.94);--line:#1e293b;--ink:#e2e8f0;--mut:#94a3b8;--dim:#64748b;--accent:#3b82f6}
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-            font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
-  #app{position:fixed;inset:0}
-  #graph{position:absolute;inset:0}
-  #top{position:absolute;top:14px;left:14px;z-index:6;width:300px;max-width:42vw}
-  #top .title{font-size:18px;font-weight:800;text-shadow:0 1px 6px #000}
-  #top .counts{font-size:12px;color:var(--mut);margin:2px 0 8px}
-  #search{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);
-        border-radius:9px;padding:8px 10px;font-size:13px;outline:none}
-  #search:focus{border-color:var(--accent)}
-  #panel{position:absolute;top:0;right:0;bottom:0;width:330px;background:var(--panel);
-         border-left:1px solid var(--line);display:flex;flex-direction:column;z-index:7;backdrop-filter:blur(3px)}
-  #panel.hidden{transform:translateX(100%)}
-  #tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
-  #tabs button{flex:1;background:none;border:none;color:var(--mut);padding:12px 6px;font-size:11px;
-        letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-weight:700}
-  #tabs button.active{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
-  .tabpane{display:none;overflow-y:auto;padding:14px 16px;flex:1}
-  .tabpane.active{display:block}
-  h4{margin:0 0 8px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
-  .muted{color:var(--mut);font-size:12px}
-  .dim{color:var(--dim)}
-  .kv{font-size:12.5px;margin:3px 0;word-break:break-word}
-  .kv b{color:var(--mut);font-weight:600}
-  .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;vertical-align:middle}
-  .row{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
-  .row:hover{background:#0f172a}
-  .row.off{opacity:.4}
-  .row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .row .ct{color:var(--dim);font-size:11px}
-  .sec{margin-top:14px}
-  .conn{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
-  .conn:hover{background:#0f172a}
-  .conn .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .conn .et{font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:0 5px}
-  label.ck{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin:6px 0;color:var(--ink)}
-  .btn{display:inline-block;margin-top:6px;font-size:12px;color:#60a5fa;cursor:pointer}
-  #toggle{position:absolute;top:14px;right:14px;z-index:8;background:var(--panel);border:1px solid var(--line);
-          color:var(--ink);border-radius:8px;padding:6px 9px;font-size:14px;cursor:pointer;display:none}
-  .hint{position:absolute;left:14px;bottom:12px;z-index:6;font-size:11.5px;color:var(--dim);text-shadow:0 1px 4px #000}
-  #error{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
-         padding:40px;z-index:20;background:var(--bg)}
-  #error div{max-width:520px;color:#cbd5e1;font-size:15px;line-height:1.6}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #graph { flex: 1; }
+  #sidebar { width: 300px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
+  #title-wrap { padding: 12px 12px 0; }
+  #title-wrap .title { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
+  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: #4E79A7; }
+  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: #2a2a4e; }
+  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
+  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
+  #info-content .field { margin-bottom: 5px; }
+  #info-content .field b { color: #e0e0e0; }
+  #info-content .empty { color: #555; font-style: italic; }
+  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
+  .neighbor-link:hover { background: #2a2a4e; }
+  #neighbors-list { max-height: 200px; overflow-y: auto; margin-top: 4px; }
+  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
+  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: #666; font-size: 11px; }
+  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
+  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
+  #legend-controls label:hover { color: #e0e0e0; }
+  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
+  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
+  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
+  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
+  #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 40px; background: #0f0f1a; }
+  #error div { max-width: 520px; color: #cbd5e1; font-size: 15px; line-height: 1.6; }
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="graph"></div>
-
-  <div id="top">
-    <div class="title" id="title"></div>
-    <div class="counts" id="counts"></div>
-    <input id="search" placeholder="search nodes…" autocomplete="off">
+<div id="graph"></div>
+<div id="sidebar">
+  <div id="title-wrap"><div class="title" id="title"></div></div>
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <div id="search-results"></div>
   </div>
-
-  <button id="toggle">&#9776;</button>
-
-  <aside id="panel">
-    <div id="tabs">
-      <button data-tab="info" class="active">Info</button>
-      <button data-tab="filters">Filters</button>
-      <button data-tab="comm">Communities</button>
+  <div id="info-panel">
+    <h3>Node Info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </div>
+  <div id="legend-wrap">
+    <h3>Communities</h3>
+    <div id="legend-controls">
+      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
     </div>
-    <div class="tabpane active" id="pane-info">
-      <div class="muted">Click a node to inspect it.</div>
-    </div>
-    <div class="tabpane" id="pane-filters">
-      <h4>Node types</h4><div id="legend"></div>
-      <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
-      <div class="sec muted dim" id="filter-totals"></div>
-    </div>
-    <div class="tabpane" id="pane-comm">
-      <h4>Communities</h4>
-      <div id="comm-list"></div>
-      <div class="btn" id="comm-reset" style="display:none">&#8635; show all communities</div>
-    </div>
-  </aside>
-
-  <div class="hint">drag to pan &middot; scroll to zoom &middot; click a node for details</div>
-  <div id="error"><div><b>Graph library could not be loaded.</b><br>
-    The viewer bundles its rendering library inline and works fully offline, no network needed.
-    If you see this, the page may be corrupted or truncated; re-run
-    <code>second-brain view</code> to regenerate it.</div></div>
+    <div id="legend"></div>
+  </div>
+  <div id="stats"></div>
 </div>
+<div id="error"><div><b>Graph library could not be loaded.</b><br>
+  The viewer bundles its rendering library inline and works fully offline. If you see this,
+  the page may be corrupted; re-run <code>second-brain view</code> to regenerate it.</div></div>
 
 <script type="application/json" id="sb-data">__SB_DATA__</script>
-<script src="sigma-bundle.min.js"></script>
 <script>
 (function () {
-  const $ = id => document.getElementById(id);
-  let SB;
-  try { SB = JSON.parse($('sb-data').textContent); }
-  catch (err) { $('error').style.display = 'flex'; $('error').textContent = 'Graph data is corrupted: ' + err.message; return; }
-  if (typeof Sigma === 'undefined' || typeof graphology === 'undefined') { $('error').style.display = 'flex'; return; }
+  var SB;
+  try { SB = JSON.parse(document.getElementById('sb-data').textContent); }
+  catch (err) { var e = document.getElementById('error'); e.style.display = 'flex'; e.textContent = 'Graph data is corrupted: ' + err.message; return; }
+  if (typeof vis === 'undefined' || !vis.Network) { document.getElementById('error').style.display = 'flex'; return; }
 
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const fmtSize = b => { b = b||0; if (b<1024) return b+' B'; if (b<1048576) return (b/1024).toFixed(1)+' KB';
-    if (b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; };
+  var RAW_NODES = SB.nodes, RAW_EDGES = SB.edges, LEGEND = SB.legend;
+  document.getElementById('title').textContent = SB.project || 'Second Brain';
+  document.getElementById('stats').textContent =
+    SB.stats.nodes + ' nodes · ' + SB.stats.edges + ' edges · ' + SB.stats.communities + ' communities';
 
-  $('title').textContent = SB.project || 'Second Brain';
-
-  const byId = {}; for (const n of SB.nodes) byId[n.id] = n;
-  const lid = e => (e && e.id !== undefined ? e.id : e);
-
-  const outAdj = {}, inAdj = {}, kdeg = {};
-  for (const l of SB.links) {
-    const s = lid(l.source), t = lid(l.target);
-    (outAdj[s] = outAdj[s] || []).push({other:t, type:l.type});
-    (inAdj[t] = inAdj[t] || []).push({other:s, type:l.type});
-    if (l.type === 'imports' || l.type === 'references') { kdeg[s]=(kdeg[s]||0)+1; kdeg[t]=(kdeg[t]||0)+1; }
-  }
-  const isOrphan = n => n.type !== 'area' && !kdeg[n.id];
-
-  // HSL -> hex: Sigma's WebGL colour parser wants hex/rgb, not hsl() strings.
-  function hslToHex(h, s, l){ s/=100; l/=100;
-    const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l);
-    const f=n=>{ const c=l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
-      return Math.round(255*c).toString(16).padStart(2,'0'); };
-    return '#'+f(0)+f(8)+f(4); }
-  function communityColor(name){ if(!name) return '#64748b';
-    let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return hslToHex(h,62,60); }
-  const nodeColor = n => n.community ? communityColor(n.community) : (SB.nodeColors[n.type] || '#94a3b8');
-  function nodeSize(n){ const kb=((n.meta&&n.meta.size)||0)/1024;
-    return 3 + Math.min(5, Math.sqrt(kb)/3) + Math.min(11, (kdeg[n.id]||0)*0.8); }
-
-  // Build graphology graph for layout + render. Area nodes and belongs_to edges are dropped:
-  // they form star-hubs that drown the real community structure. ForceAtlas2 then lays the
-  // content nodes out so communities self-organise into islands.
-  const Graph = graphology.Graph;
-  const graph = new Graph();
-  const rendered = SB.nodes.filter(n => n.type !== 'area');
-  const N = rendered.length || 1;
-  const R = 10 + Math.sqrt(N) * 6;
-  rendered.forEach((n, i) => {
-    const a = (i / N) * 2 * Math.PI;
-    graph.addNode(n.id, {
-      x: R * Math.cos(a) + (Math.random()-0.5),
-      y: R * Math.sin(a) + (Math.random()-0.5),
-      size: nodeSize(n), label: n.label, color: nodeColor(n),
-      ntype: n.type, community: n.community || null,
-    });
-  });
-  for (const l of SB.links) {
-    if (l.type === 'belongs_to') continue;
-    const s = lid(l.source), t = lid(l.target);
-    if (!graph.hasNode(s) || !graph.hasNode(t) || s === t) continue;
-    if (graph.hasEdge(s, t)) continue;
-    const cs = byId[s] && byId[s].community, ct = byId[t] && byId[t].community;
-    const col = (cs && cs === ct) ? communityColor(cs) : '#3a4663';
-    graph.addEdge(s, t, { size: (l.type==='imports'||l.type==='references') ? 0.8 : 0.5,
-      color: col, etype: l.type });
-  }
-  $('counts').textContent = rendered.length + ' nodes · ' + graph.size + ' links';
-
-  try {
-    const settings = forceAtlas2.inferSettings(graph);
-    settings.linLogMode = true;
-    settings.outboundAttractionDistribution = true;
-    settings.adjustSizes = true;
-    settings.gravity = 1.2;
-    settings.scalingRatio = 12;
-    settings.barnesHutOptimize = graph.order > 800;
-    const iters = graph.order > 2500 ? 120 : graph.order > 600 ? 260 : 450;
-    forceAtlas2.assign(graph, { iterations: iters, settings });
-  } catch (e) { /* layout best-effort; nodes keep their seed positions */ }
-
-  const commStat = {};
-  graph.forEachNode((id, a) => { if (!a.community) return;
-    const c = commStat[a.community] || (commStat[a.community] = {n:0,x:0,y:0});
-    c.n++; c.x+=a.x; c.y+=a.y; });
-  const commList = Object.keys(commStat).sort((p,q)=> commStat[q].n - commStat[p].n);
-  const commName = {}; commList.forEach((c,i)=> commName[c] = 'Cluster ' + (i+1));
-
-  const renderer = new Sigma(graph, $('graph'), {
-    renderEdgeLabels: false,
-    defaultEdgeColor: '#222b3f',
-    labelColor: { color: '#cbd5e1' },
-    labelFont: '-apple-system,Segoe UI,Roboto,sans-serif',
-    labelDensity: 0.5, labelGridCellSize: 90, labelRenderedSizeThreshold: 9,
-    zIndex: true, minCameraRatio: 0.05, maxCameraRatio: 12,
-  });
-  window.renderer = renderer; window.sbgraph = graph;
-
-  let hovered = null, hoveredNbrs = null, query = '', focusComm = null;
-  const hiddenTypes = new Set();
-  let onlyOrphans = false;
-
-  function nodeVisible(n){
-    if (hiddenTypes.has(n.ntype)) return false;
-    if (onlyOrphans && !isOrphan(byId[n.id] || {})) return false;
-    if (focusComm && n.community !== focusComm) return false;
-    return true;
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  renderer.setSetting('nodeReducer', (id, data) => {
-    const res = Object.assign({}, data);
-    if (!nodeVisible(data)) { res.hidden = true; return res; }
-    const matchQ = !query || (data.label || '').toLowerCase().includes(query) || id.toLowerCase().includes(query);
-    if (query && !matchQ) { res.color = '#27324d'; res.label = ''; res.zIndex = 0; }
-    if (hovered) {
-      if (id === hovered) { res.zIndex = 2; res.highlighted = true; }
-      else if (hoveredNbrs && hoveredNbrs.has(id)) { res.zIndex = 1; }
-      else { res.color = '#27324d'; res.label = ''; res.zIndex = 0; }
-    }
-    return res;
-  });
-  renderer.setSetting('edgeReducer', (edge, data) => {
-    const res = Object.assign({}, data);
-    const ext = graph.extremities(edge); const s = ext[0], t = ext[1];
-    if (!nodeVisible(graph.getNodeAttributes(s)) || !nodeVisible(graph.getNodeAttributes(t))) { res.hidden = true; return res; }
-    if (hovered) {
-      if (s === hovered || t === hovered) { res.color = '#93c5fd'; res.size = (data.size||0.6) + 0.6; res.zIndex = 1; }
-      else { res.hidden = true; }
-    }
-    return res;
-  });
-
-  renderer.on('enterNode', ({node}) => { hovered = node; hoveredNbrs = new Set(graph.neighbors(node)); renderer.refresh(); });
-  renderer.on('leaveNode', () => { hovered = null; hoveredNbrs = null; renderer.refresh(); });
-  renderer.on('clickNode', ({node}) => openInfo(byId[node]));
-
-  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); renderer.refresh(); });
-
-  document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('active'));
-    b.classList.add('active'); $('pane-' + b.dataset.tab).classList.add('active');
+  var nodesDS = new vis.DataSet(RAW_NODES.map(function (n) {
+    return { id: n.id, label: n.label, color: n.color, size: n.size, font: n.font, title: n.title,
+      community: n.community, _community_name: n.community_name, _source_file: n.source_file,
+      _file_type: n.file_type, _degree: n.degree };
   }));
-  $('toggle').addEventListener('click', () => { $('panel').classList.toggle('hidden');
-    $('toggle').style.display = $('panel').classList.contains('hidden') ? 'block' : 'none'; });
+  var edgesDS = new vis.DataSet(RAW_EDGES.map(function (e, i) {
+    return { id: i, from: e.from, to: e.to, title: e.title, dashes: e.dashes, width: e.width,
+      color: e.color, arrows: { to: { enabled: true, scaleFactor: 0.5 } } };
+  }));
 
-  const IMPACT_TYPES = new Set(['imports','references','mentions']);
-  function impactBFS(startId, adj){
-    const seen = new Set([startId]); let frontier=[startId]; const layers=[];
-    for (let d=1; d<=2; d++){ const next=[];
-      for (const id of frontier) for (const e of (adj[id]||[])){
-        if (!IMPACT_TYPES.has(e.type) || seen.has(e.other)) continue; seen.add(e.other); next.push(e.other); }
-      if (next.length) layers.push({depth:d, ids:next}); frontier=next; if(!frontier.length) break; }
-    return layers;
-  }
-  function nodeRowHtml(id, etype){
-    const o = byId[id]; if(!o) return '';
-    const et = etype ? '<span class="et">'+esc(etype)+'</span>' : '';
-    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="background:'+esc(nodeColor(o))+'"></span>'
-      +'<span class="nm">'+esc(o.label)+'</span>'+et+'</div>';
-  }
-  function impactHtml(title, layers){
-    let h = '<div class="sec"><h4>'+title+'</h4>';
-    if (!layers.length) { h += '<div class="muted">none</div>'; }
-    else for (const L of layers){ h += '<div class="dim" style="font-size:11px;margin-top:4px">depth '+L.depth+' · '+L.ids.length+'</div>';
-      h += L.ids.slice(0,12).map(id=>nodeRowHtml(id)).join('');
-      if (L.ids.length>12) h += '<div class="muted">…and '+(L.ids.length-12)+' more</div>'; }
-    return h + '</div>';
-  }
-  function openInfo(n){
+  var container = document.getElementById('graph');
+  var network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.005, springLength: 120,
+        springConstant: 0.08, damping: 0.4, avoidOverlap: 0.8 },
+      stabilization: { iterations: 200, fit: true },
+    },
+    interaction: { hover: true, tooltipDelay: 100, hideEdgesOnDrag: true, navigationButtons: false, keyboard: false },
+    nodes: { shape: 'dot', borderWidth: 1.5 },
+    edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
+  });
+  window.network = network;
+
+  network.once('stabilizationIterationsDone', function () {
+    network.setOptions({ physics: { enabled: false } });
+  });
+
+  function showInfo(nodeId) {
+    var n = nodesDS.get(nodeId);
     if (!n) return;
-    document.querySelector('#tabs button[data-tab="info"]').click();
-    const out = outAdj[n.id]||[], inc = inAdj[n.id]||[];
-    let h = '<div class="kv"><span class="sw" style="background:'+esc(nodeColor(n))+'"></span> <b style="color:var(--ink);font-size:14px;font-weight:700">'+esc(n.label)+'</b></div>';
-    h += '<div class="kv"><b>Type:</b> '+esc(n.type)+'</div>';
-    if (n.community) h += '<div class="kv"><b>Community:</b> '+esc(commName[n.community]||n.community)+'</div>';
-    if (n.path) h += '<div class="kv"><b>Path:</b> '+esc(n.path)+'</div>';
-    if (n.meta && n.meta.size!=null) h += '<div class="kv"><b>Size:</b> '+fmtSize(n.meta.size)+'</div>';
-    h += '<div class="kv"><b>Degree:</b> '+(kdeg[n.id]||0)+'</div>';
-    if (n.description) h += '<div class="muted" style="margin-top:6px">'+esc(n.description)+'</div>';
-    if (n.meta && n.meta.broken_refs && n.meta.broken_refs.length)
-      h += '<div class="kv" style="color:#fca5a5"><b>Broken refs:</b> '+esc(n.meta.broken_refs.join(', '))+'</div>';
-    h += '<div class="sec"><h4>Outgoing ('+out.length+')</h4>'+(out.map(c=>nodeRowHtml(c.other,c.type)).join('')||'<div class="muted">none</div>')+'</div>';
-    h += '<div class="sec"><h4>Incoming ('+inc.length+')</h4>'+(inc.map(c=>nodeRowHtml(c.other,c.type)).join('')||'<div class="muted">none</div>')+'</div>';
-    h += impactHtml('Impact · upstream (what breaks if changed)', impactBFS(n.id, inAdj));
-    h += impactHtml('Impact · downstream (what it depends on)', impactBFS(n.id, outAdj));
-    const pane = $('pane-info'); pane.innerHTML = h;
-    pane.querySelectorAll('.conn').forEach(el => el.addEventListener('click', () => { const o = byId[el.getAttribute('data-id')]; if (o) openInfo(o); }));
+    var neighborIds = network.getConnectedNodes(nodeId);
+    var neighborItems = neighborIds.map(function (nid) {
+      var nb = nodesDS.get(nid);
+      var color = nb ? nb.color.background : '#555';
+      return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(nid) + ')">' + esc(nb ? nb.label : nid) + '</span>';
+    }).join('');
+    document.getElementById('info-content').innerHTML =
+      '<div class="field"><b>' + esc(n.label) + '</b></div>' +
+      '<div class="field">Type: ' + esc(n._file_type || 'unknown') + '</div>' +
+      '<div class="field">Community: ' + esc(n._community_name) + '</div>' +
+      '<div class="field">Source: ' + esc(n._source_file || '-') + '</div>' +
+      '<div class="field">Degree: ' + n._degree + '</div>' +
+      (neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (' + neighborIds.length + ')</div><div id="neighbors-list">' + neighborItems + '</div>' : '');
   }
+  window.showInfo = showInfo;
 
-  function renderLegend(){
-    const counts = {}; for (const n of SB.nodes) if (n.type!=='area') counts[n.type]=(counts[n.type]||0)+1;
-    const box = $('legend'); box.innerHTML='';
-    Object.keys(SB.nodeColors).filter(t=>counts[t]).sort().forEach(t=>{
-      const row=document.createElement('div'); row.className='row'+(hiddenTypes.has(t)?' off':'');
-      row.innerHTML='<span class="sw" style="background:'+esc(SB.nodeColors[t])+'"></span><span class="nm">'+esc(t)+'</span><span class="ct">'+counts[t]+'</span>';
-      row.addEventListener('click', ()=>{ if(hiddenTypes.has(t)) hiddenTypes.delete(t); else hiddenTypes.add(t);
-        row.classList.toggle('off'); renderer.refresh(); });
-      box.appendChild(row);
+  function focusNode(nodeId) {
+    network.focus(nodeId, { scale: 1.4, animation: true });
+    network.selectNodes([nodeId]);
+    showInfo(nodeId);
+  }
+  window.focusNode = focusNode;
+
+  var hoveredNodeId = null;
+  network.on('hoverNode', function (params) { hoveredNodeId = params.node; container.style.cursor = 'pointer'; });
+  network.on('blurNode', function () { hoveredNodeId = null; container.style.cursor = 'default'; });
+  container.addEventListener('click', function () {
+    if (hoveredNodeId !== null) { showInfo(hoveredNodeId); network.selectNodes([hoveredNodeId]); }
+  });
+  network.on('click', function (params) {
+    if (params.nodes.length > 0) showInfo(params.nodes[0]);
+    else if (hoveredNodeId === null) document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  });
+
+  var searchInput = document.getElementById('search');
+  var searchResults = document.getElementById('search-results');
+  searchInput.addEventListener('input', function () {
+    var q = searchInput.value.toLowerCase().trim();
+    searchResults.innerHTML = '';
+    if (!q) { searchResults.style.display = 'none'; return; }
+    var matches = RAW_NODES.filter(function (n) { return n.label.toLowerCase().indexOf(q) !== -1; }).slice(0, 20);
+    if (!matches.length) { searchResults.style.display = 'none'; return; }
+    searchResults.style.display = 'block';
+    matches.forEach(function (n) {
+      var el = document.createElement('div');
+      el.className = 'search-item';
+      el.textContent = n.label;
+      el.style.borderLeft = '3px solid ' + n.color.background;
+      el.style.paddingLeft = '8px';
+      el.onclick = function () {
+        network.focus(n.id, { scale: 1.5, animation: true });
+        network.selectNodes([n.id]); showInfo(n.id);
+        searchResults.style.display = 'none'; searchInput.value = '';
+      };
+      searchResults.appendChild(el);
     });
-    let files=0,size=0; for (const n of SB.nodes){ if(!n.path) continue; files++; size+=(n.meta&&n.meta.size)||0; }
-    $('filter-totals').innerHTML = '<b>'+files+'</b> files · '+fmtSize(size);
-  }
-  $('only-orphans').addEventListener('change', e => { onlyOrphans = e.target.checked; renderer.refresh(); });
+  });
+  document.addEventListener('click', function (e) {
+    if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
+  });
 
-  function focusOn(c){ focusComm = c;
-    $('comm-reset').style.display = c ? 'block' : 'none';
-    document.querySelectorAll('#comm-list .row').forEach(r => r.classList.toggle('off', !!c && r.dataset.c !== c));
-    renderer.refresh();
+  var hiddenCommunities = new Set();
+  var selectAllCb = document.getElementById('select-all-cb');
+  function updateSelectAllState() {
+    var total = LEGEND.length, hidden = hiddenCommunities.size;
+    selectAllCb.checked = hidden === 0;
+    selectAllCb.indeterminate = hidden > 0 && hidden < total;
   }
-  function renderCommunities(){
-    const box = $('comm-list'); box.innerHTML='';
-    commList.forEach(c=>{
-      const row=document.createElement('div'); row.className='row'; row.dataset.c=c;
-      row.innerHTML='<span class="sw" style="background:'+esc(communityColor(c))+'"></span><span class="nm">'+esc(commName[c])+'</span><span class="ct">'+commStat[c].n+'</span>';
-      row.addEventListener('click', ()=> focusOn(focusComm===c?null:c));
-      box.appendChild(row);
+  function toggleAllCommunities(hide) {
+    document.querySelectorAll('.legend-item').forEach(function (item) {
+      hide ? item.classList.add('dimmed') : item.classList.remove('dimmed');
     });
-    if (!commList.length) box.innerHTML='<div class="muted">no communities</div>';
+    document.querySelectorAll('.legend-cb').forEach(function (cb) { cb.checked = !hide; });
+    LEGEND.forEach(function (c) { if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid); });
+    nodesDS.update(RAW_NODES.map(function (n) { return { id: n.id, hidden: hide }; }));
+    updateSelectAllState();
   }
-  $('comm-reset').addEventListener('click', ()=> focusOn(null));
+  window.toggleAllCommunities = toggleAllCommunities;
 
-  renderLegend(); renderCommunities();
+  var legendEl = document.getElementById('legend');
+  LEGEND.forEach(function (c) {
+    var item = document.createElement('div');
+    item.className = 'legend-item';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'legend-cb'; cb.checked = true;
+    cb.addEventListener('change', function (e) {
+      e.stopPropagation();
+      if (cb.checked) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); }
+      else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); }
+      nodesDS.update(RAW_NODES.filter(function (n) { return n.community === c.cid; })
+        .map(function (n) { return { id: n.id, hidden: !cb.checked }; }));
+      updateSelectAllState();
+    });
+    item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div>' +
+      '<span class="legend-label">' + esc(c.label) + '</span>' +
+      '<span class="legend-count">' + c.count + '</span>';
+    item.prepend(cb);
+    item.onclick = function (e) { if (e.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
+    legendEl.appendChild(item);
+  });
 })();
 </script>
 </body>

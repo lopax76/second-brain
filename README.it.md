@@ -58,9 +58,11 @@ cosa sola: **consapevolezza del contesto a costo di token bassissimo.**
   in una sola chiamata.
 - **`GRAPH_REPORT.md` one-pager** — l'artefatto che l'agente legge per primo invece di grep-are:
   god node, community, collegamenti sorprendenti, decisioni e problemi, rigenerato a ogni build.
-- **Viewer offline** — una mappa 2D piatta, colorata e raggruppata per community; i dati sono inline
-  e la libreria di rendering è bundlata accanto alla pagina, quindi funziona completamente offline,
-  niente CDN, niente che un blocco-script possa rompere.
+- **Viewer offline** — una mappa interattiva force-directed (vis-network), colorata per community,
+  con ricerca, pannello nodo cliccabile con navigazione dei vicini e legenda community con
+  mostra/nascondi. Dati e libreria sono inline in un unico file HTML, quindi funziona completamente
+  offline. Il viewer è **adattato da [Graphify](https://github.com/safishamsi/graphify)** (MIT) —
+  vedi [Riconoscimenti](#riconoscimenti).
 - **Server MCP opzionale** — espone le stesse query a basso costo agli assistenti MCP, dietro un
   extra opzionale così il core resta senza dipendenze.
 
@@ -256,6 +258,13 @@ pytest -q
 I contributi sono benvenuti — vedi [CONTRIBUTING.md](CONTRIBUTING.md) e i
 [principi di design](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
 zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SECURITY.md](SECURITY.md).
+
+## Riconoscimenti
+
+Il viewer interattivo del grafo è **adattato da [Graphify](https://github.com/safishamsi/graphify)**
+di Safi Shamsi (Licenza MIT) — è il suo viewer ad aver ispirato questo, e gliene siamo grati. Il
+rendering usa [vis-network](https://github.com/visjs/vis-network) (Apache-2.0 OR MIT), incluso
+offline. Dettagli e testi di licenza completi in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Licenza
 

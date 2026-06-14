@@ -1,30 +1,26 @@
-# Third-party notices
+# Third-party notices & acknowledgments
 
-Second Brain bundles the following third-party components so its graph viewer works fully
-offline (no CDN, no network access required). They are combined into a single minified bundle,
-`second_brain/ui/sigma-bundle.min.js`, built with esbuild. Each is redistributed under the
-terms of the MIT License.
+## Bundled rendering library — vis-network
 
-## sigma
+Second Brain bundles **vis-network** (and its data layer **vis-data**) so the interactive graph
+viewer works fully offline (no CDN, no network access required). They are combined into a single
+minified bundle, `second_brain/ui/vis-bundle.min.js`, built with esbuild, and inlined into the
+single-file `view.html` at render time.
 
-- Version: 3.0.3
-- Authors: Alexis Jacomy, Guillaume Plique (Ouestware) and contributors
-- License: MIT
-- Homepage: https://github.com/jacomyal/sigma.js
+- **vis-network** — version 10.1.0 — License: Apache-2.0 OR MIT — https://github.com/visjs/vis-network
+- **vis-data** — version 8.0.4 — License: Apache-2.0 OR MIT — https://github.com/visjs/vis-data
 
-## graphology
+## Viewer design — adapted from Graphify (thank you!)
 
-- Version: 0.26.0
-- Author: Guillaume Plique and contributors
-- License: MIT
-- Homepage: https://github.com/graphology/graphology
+Second Brain's interactive viewer — the force-directed layout, community colouring, the search
+box, the click-to-inspect **Node Info** panel with clickable neighbour navigation, the
+per-community **show/hide legend** with "Select All", and the overall sidebar layout — is
+**adapted from [Graphify](https://github.com/safishamsi/graphify)** by **Safi Shamsi**, used under
+the **MIT License** (Copyright (c) 2026 Safi Shamsi). Graphify is the project whose graph viewer
+inspired this one, and we're grateful for it. The adaptation maps Second Brain's own graph
+(files, links, communities) into the same viewer and vendors the rendering library for offline use.
 
-## graphology-layout-forceatlas2
+Graphify — https://github.com/safishamsi/graphify — MIT License, Copyright (c) 2026 Safi Shamsi.
 
-- Version: 0.10.1
-- Author: Guillaume Plique and contributors
-- License: MIT
-- Homepage: https://github.com/graphology/graphology-layout-forceatlas2
-
-The bundle (`sigma-bundle.min.js`) exposes these on `window` (`Sigma`, `graphology`,
-`forceAtlas2`) and is inlined into the single-file `view.html` at render time.
+The MIT and Apache-2.0 license texts are available at https://opensource.org/licenses/MIT and
+https://www.apache.org/licenses/LICENSE-2.0 respectively.
