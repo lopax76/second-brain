@@ -193,7 +193,7 @@ Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
    sessioni dai commit git).
 2. **Stay fresh** — il diffing per content-hash ricostruisce solo ciò che è cambiato (fuori dal
    modello).
-3. **Query / view** — una persona ottiene la vista 3D; un assistente interroga il layer a basso
+3. **Query / view** — una persona ottiene la mappa 2D a community; un assistente interroga il layer a basso
    costo di token.
 
 **Sui falsi positivi:** le menzioni di path in prosa sono intrinsecamente rumorose. Second Brain

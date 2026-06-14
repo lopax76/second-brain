@@ -270,6 +270,7 @@
   function showInfo(nodeId) {
     var n = nodesDS.get(nodeId);
     if (!n) return;
+    unhoverLink();  // stop any running hover animation before the panel re-renders
     currentNode = nodeId;
     var out = outAdj[nodeId] || [], inc = inAdj[nodeId] || [];
     var box = document.getElementById('info-content');

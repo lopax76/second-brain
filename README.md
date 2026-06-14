@@ -33,7 +33,7 @@ gets worse as the project grows.
 
 Second Brain builds the project's graph **once** and keeps it fresh incrementally (outside the
 model, at near-zero token cost). The assistant **queries** it and gets compact answers; a human
-opens the **3D view** and sees the whole project at a glance.
+opens the **2D community map** and sees the whole project at a glance.
 
 It is **not a RAG system**: no embeddings, no vector store, no LLM needed to build the graph.
 It maps the *structural* relationships between files, which makes it complementary to RAG and

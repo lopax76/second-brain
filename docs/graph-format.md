@@ -75,9 +75,10 @@ A directed `source → target` between node ids, de-duplicated by `(source, targ
 > **Colors are not stored.** They are derived from `type` (single source of truth in
 > `second_brain/model.py`), keeping the store small and drift-free.
 
-> **Viewer payload differs slightly.** Inside `view.html` the data is inlined with edges
-> renamed to **`links`** and two extra maps, `nodeColors` / `edgeColors` (so the page is
-> self-contained). On disk, `graph.json` uses **`edges`** and no colors.
+> **Viewer payload differs from `graph.json`.** Inside `view.html` the data is inlined as
+> vis-network-ready `nodes` and `edges` (with display fields such as colour, size and community),
+> plus `legend`, `types`, `totals` and `stats`. On disk, `graph.json` stays the plain
+> `nodes` + `edges` model documented above (no display fields).
 
 ## Node types
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "second-brain-graph"
 dynamic = ["version"]
-description = "A living, always-fresh, low-token map of every project: files, links, areas and mechanics, with a navigable 3D view."
+description = "A living, always-fresh, low-token map of every project: files, links, areas and mechanics, with a navigable 2D community map."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

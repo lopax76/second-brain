@@ -20,8 +20,8 @@ python -m build       # -> dist/second_brain_graph-<ver>-py3-none-any.whl + .tar
 python -m twine check dist/*
 ```
 
-Both artifacts must report `PASSED`. They already include the vendored 3D viewer
-(`second_brain/ui/3d-force-graph.min.js` + `template.html`) in both the wheel and the sdist, so
+Both artifacts must report `PASSED`. They already include the vendored viewer
+(`second_brain/ui/vis-bundle.min.js` + `template.html`) in both the wheel and the sdist, so
 `second-brain view` works offline after a plain `pip install`.
 
 ## Dry run on TestPyPI (recommended for the first release)

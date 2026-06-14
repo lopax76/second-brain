@@ -2,7 +2,7 @@
 
 The graph is intentionally simple and serializable to plain JSON: nodes are files or
 logical entities (areas), edges are typed relationships between them. Colors are part of
-the model so the 3D viewer and any consumer share a single source of truth for them.
+the model so the viewer and any consumer share a single source of truth for them.
 """
 
 from __future__ import annotations
