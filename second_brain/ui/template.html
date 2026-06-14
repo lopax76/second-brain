@@ -187,19 +187,31 @@
   // ---- combined filter state ----
   var hiddenTypes = {}, hiddenComms = {}, onlyOrphans = false, groupMode = 'type', groupIsolate = null;
   function groupKey(n, mode) {
-    if (mode === 'type') return n._file_type || 'unknown';
-    if (mode === 'community') return n._community_name;
-    var parts = (n._source_file || '').split('/');
+    if (mode === 'type') return n.file_type || 'unknown';
+    if (mode === 'community') return n.community_name;
+    var parts = (n.source_file || '').split('/');
     if (mode === 'area') return parts.length > 1 ? parts[0] : '(root)';
     if (mode === 'folder') return parts.length > 1 ? parts.slice(0, 2).join('/') : '(root)';
     return null;
   }
+  // hide-filters truly remove nodes; a selected group is a FOCUS that dims everything else
+  // (kept visible, greyed) so the chosen area/group stays in the foreground.
   function applyFilters() {
+    var focusSet = null;
+    if (groupIsolate) {
+      focusSet = {};
+      RAW_NODES.forEach(function (n) { if (groupKey(n, groupIsolate.mode) === groupIsolate.key) focusSet[n.id] = 1; });
+    }
     nodesDS.update(RAW_NODES.map(function (n) {
-      var hidden = !!hiddenTypes[n._file_type] || !!hiddenComms[n.community] ||
-        (onlyOrphans && n._degree > 0) ||
-        (groupIsolate && groupKey(n, groupIsolate.mode) !== groupIsolate.key);
-      return { id: n.id, hidden: hidden };
+      var hidden = !!hiddenTypes[n.file_type] || !!hiddenComms[n.community] || (onlyOrphans && n.degree > 0);
+      var dim = focusSet && !focusSet[n.id];
+      return { id: n.id, hidden: hidden,
+        opacity: dim ? 0.13 : 1,
+        color: dim ? { background: '#2b2b3d', border: '#2b2b3d' } : n.color };
+    }));
+    edgesDS.update(RAW_EDGES.map(function (e, i) {
+      var on = !focusSet || (focusSet[e.from] && focusSet[e.to]);
+      return { id: i, color: on ? e.color : { opacity: 0.04 } };
     }));
   }
 
@@ -361,7 +373,8 @@
     SB.types.forEach(function (t) {
       var row = document.createElement('div'); row.className = 'row';
       row.innerHTML = '<span class="dot" style="background:' + esc(t.color) + '"></span>' +
-        '<span class="nm">' + esc(t.type) + '</span><span class="ct">' + t.count + '</span>';
+        '<span class="nm">' + esc(t.type) + '</span><span class="ct">' + t.count + '</span>' +
+        '<span class="sz">' + fmtSize(t.bytes) + '</span>';
       row.onclick = function () {
         if (hiddenTypes[t.type]) { delete hiddenTypes[t.type]; row.classList.remove('off'); }
         else { hiddenTypes[t.type] = true; row.classList.add('off'); }
