@@ -23,9 +23,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   instructions) plus a Claude Code `PreToolUse` (`Glob|Grep`) hook. `second-brain hook install`
   adds git `post-commit` / `post-checkout` hooks that rebuild the graph deterministically (zero
   tokens, zero API). All reversible and non-destructive (`uninstall`).
-- **2D community map viewer.** The viewer now lays the graph out as a flat, pannable/zoomable map
-  with nodes coloured and clustered by community, plus an impact section in the detail panel,
-  replacing the dense 3D layout.
+- **2D community-map viewer (Sigma.js).** The viewer is rebuilt on Sigma.js v3 + graphology +
+  ForceAtlas2 (vendored offline, all MIT): a flat WebGL map where files are coloured and clustered
+  into communities (islands), with hover neighbour-highlight, a tabbed side panel
+  (Info / Filters / Communities), search, community focus, and an impact section on the selected
+  node. Replaces the previous 3d-force-graph layout.
 
 ### Notes
 

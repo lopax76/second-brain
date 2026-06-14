@@ -18,8 +18,8 @@ from second_brain.store import store_dir
 
 _UI_DIR = Path(__file__).parent / "ui"
 _TEMPLATE = _UI_DIR / "template.html"
-_LIB = _UI_DIR / "3d-force-graph.min.js"
-_LIB_TAG = '<script src="3d-force-graph.min.js"></script>'
+_LIB = _UI_DIR / "sigma-bundle.min.js"
+_LIB_TAG = '<script src="sigma-bundle.min.js"></script>'
 _TOKEN = "__SB_DATA__"
 
 

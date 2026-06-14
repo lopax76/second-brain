@@ -40,7 +40,7 @@ def test_view_is_self_contained(tmp_path):
     html = (proj / ".secondbrain" / "view.html").read_text(encoding="utf-8")
     assert "__SB_DATA__" not in html          # token was replaced
     assert '"project": "proj"' in html or '"project":"proj"' in html
-    assert "ForceGraph3D" in html             # the 3D library is referenced
+    assert "Sigma" in html                    # the rendering library is inlined
 
 
 def test_stats_runs(tmp_path):

@@ -5,55 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Second Brain</title>
 <style>
-  :root{--bg:#0b1020;--panel:rgba(15,23,42,.92);--line:#1e293b;--ink:#e2e8f0;--mut:#94a3b8;--dim:#64748b}
+  :root{--bg:#0b1020;--panel:rgba(15,23,42,.94);--line:#1e293b;--ink:#e2e8f0;--mut:#94a3b8;--dim:#64748b;--accent:#3b82f6}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
             font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
-  #app{position:fixed;inset:0;display:flex}
-  #side{width:300px;flex:0 0 300px;background:var(--panel);border-right:1px solid var(--line);
-        display:flex;flex-direction:column;z-index:10}
-  #side.collapsed{width:0;flex-basis:0;overflow:hidden}
-  #side header{padding:14px 16px 8px}
-  #side header .title{font-size:18px;font-weight:800}
-  #side header .counts{font-size:12px;color:var(--mut);margin-top:2px}
-  #side .scroll{overflow-y:auto;padding:0 16px 16px;flex:1}
-  .blk{margin-top:14px}
-  .blk h4{margin:0 0 7px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
-  input,select{width:100%;background:#0f172a;border:1px solid var(--line);color:var(--ink);
-        border-radius:8px;padding:7px 9px;font-size:13px;outline:none}
-  input:focus,select:focus{border-color:#3b82f6}
-  label.ck{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px;color:var(--ink)}
-  .row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;user-select:none;
-       padding:4px 6px;border-radius:7px}
-  .row:hover{background:#0f172a}
-  .row.off{opacity:.35}
-  .row.active{background:#13213f;outline:1px solid #2a3c63}
-  .row .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
-  .row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-  .row .ct{color:var(--dim);font-size:11.5px}
-  .row .sz{color:var(--mut);font-size:11px;min-width:54px;text-align:right}
-  .bar{display:flex;height:4px;border-radius:3px;overflow:hidden;margin:3px 0 2px}
-  .bar span{height:100%}
-  .muted{color:var(--mut);font-size:12px}
-  .reset{font-size:12px;color:#60a5fa;cursor:pointer}
-  #graphwrap{position:relative;flex:1}
+  #app{position:fixed;inset:0}
   #graph{position:absolute;inset:0}
-  #toggle{position:absolute;top:12px;left:12px;z-index:11;background:var(--panel);border:1px solid var(--line);
-          color:var(--ink);border-radius:8px;padding:6px 9px;font-size:13px;cursor:pointer}
-  .hint{position:absolute;right:14px;bottom:12px;z-index:11;font-size:11.5px;color:var(--dim)}
-  #detail{width:330px;flex:0 0 330px;background:var(--panel);border-left:1px solid var(--line);
-          display:none;flex-direction:column;z-index:10}
-  #detail.open{display:flex}
-  #detail .dhead{padding:14px 16px;border-bottom:1px solid var(--line)}
-  #detail .dclose{float:right;cursor:pointer;color:var(--mut);font-size:18px;line-height:1}
-  #detail .dname{font-size:15px;font-weight:700;word-break:break-word}
-  #detail .dmeta{font-size:12px;color:var(--mut);margin-top:6px;word-break:break-all}
-  #detail .dscroll{overflow-y:auto;padding:12px 16px}
-  #detail .sec{margin-top:12px}
-  #detail .sec h5{margin:0 0 6px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
-  #detail .conn{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
-  #detail .conn:hover{background:#0f172a}
-  #detail .conn .et{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  #top{position:absolute;top:14px;left:14px;z-index:6;width:300px;max-width:42vw}
+  #top .title{font-size:18px;font-weight:800;text-shadow:0 1px 6px #000}
+  #top .counts{font-size:12px;color:var(--mut);margin:2px 0 8px}
+  #search{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+        border-radius:9px;padding:8px 10px;font-size:13px;outline:none}
+  #search:focus{border-color:var(--accent)}
+  #panel{position:absolute;top:0;right:0;bottom:0;width:330px;background:var(--panel);
+         border-left:1px solid var(--line);display:flex;flex-direction:column;z-index:7;backdrop-filter:blur(3px)}
+  #panel.hidden{transform:translateX(100%)}
+  #tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
+  #tabs button{flex:1;background:none;border:none;color:var(--mut);padding:12px 6px;font-size:11px;
+        letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-weight:700}
+  #tabs button.active{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+  .tabpane{display:none;overflow-y:auto;padding:14px 16px;flex:1}
+  .tabpane.active{display:block}
+  h4{margin:0 0 8px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+  .muted{color:var(--mut);font-size:12px}
+  .dim{color:var(--dim)}
+  .kv{font-size:12.5px;margin:3px 0;word-break:break-word}
+  .kv b{color:var(--mut);font-weight:600}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;vertical-align:middle}
+  .row{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  .row:hover{background:#0f172a}
+  .row.off{opacity:.4}
+  .row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .ct{color:var(--dim);font-size:11px}
+  .sec{margin-top:14px}
+  .conn{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  .conn:hover{background:#0f172a}
+  .conn .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .conn .et{font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  label.ck{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin:6px 0;color:var(--ink)}
+  .btn{display:inline-block;margin-top:6px;font-size:12px;color:#60a5fa;cursor:pointer}
+  #toggle{position:absolute;top:14px;right:14px;z-index:8;background:var(--panel);border:1px solid var(--line);
+          color:var(--ink);border-radius:8px;padding:6px 9px;font-size:14px;cursor:pointer;display:none}
+  .hint{position:absolute;left:14px;bottom:12px;z-index:6;font-size:11.5px;color:var(--dim);text-shadow:0 1px 4px #000}
   #error{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
          padding:40px;z-index:20;background:var(--bg)}
   #error div{max-width:520px;color:#cbd5e1;font-size:15px;line-height:1.6}
@@ -61,81 +54,63 @@
 </head>
 <body>
 <div id="app">
-  <aside id="side">
-    <header><div class="title" id="title"></div><div class="counts" id="counts"></div></header>
-    <div class="scroll">
-      <div class="blk"><h4>Search</h4><input id="search" placeholder="filter by name or path…" autocomplete="off"></div>
-      <div class="blk"><h4>Group by</h4>
-        <select id="groupby">
-          <option value="community">Community (auto)</option>
-          <option value="area">Area (top folder)</option>
-          <option value="folder">Sub-folder (2 levels)</option>
-          <option value="type">Type</option>
-          <option value="none">None</option>
-        </select>
-        <label class="ck"><input type="checkbox" id="cluster" checked> cluster into islands</label>
-        <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
-      </div>
-      <div class="blk"><h4 id="groups-h">Groups</h4>
-        <div id="groups"></div>
-        <div class="reset" id="reset" style="display:none">↺ show all groups</div>
-      </div>
-      <div class="blk"><h4>Node types</h4><div id="legend"></div></div>
-      <div class="blk"><h4>Totals</h4><div class="muted" id="totals"></div></div>
+  <div id="graph"></div>
+
+  <div id="top">
+    <div class="title" id="title"></div>
+    <div class="counts" id="counts"></div>
+    <input id="search" placeholder="search nodes…" autocomplete="off">
+  </div>
+
+  <button id="toggle">&#9776;</button>
+
+  <aside id="panel">
+    <div id="tabs">
+      <button data-tab="info" class="active">Info</button>
+      <button data-tab="filters">Filters</button>
+      <button data-tab="comm">Communities</button>
+    </div>
+    <div class="tabpane active" id="pane-info">
+      <div class="muted">Click a node to inspect it.</div>
+    </div>
+    <div class="tabpane" id="pane-filters">
+      <h4>Node types</h4><div id="legend"></div>
+      <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
+      <div class="sec muted dim" id="filter-totals"></div>
+    </div>
+    <div class="tabpane" id="pane-comm">
+      <h4>Communities</h4>
+      <div id="comm-list"></div>
+      <div class="btn" id="comm-reset" style="display:none">&#8635; show all communities</div>
     </div>
   </aside>
 
-  <div id="graphwrap">
-    <div id="graph"></div>
-    <button id="toggle">&#9776;</button>
-    <div class="hint">drag to pan · scroll to zoom · double-click a node for details</div>
-    <div id="error"><div><b>Graph library could not be loaded.</b><br>
-      The viewer bundles its rendering library inline and works fully offline, no network needed.
-      If you see this, the page may be corrupted or truncated; re-run
-      <code>second-brain view</code> to regenerate it.</div></div>
-  </div>
-
-  <aside id="detail">
-    <div class="dhead"><span class="dclose" id="dclose">&times;</span>
-      <div class="dname" id="dname"></div><div class="dmeta" id="dmeta"></div></div>
-    <div class="dscroll" id="dbody"></div>
-  </aside>
+  <div class="hint">drag to pan &middot; scroll to zoom &middot; click a node for details</div>
+  <div id="error"><div><b>Graph library could not be loaded.</b><br>
+    The viewer bundles its rendering library inline and works fully offline, no network needed.
+    If you see this, the page may be corrupted or truncated; re-run
+    <code>second-brain view</code> to regenerate it.</div></div>
 </div>
 
 <script type="application/json" id="sb-data">__SB_DATA__</script>
-<script src="3d-force-graph.min.js"></script>
+<script src="sigma-bundle.min.js"></script>
 <script>
 (function () {
   const $ = id => document.getElementById(id);
   let SB;
-  try { SB = JSON.parse(document.getElementById('sb-data').textContent); }
-  catch (err) {
-    $('error').style.display = 'flex';
-    $('error').textContent = 'Graph data is corrupted: ' + err.message;
-    return;
-  }
-  const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
-    if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
+  try { SB = JSON.parse($('sb-data').textContent); }
+  catch (err) { $('error').style.display = 'flex'; $('error').textContent = 'Graph data is corrupted: ' + err.message; return; }
+  if (typeof Sigma === 'undefined' || typeof graphology === 'undefined') { $('error').style.display = 'flex'; return; }
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtSize = b => { b = b||0; if (b<1024) return b+' B'; if (b<1048576) return (b/1024).toFixed(1)+' KB';
+    if (b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; };
 
   $('title').textContent = SB.project || 'Second Brain';
-  $('counts').textContent = SB.nodes.length + ' nodes · ' + SB.links.length + ' links';
 
   const byId = {}; for (const n of SB.nodes) byId[n.id] = n;
   const lid = e => (e && e.id !== undefined ? e.id : e);
-  function communityColor(name){
-    if (!name) return '#64748b';
-    let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % 360;
-    return 'hsl(' + h + ',60%,60%)';
-  }
-  // In community mode (the default) nodes are coloured by their auto-detected community; in the
-  // other group modes they fall back to type colours.
-  function nodeColor(n){
-    return (mode === 'community') ? communityColor(n.community) : (SB.nodeColors[n.type] || '#94a3b8');
-  }
-  const edgeColor = l => SB.edgeColors[l.type] || '#475569';
 
-  // adjacency + knowledge degree
   const outAdj = {}, inAdj = {}, kdeg = {};
   for (const l of SB.links) {
     const s = lid(l.source), t = lid(l.target);
@@ -144,294 +119,202 @@
     if (l.type === 'imports' || l.type === 'references') { kdeg[s]=(kdeg[s]||0)+1; kdeg[t]=(kdeg[t]||0)+1; }
   }
   const isOrphan = n => n.type !== 'area' && !kdeg[n.id];
-  const knowledge = l => l.type === 'imports' || l.type === 'references';
-  // Node size blends file size (sqrt-damped & capped) with importance (knowledge connections),
-  // so big files and well-connected hubs stand out without swamping the scene.
-  function nodeVal(n){
-    const kb = ((n.meta && n.meta.size) || 0) / 1024;
-    const sizeComp = Math.min(4, Math.sqrt(kb) / 3);
-    const impComp = Math.min(6, (kdeg[n.id] || 0) * 0.7);
-    return 0.5 + sizeComp + impComp;
-  }
 
-  function dirParts(n){ const p = n.path || ''; const a = p.split('/'); return a.slice(0, -1); }
-  function groupOf(n, mode){
-    if (mode === 'community') return n.community || (n.type === 'area' ? n.label : null);
-    if (mode === 'type') return n.type;
-    if (n.type === 'area') return n.label;
-    const d = dirParts(n);
-    if (mode === 'area') return d[0] || '(root)';
-    if (mode === 'folder') return d.slice(0,2).join('/') || '(root)';
-    return null;
-  }
-  // stable color for a group name (area/folder mode)
-  function groupColor(name, mode){
-    if (mode === 'type') return SB.nodeColors[name] || '#94a3b8';
-    if (mode === 'community') return communityColor(name);
-    let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % 360;
-    return 'hsl(' + h + ',55%,60%)';
-  }
+  // HSL -> hex: Sigma's WebGL colour parser wants hex/rgb, not hsl() strings.
+  function hslToHex(h, s, l){ s/=100; l/=100;
+    const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l);
+    const f=n=>{ const c=l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+      return Math.round(255*c).toString(16).padStart(2,'0'); };
+    return '#'+f(0)+f(8)+f(4); }
+  function communityColor(name){ if(!name) return '#64748b';
+    let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return hslToHex(h,62,60); }
+  const nodeColor = n => n.community ? communityColor(n.community) : (SB.nodeColors[n.type] || '#94a3b8');
+  function nodeSize(n){ const kb=((n.meta&&n.meta.size)||0)/1024;
+    return 3 + Math.min(5, Math.sqrt(kb)/3) + Math.min(11, (kdeg[n.id]||0)*0.8); }
 
-  // ---- state ----
-  let mode = 'community', clusterOn = true, onlyOrphans = false, query = '', groupFilter = null;
+  // Build graphology graph for layout + render. Area nodes and belongs_to edges are dropped:
+  // they form star-hubs that drown the real community structure. ForceAtlas2 then lays the
+  // content nodes out so communities self-organise into islands.
+  const Graph = graphology.Graph;
+  const graph = new Graph();
+  const rendered = SB.nodes.filter(n => n.type !== 'area');
+  const N = rendered.length || 1;
+  const R = 10 + Math.sqrt(N) * 6;
+  rendered.forEach((n, i) => {
+    const a = (i / N) * 2 * Math.PI;
+    graph.addNode(n.id, {
+      x: R * Math.cos(a) + (Math.random()-0.5),
+      y: R * Math.sin(a) + (Math.random()-0.5),
+      size: nodeSize(n), label: n.label, color: nodeColor(n),
+      ntype: n.type, community: n.community || null,
+    });
+  });
+  for (const l of SB.links) {
+    if (l.type === 'belongs_to') continue;
+    const s = lid(l.source), t = lid(l.target);
+    if (!graph.hasNode(s) || !graph.hasNode(t) || s === t) continue;
+    if (graph.hasEdge(s, t)) continue;
+    const cs = byId[s] && byId[s].community, ct = byId[t] && byId[t].community;
+    const col = (cs && cs === ct) ? communityColor(cs) : '#3a4663';
+    graph.addEdge(s, t, { size: (l.type==='imports'||l.type==='references') ? 0.8 : 0.5,
+      color: col, etype: l.type });
+  }
+  $('counts').textContent = rendered.length + ' nodes · ' + graph.size + ' links';
+
+  try {
+    const settings = forceAtlas2.inferSettings(graph);
+    settings.linLogMode = true;
+    settings.outboundAttractionDistribution = true;
+    settings.adjustSizes = true;
+    settings.gravity = 1.2;
+    settings.scalingRatio = 12;
+    settings.barnesHutOptimize = graph.order > 800;
+    const iters = graph.order > 2500 ? 120 : graph.order > 600 ? 260 : 450;
+    forceAtlas2.assign(graph, { iterations: iters, settings });
+  } catch (e) { /* layout best-effort; nodes keep their seed positions */ }
+
+  const commStat = {};
+  graph.forEachNode((id, a) => { if (!a.community) return;
+    const c = commStat[a.community] || (commStat[a.community] = {n:0,x:0,y:0});
+    c.n++; c.x+=a.x; c.y+=a.y; });
+  const commList = Object.keys(commStat).sort((p,q)=> commStat[q].n - commStat[p].n);
+  const commName = {}; commList.forEach((c,i)=> commName[c] = 'Cluster ' + (i+1));
+
+  const renderer = new Sigma(graph, $('graph'), {
+    renderEdgeLabels: false,
+    defaultEdgeColor: '#222b3f',
+    labelColor: { color: '#cbd5e1' },
+    labelFont: '-apple-system,Segoe UI,Roboto,sans-serif',
+    labelDensity: 0.5, labelGridCellSize: 90, labelRenderedSizeThreshold: 9,
+    zIndex: true, minCameraRatio: 0.05, maxCameraRatio: 12,
+  });
+  window.renderer = renderer; window.sbgraph = graph;
+
+  let hovered = null, hoveredNbrs = null, query = '', focusComm = null;
   const hiddenTypes = new Set();
+  let onlyOrphans = false;
 
-  function matches(n){ if(!query) return true; const q=query;
-    return (n.label||'').toLowerCase().includes(q) || (n.path||'').toLowerCase().includes(q); }
-  function visible(n){
-    if (hiddenTypes.has(n.type)) return false;
-    if (onlyOrphans && !isOrphan(n)) return false;
-    if (groupFilter !== null && groupOf(n, mode) !== groupFilter && n.type !== 'area') return false;
+  function nodeVisible(n){
+    if (hiddenTypes.has(n.ntype)) return false;
+    if (onlyOrphans && !isOrphan(byId[n.id] || {})) return false;
+    if (focusComm && n.community !== focusComm) return false;
     return true;
   }
-  function visibleData(){
-    const nodes = SB.nodes.filter(visible);
-    const ids = new Set(nodes.map(n => n.id));
-    const links = SB.links.filter(l => ids.has(lid(l.source)) && ids.has(lid(l.target)));
-    return { nodes, links };
-  }
 
-  if (typeof ForceGraph3D === 'undefined') { $('error').style.display = 'flex'; return; }
-
-  const G = ForceGraph3D()($('graph'))
-    .backgroundColor('#0b1020')
-    .numDimensions(2)
-    .nodeResolution(12)
-    .nodeRelSize(3)
-    .nodeColor(nodeColor)
-    .nodeVal(nodeVal)
-    .nodeOpacity(0.85)
-    .nodeLabel(n => '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:7px 9px;'
-      + 'max-width:300px;color:#e2e8f0;font-size:12px"><b>' + esc(n.label) + '</b> '
-      + '<span style="color:' + nodeColor(n) + '">&#9679; ' + esc(n.type) + '</span>'
-      + (n.meta && n.meta.size!=null ? ' · ' + fmtSize(n.meta.size) : '') + '<br>'
-      + '<span style="color:#94a3b8">double-click for details</span></div>')
-    .linkColor(edgeColor)
-    .linkOpacity(0.16)
-    .linkWidth(l => knowledge(l) ? 0.5 : 0.2)
-    .onNodeClick(handleClick)
-    .cooldownTicks(150)
-    .onEngineStop(() => fit())
-    .graphData(visibleData());
-  window.G = G;  // exposed for scripting / debugging
-
-  // 2D map feel: lock camera rotation so the graph reads as a flat, pannable/zoomable map
-  // (the community islands laid out in the z=0 plane), instead of an orbiting 3D cloud.
-  try { const _ctl = G.controls && G.controls(); if (_ctl) _ctl.noRotate = true; } catch (e) {}
-
-  // ForceGraph3D sizes its canvas to the WINDOW by default, ignoring the #graph container — so
-  // in this sidebar layout the aspect ratio is wrong. Pin the canvas to the container's real
-  // size and keep it in sync on resize.
-  function _size(){ const el = $('graph');
-    const w = el.clientWidth || el.offsetWidth, h = el.clientHeight || el.offsetHeight;
-    if (w && h) { G.width(w).height(h); } }
-  _size();
-  window.addEventListener('resize', _size);
-  if (window.ResizeObserver) { new ResizeObserver(_size).observe($('graph')); }
-
-  // Frame the whole graph. ForceGraph3D's zoomToFit relies on its internal animation loop, which
-  // (see the render loop below) can never start when the page is first painted in a background
-  // tab — so we set the camera distance directly from the node cloud's radius instead.
-  function fit(){
-    const ns = G.graphData().nodes; if (!ns.length) return;
-    let r = 0; for (const n of ns){ const d = Math.hypot(n.x||0, n.y||0, n.z||0); if (d > r) r = d; }
-    const dist = (r || 80) * 2.2 + 80;
-    try { G.cameraPosition({ x:0, y:0, z:dist }, { x:0, y:0, z:0 }, 0); } catch (e) {}
-  }
-
-  // CRITICAL: ForceGraph3D drives rendering with requestAnimationFrame started in its constructor.
-  // If the page is first painted while hidden (opened in a background tab/window), that rAF chain
-  // never fires and is not reliably resumed — the d3 force simulation still settles on its own
-  // timer, but NOTHING is ever drawn (0 WebGL draw calls => a blank canvas over correct data).
-  // We drive our own render+controls loop so the graph always paints, in any tab state.
-  // The library copies each node's layout coordinates onto its 3D mesh, and each link's onto its
-  // line geometry, INSIDE that dead render loop — so without it every mesh stays at the origin and
-  // all 123 nodes overlap into a single blob. We sync positions ourselves every frame, then render.
-  function _syncAndRender(){
-    const gd = G.graphData();
-    for (const n of gd.nodes){ const o = n.__threeObj;
-      if (o) o.position.set(n.x || 0, n.y || 0, n.z || 0); }
-    for (const l of gd.links){
-      const s = l.source, t = l.target; if (!s || !t) continue;
-      const line = l.__lineObj; const arrow = l.__arrowObj;
-      if (line && line.geometry){
-        const pos = line.geometry.getAttribute('position');
-        if (pos && pos.count >= 2){
-          pos.setXYZ(0, s.x||0, s.y||0, s.z||0);
-          pos.setXYZ(pos.count - 1, t.x||0, t.y||0, t.z||0);
-          pos.needsUpdate = true; line.geometry.computeBoundingSphere();
-        }
-      }
-      if (arrow){ arrow.position.set(((s.x||0)+(t.x||0))/2, ((s.y||0)+(t.y||0))/2, ((s.z||0)+(t.z||0))/2); }
+  renderer.setSetting('nodeReducer', (id, data) => {
+    const res = Object.assign({}, data);
+    if (!nodeVisible(data)) { res.hidden = true; return res; }
+    const matchQ = !query || (data.label || '').toLowerCase().includes(query) || id.toLowerCase().includes(query);
+    if (query && !matchQ) { res.color = '#27324d'; res.label = ''; res.zIndex = 0; }
+    if (hovered) {
+      if (id === hovered) { res.zIndex = 2; res.highlighted = true; }
+      else if (hoveredNbrs && hoveredNbrs.has(id)) { res.zIndex = 1; }
+      else { res.color = '#27324d'; res.label = ''; res.zIndex = 0; }
     }
-    const c = G.controls && G.controls(); if (c && c.update) c.update();
-    G.renderer().render(G.scene(), G.camera());
-  }
-  (function _renderLoop(){ requestAnimationFrame(_renderLoop); try { _syncAndRender(); } catch (e) {} })();
-
-  // Re-fit a few times while the simulation settles, and whenever the page becomes visible.
-  setTimeout(fit, 300); setTimeout(fit, 1200); setTimeout(fit, 2600);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { _size(); fit(); } });
-  window.addEventListener('focus', () => { _size(); fit(); });
-
-  function refresh(){ G.graphData(visibleData()); applyCluster(); setTimeout(fit, 400); }
-
-  // ---- double-click opens details; clicks never move the camera (no zoom in/out churn) ----
-  let last = { id:null, t:0 };
-  function handleClick(n){ const now = Date.now();
-    if (last.id === n.id && now - last.t < 350){ last={id:null,t:0}; openDetail(n); }
-    else { last = {id:n.id, t:now}; } }
-
-  // ---- clustering force ----
-  let anchors = {};
-  function computeAnchors(){
-    anchors = {};
-    if (mode === 'none' || !clusterOn) return;
-    const groups = [...new Set(SB.nodes.filter(visible).map(n => groupOf(n, mode)))];
-    if (!groups.length) return;            // no visible groups -> no anchors (avoid /0 = NaN)
-    const R = 60 + groups.length * 18;
-    groups.forEach((g,i)=>{ const a = (i/groups.length)*2*Math.PI;
-      anchors[g] = { x: R*Math.cos(a), y: R*Math.sin(a), z: 0 }; });
-  }
-  function clusterForce(alpha){
-    if (mode === 'none' || !clusterOn) return;
-    for (const n of G.graphData().nodes){ const a = anchors[groupOf(n, mode)]; if(!a) continue;
-      const s = 0.12 * alpha; n.vx += (a.x-n.x)*s; n.vy += (a.y-n.y)*s; n.vz += (a.z-n.z)*s; }
-  }
-  const _force = a => clusterForce(a); _force.initialize = ()=>{};
-  G.d3Force('cluster', _force);
-  function applyCluster(){ computeAnchors(); G.d3ReheatSimulation(); }
-
-  // ---- search (dim non-matches) ----
-  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase();
-    G.nodeOpacity(n => (query && !matches(n)) ? 0.07 : 0.95); });
-
-  // ---- controls ----
-  $('groupby').addEventListener('change', e => { mode = e.target.value; groupFilter = null;
-    $('reset').style.display='none'; renderGroups(); refresh(); });
-  $('cluster').addEventListener('change', e => { clusterOn = e.target.checked; applyCluster(); });
-  $('only-orphans').addEventListener('change', e => { onlyOrphans = e.target.checked; renderGroups(); refresh(); });
-  $('toggle').addEventListener('click', ()=> $('side').classList.toggle('collapsed'));
-  $('reset').addEventListener('click', ()=>{ groupFilter=null; $('reset').style.display='none';
-    document.querySelectorAll('#groups .row').forEach(r=>r.classList.remove('active')); refresh(); });
-  $('dclose').addEventListener('click', ()=> $('detail').classList.remove('open'));
-
-  // ---- groups list + stats ----
-  function groupStats(){
-    const m = (mode === 'none') ? 'area' : mode;
-    const st = {};
-    for (const n of SB.nodes){ if (!n.path) continue; if (onlyOrphans && !isOrphan(n)) continue;
-      const g = groupOf(n, m); const sz = (n.meta && n.meta.size) || 0;
-      const e = st[g] || (st[g] = {count:0,size:0,types:{}});
-      e.count++; e.size += sz;
-      const t = e.types[n.type] || (e.types[n.type]={count:0,size:0}); t.count++; t.size += sz; }
-    return { m, st };
-  }
-  function renderGroups(){
-    const {m, st} = groupStats();
-    $('groups-h').textContent = 'Groups · by ' + m;
-    const names = Object.keys(st).sort((a,b)=> st[b].size - st[a].size);
-    const box = $('groups'); box.innerHTML = '';
-    for (const g of names){
-      const e = st[g];
-      const row = document.createElement('div'); row.className = 'row';
-      if (groupFilter === g) row.classList.add('active');
-      const types = Object.keys(e.types).sort((a,b)=> e.types[b].size - e.types[a].size);
-      const bar = types.map(t => '<span style="width:' + (100*e.types[t].size/(e.size||1)) + '%;background:'
-        + (SB.nodeColors[t]||'#64748b') + '" title="' + esc(t) + ': ' + e.types[t].count + ' · '
-        + fmtSize(e.types[t].size) + '"></span>').join('');
-      row.innerHTML = '<span class="sw" style="background:' + groupColor(g, m) + '"></span>'
-        + '<span class="nm" title="' + esc(g) + '">' + esc(g) + '</span>'
-        + '<span class="ct">' + e.count + '</span><span class="sz">' + fmtSize(e.size) + '</span>';
-      const barEl = document.createElement('div'); barEl.className='bar'; barEl.innerHTML = bar;
-      const wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(barEl);
-      row.addEventListener('click', ()=>{ groupFilter = (groupFilter === g) ? null : g; mode = (mode==='none')?m:mode;
-        $('groupby').value = mode; $('reset').style.display = groupFilter? 'block':'none'; renderGroups(); refresh(); });
-      box.appendChild(wrap);
+    return res;
+  });
+  renderer.setSetting('edgeReducer', (edge, data) => {
+    const res = Object.assign({}, data);
+    const ext = graph.extremities(edge); const s = ext[0], t = ext[1];
+    if (!nodeVisible(graph.getNodeAttributes(s)) || !nodeVisible(graph.getNodeAttributes(t))) { res.hidden = true; return res; }
+    if (hovered) {
+      if (s === hovered || t === hovered) { res.color = '#93c5fd'; res.size = (data.size||0.6) + 0.6; res.zIndex = 1; }
+      else { res.hidden = true; }
     }
+    return res;
+  });
+
+  renderer.on('enterNode', ({node}) => { hovered = node; hoveredNbrs = new Set(graph.neighbors(node)); renderer.refresh(); });
+  renderer.on('leaveNode', () => { hovered = null; hoveredNbrs = null; renderer.refresh(); });
+  renderer.on('clickNode', ({node}) => openInfo(byId[node]));
+
+  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); renderer.refresh(); });
+
+  document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); $('pane-' + b.dataset.tab).classList.add('active');
+  }));
+  $('toggle').addEventListener('click', () => { $('panel').classList.toggle('hidden');
+    $('toggle').style.display = $('panel').classList.contains('hidden') ? 'block' : 'none'; });
+
+  const IMPACT_TYPES = new Set(['imports','references','mentions']);
+  function impactBFS(startId, adj){
+    const seen = new Set([startId]); let frontier=[startId]; const layers=[];
+    for (let d=1; d<=2; d++){ const next=[];
+      for (const id of frontier) for (const e of (adj[id]||[])){
+        if (!IMPACT_TYPES.has(e.type) || seen.has(e.other)) continue; seen.add(e.other); next.push(e.other); }
+      if (next.length) layers.push({depth:d, ids:next}); frontier=next; if(!frontier.length) break; }
+    return layers;
+  }
+  function nodeRowHtml(id, etype){
+    const o = byId[id]; if(!o) return '';
+    const et = etype ? '<span class="et">'+esc(etype)+'</span>' : '';
+    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="background:'+esc(nodeColor(o))+'"></span>'
+      +'<span class="nm">'+esc(o.label)+'</span>'+et+'</div>';
+  }
+  function impactHtml(title, layers){
+    let h = '<div class="sec"><h4>'+title+'</h4>';
+    if (!layers.length) { h += '<div class="muted">none</div>'; }
+    else for (const L of layers){ h += '<div class="dim" style="font-size:11px;margin-top:4px">depth '+L.depth+' · '+L.ids.length+'</div>';
+      h += L.ids.slice(0,12).map(id=>nodeRowHtml(id)).join('');
+      if (L.ids.length>12) h += '<div class="muted">…and '+(L.ids.length-12)+' more</div>'; }
+    return h + '</div>';
+  }
+  function openInfo(n){
+    if (!n) return;
+    document.querySelector('#tabs button[data-tab="info"]').click();
+    const out = outAdj[n.id]||[], inc = inAdj[n.id]||[];
+    let h = '<div class="kv"><span class="sw" style="background:'+esc(nodeColor(n))+'"></span> <b style="color:var(--ink);font-size:14px;font-weight:700">'+esc(n.label)+'</b></div>';
+    h += '<div class="kv"><b>Type:</b> '+esc(n.type)+'</div>';
+    if (n.community) h += '<div class="kv"><b>Community:</b> '+esc(commName[n.community]||n.community)+'</div>';
+    if (n.path) h += '<div class="kv"><b>Path:</b> '+esc(n.path)+'</div>';
+    if (n.meta && n.meta.size!=null) h += '<div class="kv"><b>Size:</b> '+fmtSize(n.meta.size)+'</div>';
+    h += '<div class="kv"><b>Degree:</b> '+(kdeg[n.id]||0)+'</div>';
+    if (n.description) h += '<div class="muted" style="margin-top:6px">'+esc(n.description)+'</div>';
+    if (n.meta && n.meta.broken_refs && n.meta.broken_refs.length)
+      h += '<div class="kv" style="color:#fca5a5"><b>Broken refs:</b> '+esc(n.meta.broken_refs.join(', '))+'</div>';
+    h += '<div class="sec"><h4>Outgoing ('+out.length+')</h4>'+(out.map(c=>nodeRowHtml(c.other,c.type)).join('')||'<div class="muted">none</div>')+'</div>';
+    h += '<div class="sec"><h4>Incoming ('+inc.length+')</h4>'+(inc.map(c=>nodeRowHtml(c.other,c.type)).join('')||'<div class="muted">none</div>')+'</div>';
+    h += impactHtml('Impact · upstream (what breaks if changed)', impactBFS(n.id, inAdj));
+    h += impactHtml('Impact · downstream (what it depends on)', impactBFS(n.id, outAdj));
+    const pane = $('pane-info'); pane.innerHTML = h;
+    pane.querySelectorAll('.conn').forEach(el => el.addEventListener('click', () => { const o = byId[el.getAttribute('data-id')]; if (o) openInfo(o); }));
   }
 
-  // ---- legend (type filters) ----
   function renderLegend(){
-    const counts = {}; for (const n of SB.nodes) counts[n.type]=(counts[n.type]||0)+1;
+    const counts = {}; for (const n of SB.nodes) if (n.type!=='area') counts[n.type]=(counts[n.type]||0)+1;
     const box = $('legend'); box.innerHTML='';
     Object.keys(SB.nodeColors).filter(t=>counts[t]).sort().forEach(t=>{
       const row=document.createElement('div'); row.className='row'+(hiddenTypes.has(t)?' off':'');
-      row.innerHTML='<span class="sw" style="background:'+SB.nodeColors[t]+'"></span>'
-        +'<span class="nm">'+esc(t)+'</span><span class="ct">'+counts[t]+'</span>';
-      row.addEventListener('click', ()=>{ if(hiddenTypes.has(t)){hiddenTypes.delete(t);row.classList.remove('off');}
-        else{hiddenTypes.add(t);row.classList.add('off');} renderGroups(); refresh(); });
+      row.innerHTML='<span class="sw" style="background:'+esc(SB.nodeColors[t])+'"></span><span class="nm">'+esc(t)+'</span><span class="ct">'+counts[t]+'</span>';
+      row.addEventListener('click', ()=>{ if(hiddenTypes.has(t)) hiddenTypes.delete(t); else hiddenTypes.add(t);
+        row.classList.toggle('off'); renderer.refresh(); });
       box.appendChild(row);
     });
+    let files=0,size=0; for (const n of SB.nodes){ if(!n.path) continue; files++; size+=(n.meta&&n.meta.size)||0; }
+    $('filter-totals').innerHTML = '<b>'+files+'</b> files · '+fmtSize(size);
   }
+  $('only-orphans').addEventListener('change', e => { onlyOrphans = e.target.checked; renderer.refresh(); });
 
-  // ---- totals ----
-  function renderTotals(){
-    let files=0, size=0; const byType={};
-    for (const n of SB.nodes){ if(!n.path) continue; files++; const sz=(n.meta&&n.meta.size)||0; size+=sz;
-      byType[n.type]=(byType[n.type]||0)+sz; }
-    const top = Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).slice(0,4)
-      .map(t=> esc(t)+' '+fmtSize(byType[t])).join(' · ');
-    $('totals').innerHTML = '<b>'+files+'</b> files · <b>'+fmtSize(size)+'</b><br><span style="color:var(--dim)">'+top+'</span>';
+  function focusOn(c){ focusComm = c;
+    $('comm-reset').style.display = c ? 'block' : 'none';
+    document.querySelectorAll('#comm-list .row').forEach(r => r.classList.toggle('off', !!c && r.dataset.c !== c));
+    renderer.refresh();
   }
+  function renderCommunities(){
+    const box = $('comm-list'); box.innerHTML='';
+    commList.forEach(c=>{
+      const row=document.createElement('div'); row.className='row'; row.dataset.c=c;
+      row.innerHTML='<span class="sw" style="background:'+esc(communityColor(c))+'"></span><span class="nm">'+esc(commName[c])+'</span><span class="ct">'+commStat[c].n+'</span>';
+      row.addEventListener('click', ()=> focusOn(focusComm===c?null:c));
+      box.appendChild(row);
+    });
+    if (!commList.length) box.innerHTML='<div class="muted">no communities</div>';
+  }
+  $('comm-reset').addEventListener('click', ()=> focusOn(null));
 
-  // ---- impact (depth-2 BFS over imports/references/mentions, mirrors `second-brain impact`) ----
-  const IMPACT_TYPES = new Set(['imports','references','mentions']);
-  function impactBFS(startId, adj){
-    const seen = new Set([startId]); let frontier = [startId]; const layers = [];
-    for (let d=1; d<=2; d++){
-      const next = [];
-      for (const id of frontier){ for (const e of (adj[id]||[])){
-        if (!IMPACT_TYPES.has(e.type) || seen.has(e.other)) continue;
-        seen.add(e.other); next.push(e.other);
-      }}
-      if (next.length) layers.push({depth:d, ids:next});
-      frontier = next; if (!frontier.length) break;
-    }
-    return layers;
-  }
-  function nodeRow(id){
-    const o = byId[id]; if(!o) return '';
-    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="width:9px;height:9px;'
-      +'border-radius:50%;background:'+nodeColor(o)+'"></span><span style="flex:1;overflow:hidden;'
-      +'text-overflow:ellipsis;white-space:nowrap">'+esc(o.label)+'</span></div>';
-  }
-  function impactSection(title, layers){
-    let h = '<div class="sec"><h5>'+title+'</h5>';
-    if (!layers.length){ h += '<div class="muted">none</div>'; }
-    else { for (const L of layers){
-      h += '<div class="muted" style="margin-top:4px">depth '+L.depth+' · '+L.ids.length+'</div>';
-      h += L.ids.slice(0,15).map(nodeRow).join('');
-      if (L.ids.length > 15) h += '<div class="muted">…and '+(L.ids.length-15)+' more</div>';
-    }}
-    return h + '</div>';
-  }
-
-  // ---- detail panel ----
-  function connRow(c){
-    const o = byId[c.other]; if(!o) return '';
-    return '<div class="conn" data-id="'+esc(o.id)+'"><span class="sw" style="width:9px;height:9px;border-radius:50%;'
-      +'background:'+nodeColor(o)+'"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;'
-      +'white-space:nowrap">'+esc(o.label)+'</span><span class="et">'+esc(c.type)+'</span></div>';
-  }
-  function openDetail(n){
-    $('dname').innerHTML = '<span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:50%;'
-      +'background:'+nodeColor(n)+';margin-right:6px"></span>'+esc(n.label);
-    $('dmeta').innerHTML = esc(n.type) + (n.meta&&n.meta.size!=null? ' · '+fmtSize(n.meta.size):'')
-      + (n.path? '<br>'+esc(n.path):'');
-    const out = (outAdj[n.id]||[]), inc = (inAdj[n.id]||[]);
-    let html = '<div class="muted">'+esc(n.description||'')+'</div>';
-    html += '<div class="sec"><h5>Outgoing ('+out.length+')</h5>'+ (out.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
-    html += '<div class="sec"><h5>Incoming ('+inc.length+')</h5>'+ (inc.map(connRow).join('')||'<div class="muted">none</div>') +'</div>';
-    html += impactSection('Impact · upstream (what breaks if changed)', impactBFS(n.id, inAdj));
-    html += impactSection('Impact · downstream (what it depends on)', impactBFS(n.id, outAdj));
-    $('dbody').innerHTML = html;
-    $('dbody').querySelectorAll('.conn').forEach(el=> el.addEventListener('click', ()=>{
-      const o = byId[el.getAttribute('data-id')]; if(o){ openDetail(o); } }));
-    $('detail').classList.add('open');
-  }
-
-  renderLegend(); renderGroups(); renderTotals(); applyCluster();
+  renderLegend(); renderCommunities();
 })();
 </script>
 </body>

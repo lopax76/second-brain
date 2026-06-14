@@ -1,15 +1,30 @@
 # Third-party notices
 
-Second Brain bundles the following third-party component so its 3D viewer works fully
-offline (no CDN, no network access required).
+Second Brain bundles the following third-party components so its graph viewer works fully
+offline (no CDN, no network access required). They are combined into a single minified bundle,
+`second_brain/ui/sigma-bundle.min.js`, built with esbuild. Each is redistributed under the
+terms of the MIT License.
 
-## 3d-force-graph
+## sigma
 
-- File: `second_brain/ui/3d-force-graph.min.js`
-- Version: 1.80.0
-- Author: Vasco Asturiano
+- Version: 3.0.3
+- Authors: Alexis Jacomy, Guillaume Plique (Ouestware) and contributors
 - License: MIT
-- Homepage: https://github.com/vasturiano/3d-force-graph
+- Homepage: https://github.com/jacomyal/sigma.js
 
-This UMD build bundles its own dependencies (including three.js, also MIT-licensed).
-The library is redistributed unmodified under the terms of the MIT License.
+## graphology
+
+- Version: 0.26.0
+- Author: Guillaume Plique and contributors
+- License: MIT
+- Homepage: https://github.com/graphology/graphology
+
+## graphology-layout-forceatlas2
+
+- Version: 0.10.1
+- Author: Guillaume Plique and contributors
+- License: MIT
+- Homepage: https://github.com/graphology/graphology-layout-forceatlas2
+
+The bundle (`sigma-bundle.min.js`) exposes these on `window` (`Sigma`, `graphology`,
+`forceAtlas2`) and is inlined into the single-file `view.html` at render time.

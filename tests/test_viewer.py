@@ -18,20 +18,21 @@ def test_render_view_is_single_self_contained_file() -> None:
     html = render_view(_tiny_graph())
     assert "__SB_DATA__" not in html  # placeholder token was replaced
     assert '"demo"' in html  # the project name is present in the inlined payload
-    # the 3D library is INLINED — not referenced as a sibling/external file or a remote URL,
+    # the graph library is INLINED — not referenced as a sibling/external file or a remote URL,
     # so the single HTML renders even when moved or shared on its own.
     assert "<script src=" not in html
-    assert "ForceGraph3D" in html  # the library is present in the page
-    assert "3d-force-graph" in html  # the library source itself is embedded
+    assert "Sigma" in html  # the rendering library is present in the page
+    assert "graphology" in html  # the graph library source itself is embedded
     assert "cdnjs" not in html and "unpkg" not in html
 
 
-def test_template_does_not_claim_a_cdn_dependency() -> None:
+def test_template_is_offline_and_references_the_vendored_bundle() -> None:
     text = _TEMPLATE.read_text(encoding="utf-8")
     # the viewer is fully offline; stale "fetches from a CDN" copy must not creep back in
     assert "from a CDN" not in text
-    # render stays robust when the page is opened in a background tab/window
-    assert "visibilitychange" in text
+    assert "cdnjs" not in text and "unpkg" not in text
+    # it loads the vendored bundle (inlined at render time), not a remote URL
+    assert "sigma-bundle.min.js" in text
 
 
 def test_write_view_is_self_contained_single_file(tmp_path) -> None:
@@ -39,10 +40,10 @@ def test_write_view_is_self_contained_single_file(tmp_path) -> None:
     d = tmp_path / ".secondbrain"
     assert (d / "view.html").is_file()
     # no sibling library file is needed: everything is inlined in the one HTML
-    assert not (d / "3d-force-graph.min.js").exists()
+    assert not (d / "sigma-bundle.min.js").exists()
     html = (d / "view.html").read_text(encoding="utf-8")
     assert "__SB_DATA__" not in html
-    assert "ForceGraph3D" in html and "<script src=" not in html
+    assert "Sigma" in html and "<script src=" not in html
 
 
 def test_render_view_escapes_script_breakout() -> None:
