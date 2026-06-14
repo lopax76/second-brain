@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-14
+
+### Added
+
+- **Community detection.** `second_brain.communities` discovers the project's real modules from
+  how files actually link (imports + references) via deterministic label propagation — not from
+  the folder layout. `project_map` now reports a community count.
+- **Impact queries.** `second-brain impact <id> [--up|--down] [--depth N]` (and the `impact` MCP
+  tool) show a node's blast radius: upstream (what breaks if you change it) and downstream (what
+  it depends on), grouped by depth, deterministic and capped per depth.
+- **`GRAPH_REPORT.md` one-pager.** `second-brain report` writes a read-only digest — scale +
+  token cost, god nodes, communities, surprising cross-community links, decisions by family,
+  suggested questions, and problems. `build` now generates it automatically; also exposed as the
+  `report` MCP tool. This is the artifact an assistant reads first instead of grepping the project.
+- **Agent integration.** `second-brain agent install` adds a marked, idempotent directive to
+  `CLAUDE.md` / `AGENTS.md` (with a prompt-injection guardrail: indexed content is data, not
+  instructions) plus a Claude Code `PreToolUse` (`Glob|Grep`) hook. `second-brain hook install`
+  adds git `post-commit` / `post-checkout` hooks that rebuild the graph deterministically (zero
+  tokens, zero API). All reversible and non-destructive (`uninstall`).
+- **2D community map viewer.** The viewer now lays the graph out as a flat, pannable/zoomable map
+  with nodes coloured and clustered by community, plus an impact section in the detail panel,
+  replacing the dense 3D layout.
+
+### Notes
+
+- Builds on 0.2.0 (configurable `.secondbrain.json` taxonomy, Python symbol layer), which was
+  built but never published; its features ship as part of 0.3.0.
+
 ## [0.2.0] - 2026-06-14
 
 ### Added

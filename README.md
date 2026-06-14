@@ -8,7 +8,7 @@
 
 **A living, always-fresh, low-token map of every project** — files, links, areas and
 mechanics — that an AI assistant can **query** instead of re-reading everything, and that a
-human can explore in a navigable **3D graph**.
+human can explore as a navigable **2D community map**.
 
 🇮🇹 [Leggi in italiano →](README.it.md)
 
@@ -51,8 +51,13 @@ purpose-built for one thing: **situational awareness at a very low token cost.**
   contents, so orienting an assistant costs a few hundred tokens, not tens of thousands.
 - **Anti-drift gate** — refuses to call the graph "fine" while something is stale, orphaned, or
   broken.
-- **Offline 3D viewer** — the data is inlined and the 3D library is vendored next to the page;
-  the viewer works fully offline, no CDN, nothing for a script blocker to break.
+- **Communities & impact** — auto-detects the project's real modules from how files link (not
+  folders), and answers "what breaks if I change this?" (upstream/downstream impact) in one call.
+- **`GRAPH_REPORT.md` one-pager** — the artifact an agent reads first instead of grepping: god
+  nodes, communities, surprising links, decisions, and problems, regenerated on every build.
+- **Offline graph viewer** — a flat 2D map coloured and clustered by community; the data is
+  inlined and the rendering library is vendored next to the page, so it works fully offline, no
+  CDN, nothing for a script blocker to break.
 - **Optional MCP server** — exposes the same low-token queries to MCP-aware assistants, behind
   an optional extra so the core stays dependency-free.
 
@@ -136,8 +141,12 @@ second-brain stats  .          # quick counts by node/edge type
 second-brain map    .          # compact digest: areas, sizes, most-connected files
 second-brain find   util .     # find nodes by name or path
 second-brain neighbors second_brain/model.py .   # a node and its connections
+second-brain impact second_brain/model.py .      # blast radius: what breaks / what it depends on
+second-brain report .          # write GRAPH_REPORT.md: god nodes, communities, decisions, problems
 second-brain assess .          # one-shot before/after report: problems + token savings
 second-brain symbols second_brain/model.py       # function/class signatures in one Python file
+second-brain agent install .   # add the SB directive to CLAUDE.md/AGENTS.md + a Claude Code hook
+second-brain hook install .    # git post-commit/post-checkout: keep the graph fresh automatically
 ```
 
 **Drill down** by pointing the tool at a subfolder — `second-brain view ./src/api` renders just
@@ -150,18 +159,21 @@ the knowledge-connected core; isolated data files are summarized on their area n
 2. **Open it:** double-click the file it writes — `.secondbrain/view.html` — in any browser. No
    server, no install: the data is inlined and the 3D library is bundled next to the page, so it
    works fully offline.
-3. **Explore:** left-drag to orbit, scroll to zoom, double-click a node for its details. Use the
-   left panel to search, group by type / area / folder, or show only orphans.
+3. **Explore:** the graph is laid out as a flat **2D map**, with files coloured and clustered into
+   **communities** (auto-detected from how they link). Scroll to zoom, right-drag to pan,
+   double-click a node for its details (including its impact radius). Use the left panel to search,
+   switch grouping (community / area / folder / type), focus a single community, or show only
+   orphans.
 
 ## Query layer (for AI assistants)
 
-`second-brain map`, `find`, and `neighbors` return compact, budgeted answers (ids, types, sizes,
-connections — never file contents). An optional **MCP server** exposes the same queries to
-MCP-aware assistants:
+`second-brain map`, `find`, `neighbors`, `impact`, and `report` return compact, budgeted answers
+(ids, types, sizes, connections — never file contents). An optional **MCP server** exposes the
+same queries to MCP-aware assistants:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .      # serves map / find / neighbors / subgraph / health over stdio
+second-brain-mcp .      # serves map / find / neighbors / subgraph / impact / report / health
 ```
 
 See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
@@ -215,13 +227,15 @@ tell me the time and tokens you used.
 
 ## Status & roadmap
 
-Alpha (v0.2, published on PyPI). Working today: the typed graph, the anti-drift gate, the offline
-3D viewer, the low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
-(decisions/sessions), the optional MCP server, a **configurable classification taxonomy**
-(an optional `.secondbrain.json` tunes the type keywords, foundation-doc names, and decision-ID
-prefixes per project — with no file, behaviour is unchanged), and a **Python symbol layer**
-(`second-brain symbols <file.py>` lists function/class signatures on demand via `ast`). Next:
-richer reference resolution and symbol layers for more languages.
+Alpha. Working today: the typed graph, the anti-drift gate, the offline **2D community-map**
+viewer, the low-token query layer (`map`/`find`/`neighbors`/`subgraph`), operational nodes
+(decisions/sessions), and the optional MCP server. **v0.3** adds **community detection**
+(real modules discovered from how files link), **impact queries** (`impact` — what breaks if you
+change a node), a **`GRAPH_REPORT.md` one-pager** (`report`, regenerated on every build), and
+**agent integration** (`agent install` writes a CLAUDE.md/AGENTS.md directive + a Claude Code
+`PreToolUse` hook; `hook install` adds git hooks that rebuild the graph for free). It also carries
+forward v0.2's **configurable `.secondbrain.json` taxonomy** and **Python symbol layer**
+(`symbols`). Next: richer reference resolution and symbol layers for more languages.
 
 ## Development
 

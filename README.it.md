@@ -8,7 +8,7 @@
 
 **Una mappa viva, sempre fresca e a basso costo di token di ogni progetto** — file, collegamenti,
 aree e meccaniche — che un assistente AI può **interrogare** invece di rileggere tutto, e che una
-persona può esplorare in un **grafo 3D** navigabile.
+persona può esplorare come una **mappa 2D a community** navigabile.
 
 🇬🇧 [Read in English →](README.md)
 
@@ -53,8 +53,14 @@ cosa sola: **consapevolezza del contesto a costo di token bassissimo.**
   migliaia.
 - **Gate anti-deriva** — rifiuta di dichiarare il grafo "a posto" finché c'è qualcosa di stantio,
   orfano o rotto.
-- **Viewer 3D offline** — i dati sono inline e la libreria 3D è bundlata accanto alla pagina; il
-  viewer funziona completamente offline, niente CDN, niente che un blocco-script possa rompere.
+- **Community e impatto** — rileva da solo i moduli reali del progetto da come i file si collegano
+  (non dalle cartelle) e risponde a "cosa si rompe se tocco questo?" (impatto upstream/downstream)
+  in una sola chiamata.
+- **`GRAPH_REPORT.md` one-pager** — l'artefatto che l'agente legge per primo invece di grep-are:
+  god node, community, collegamenti sorprendenti, decisioni e problemi, rigenerato a ogni build.
+- **Viewer offline** — una mappa 2D piatta, colorata e raggruppata per community; i dati sono inline
+  e la libreria di rendering è bundlata accanto alla pagina, quindi funziona completamente offline,
+  niente CDN, niente che un blocco-script possa rompere.
 - **Server MCP opzionale** — espone le stesse query a basso costo agli assistenti MCP, dietro un
   extra opzionale così il core resta senza dipendenze.
 
@@ -138,8 +144,12 @@ second-brain stats  .          # conteggi rapidi per tipo nodo/arco
 second-brain map    .          # digest compatto: aree, dimensioni, file più connessi
 second-brain find   util .     # trova nodi per nome o path
 second-brain neighbors second_brain/model.py .   # un nodo e le sue connessioni
+second-brain impact second_brain/model.py .      # raggio d'impatto: cosa si rompe / da cosa dipende
+second-brain report .          # scrive GRAPH_REPORT.md: god node, community, decisioni, problemi
 second-brain assess .          # report prima/dopo: problemi + risparmio token
 second-brain symbols second_brain/model.py       # firme funzioni/classi di un file Python
+second-brain agent install .   # aggiunge la direttiva SB a CLAUDE.md/AGENTS.md + un hook Claude Code
+second-brain hook install .    # git post-commit/post-checkout: tiene il grafo fresco da solo
 ```
 
 **Drill-down** puntando lo strumento su una sottocartella — `second-brain view ./src/api`
@@ -153,19 +163,21 @@ nodo-area).
 2. **Aprilo:** doppio clic sul file creato — `.secondbrain/view.html` — in un browser qualsiasi.
    Niente server, niente installazione: i dati sono inline e la libreria 3D è inclusa accanto alla
    pagina, quindi funziona completamente offline.
-3. **Esplora:** trascina col tasto sinistro per orbitare, rotella per lo zoom, doppio clic su un
-   nodo per i dettagli. Dal pannello a sinistra puoi cercare, raggruppare per tipo / area / cartella
-   o mostrare solo gli orfani.
+3. **Esplora:** il grafo è disposto come una **mappa 2D** piatta, con i file colorati e raggruppati
+   in **community** (rilevate da come si collegano). Rotella per lo zoom, trascina col tasto destro
+   per spostarti, doppio clic su un nodo per i dettagli (incluso il suo raggio d'impatto). Dal
+   pannello a sinistra puoi cercare, cambiare raggruppamento (community / area / cartella / tipo),
+   isolare una singola community o mostrare solo gli orfani.
 
 ## Layer di query (per gli assistenti AI)
 
-`second-brain map`, `find` e `neighbors` restituiscono risposte compatte e budgettate (id, tipi,
-dimensioni, connessioni — mai il contenuto dei file). Un **server MCP** opzionale espone le stesse
-query agli assistenti compatibili MCP:
+`second-brain map`, `find`, `neighbors`, `impact` e `report` restituiscono risposte compatte e
+budgettate (id, tipi, dimensioni, connessioni — mai il contenuto dei file). Un **server MCP**
+opzionale espone le stesse query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .      # serve map / find / neighbors / subgraph / health su stdio
+second-brain-mcp .      # serve map / find / neighbors / subgraph / impact / report / health
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -221,20 +233,22 @@ dimmi tempo e token consumati.
 
 ## Stato & roadmap
 
-Alpha (v0.2, pubblicato su PyPI). Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer 3D
+Alpha. Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer **mappa 2D a community**
 offline, layer di query a basso costo (`map`/`find`/`neighbors`/`subgraph`), nodi operativi
-(decisioni/sessioni), server MCP opzionale, una **tassonomia di classificazione configurabile**
-(un `.secondbrain.json` opzionale tara parole-chiave dei tipi, nomi dei documenti-fondamento e
-prefissi degli ID-decisione per progetto — senza file il comportamento è invariato) e un **layer
-di simboli Python** (`second-brain symbols <file.py>` elenca le firme di funzioni/classi su
-richiesta via `ast`). Prossimi passi: risoluzione dei riferimenti più ricca e layer di simboli
-per altri linguaggi.
+(decisioni/sessioni) e server MCP opzionale. **v0.3** aggiunge il **rilevamento delle community**
+(i moduli reali scoperti da come i file si collegano), le **query d'impatto** (`impact` — cosa si
+rompe se tocchi un nodo), il **`GRAPH_REPORT.md` one-pager** (`report`, rigenerato a ogni build) e
+l'**integrazione con gli agent** (`agent install` scrive una direttiva in CLAUDE.md/AGENTS.md + un
+hook `PreToolUse` di Claude Code; `hook install` aggiunge hook git che ricostruiscono il grafo
+gratis). Porta avanti anche la **tassonomia configurabile `.secondbrain.json`** e il **layer di
+simboli Python** (`symbols`) di v0.2. Prossimi passi: risoluzione dei riferimenti più ricca e layer
+di simboli per altri linguaggi.
 
 ## Sviluppo
 
 ```bash
 pip install -e ".[dev,mcp]"
-ruff check second-brain tests
+ruff check second_brain tests
 pytest -q
 ```
 
