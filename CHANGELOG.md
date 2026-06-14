@@ -17,6 +17,15 @@ adheres to [Semantic Versioning](https://semver.org/).
   with full signatures (via the stdlib `ast`), so an assistant can see the signatures a file-level
   map omits — on demand, without bloating the graph or the token budget.
 
+### Fixed
+
+- **`find` no longer under-counts.** The query previously capped results at 25 *and* its
+  match counter stopped there too — so a large family (e.g. 47 decisions sharing a prefix)
+  could be silently under-reported as "25 matches". `find` now returns every match by default;
+  the CLI shows the first 50 with `--limit N` / `--all` to widen, but **always prints the true
+  total**, and the MCP `find` tool returns an explicit `total`. A memory index must never hide
+  results.
+
 ## [0.1.2] - 2026-06-14
 
 ### Fixed

@@ -85,8 +85,13 @@ def project_map(graph: Graph, *, top: int = 8) -> dict[str, Any]:
     }
 
 
-def find(graph: Graph, query: str, *, limit: int = 25) -> list[dict[str, Any]]:
-    """Return file/entity nodes whose label or path contains ``query`` (case-insensitive)."""
+def find(graph: Graph, query: str, *, limit: int | None = None) -> list[dict[str, Any]]:
+    """Return file/entity nodes whose label or path contains ``query`` (case-insensitive).
+
+    Returns *every* match by default so the count is always truthful — a memory tool must never
+    silently drop results (or under-count whole families). Pass ``limit`` to cap the returned
+    list; the caller is responsible for reporting the true total alongside any capped view.
+    """
     q = query.lower().strip()
     if not q:
         return []
@@ -95,7 +100,8 @@ def find(graph: Graph, query: str, *, limit: int = 25) -> list[dict[str, Any]]:
             and (q in n.label.lower() or (n.path and q in n.path.lower()))]
     # Sort by id before capping so the returned subset is deterministic, not insertion-order.
     hits.sort(key=lambda n: n.id)
-    return [{"id": n.id, "type": n.type.value, "path": n.path} for n in hits[:limit]]
+    rows = [{"id": n.id, "type": n.type.value, "path": n.path} for n in hits]
+    return rows if limit is None else rows[: max(0, limit)]
 
 
 def neighbors(graph: Graph, node_id: str) -> dict[str, Any] | None:

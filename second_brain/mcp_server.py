@@ -47,9 +47,15 @@ def build_server(project: str):
         return query.project_map(_graph(project))
 
     @server.tool()
-    def find(text: str) -> list[dict[str, Any]]:
-        """Find files/nodes whose name or path contains ``text`` (case-insensitive)."""
-        return query.find(_graph(project), text)
+    def find(text: str, limit: int = 100) -> dict[str, Any]:
+        """Find files/nodes whose name or path contains ``text`` (case-insensitive).
+
+        Returns the true ``total`` count and up to ``limit`` matches, so a family is never
+        silently under-counted. Raise ``limit`` (or read the count) to enumerate fully.
+        """
+        rows = query.find(_graph(project), text)
+        cap = len(rows) if limit <= 0 else limit
+        return {"total": len(rows), "shown": min(cap, len(rows)), "matches": rows[:cap]}
 
     @server.tool()
     def neighbors(node_id: str) -> dict[str, Any]:

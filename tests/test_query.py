@@ -28,6 +28,17 @@ def test_find():
     assert query.find(g, "") == []
 
 
+def test_find_returns_all_by_default_and_respects_limit():
+    """find() must never silently cap: default returns every match; limit only trims the view."""
+    g = Graph(project="t")
+    for i in range(60):
+        nid = f"src/m{i:02d}_util.py"
+        g.add_node(Node(id=nid, type=NodeType.PROGRAM, label=nid.split("/")[-1], path=nid))
+    assert len(query.find(g, "util")) == 60          # no hidden 25-cap
+    assert len(query.find(g, "util", limit=10)) == 10
+    assert len(query.find(g, "util", limit=0)) == 0
+
+
 def test_neighbors():
     g = build_graph(FIXTURE)
     n = query.neighbors(g, "src/app.py")

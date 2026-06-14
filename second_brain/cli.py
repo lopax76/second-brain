@@ -101,9 +101,13 @@ def cmd_map(args: argparse.Namespace) -> int:
 
 def cmd_find(args: argparse.Namespace) -> int:
     res = query.find(_load_or_build(args.path), args.query)
-    for r in res:
+    cap = len(res) if args.all else max(0, args.limit)
+    for r in res[:cap]:
         print(f"  {r['type']:9} {r['id']}")
-    print(f"({len(res)} matches)")
+    if cap < len(res):
+        print(f"({len(res)} matches — showing {cap}; use --all or --limit N)")
+    else:
+        print(f"({len(res)} matches)")
     return 0
 
 
@@ -187,6 +191,9 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("find", help="find nodes by name or path substring")
     sp.add_argument("query", help="substring to search for")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--limit", type=int, default=50,
+                    help="max rows to display (default: 50); the true total is always printed")
+    sp.add_argument("--all", action="store_true", help="display every match, no cap")
     sp.set_defaults(func=cmd_find)
 
     sp = sub.add_parser("neighbors", help="show a node and its connections")

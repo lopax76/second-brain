@@ -58,6 +58,21 @@ def test_query_commands_run(tmp_path):
     assert main(["view", "--backbone", str(proj)]) == 0
 
 
+def test_find_prints_true_total_when_capped(tmp_path, capsys):
+    """A capped display must still report the real total (no lying counter)."""
+    proj = tmp_path / "many"
+    proj.mkdir()
+    for i in range(60):
+        (proj / f"util_{i:02d}.py").write_text("x = 1\n", encoding="utf-8")
+    assert main(["build", str(proj)]) == 0
+    assert main(["find", "util", "--limit", "5", str(proj)]) == 0
+    out = capsys.readouterr().out
+    assert "60 matches" in out and "showing 5" in out
+    capsys.readouterr()
+    assert main(["find", "util", "--all", str(proj)]) == 0
+    assert capsys.readouterr().out.count("util_") >= 60
+
+
 def test_gate_passes_on_clean_project(tmp_path):
     proj = tmp_path / "clean"
     proj.mkdir()
