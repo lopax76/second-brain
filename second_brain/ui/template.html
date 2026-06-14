@@ -14,84 +14,104 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
   #graph { flex: 1; min-width: 0; }
-  #sidebar { width: 320px; flex: 0 0 320px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
+  .bar { width: 300px; flex: 0 0 300px; background: #1a1a2e; display: flex; flex-direction: column; overflow: hidden; }
+  #leftbar { border-right: 1px solid #2a2a4e; }
+  #sidebar { border-left: 1px solid #2a2a4e; }
+  .scroll { flex: 1; overflow-y: auto; }
+  .section { padding: 11px 13px; border-bottom: 1px solid #2a2a4e; }
+  .section:last-child { border-bottom: none; }
+  .section h3 { font-size: 11px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  input[type=text], select { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 9px; border-radius: 6px; font-size: 13px; outline: none; }
+  input[type=text]:focus, select:focus { border-color: #4E79A7; }
+  #search-results { max-height: 160px; overflow-y: auto; margin-top: 6px; display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: #2a2a4e; }
+  .ck { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .row:hover { background: #2a2a4e; padding-left: 4px; }
+  .row.off { opacity: 0.35; }
+  .row.active { background: #20203a; outline: 1px solid #34345a; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ct { color: #888; font-size: 11px; }
+  .sz { color: #666; font-size: 11px; min-width: 60px; text-align: right; }
+  .reset { font-size: 11px; color: #6aa6e8; cursor: pointer; margin-top: 6px; display: none; }
+  /* right tabs */
   #tabbar { display: flex; border-bottom: 1px solid #2a2a4e; flex: 0 0 auto; }
   .tab { flex: 1; min-width: 0; background: none; border: none; color: #888; padding: 13px 8px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tab.active { color: #e0e0e0; box-shadow: inset 0 -2px 0 #4E79A7; }
   .pane { display: none; flex: 1; overflow-y: auto; }
   .pane.active { display: block; }
-  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
-  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
-  #search:focus { border-color: #4E79A7; }
-  #search-results { max-height: 160px; overflow-y: auto; margin-top: 6px; display: none; }
-  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .search-item:hover { background: #2a2a4e; }
-  .section { padding: 12px 14px; border-bottom: 1px solid #2a2a4e; }
-  .section h3 { font-size: 12px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
   #info-content { font-size: 13px; color: #ccc; line-height: 1.55; }
   #info-content .field { margin-bottom: 4px; }
   #info-content .field b { color: #e0e0e0; }
   #info-content .empty { color: #555; font-style: italic; }
   .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
   .neighbor-link:hover { background: #2a2a4e; }
-  .ov-tot { font-size: 12px; color: #ccc; margin-bottom: 8px; }
-  .ov-tot b { color: #e0e0e0; }
-  .ov-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
-  .ov-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ov-row .ct { color: #888; font-size: 11px; }
-  .ov-row .sz { color: #666; font-size: 11px; min-width: 58px; text-align: right; }
-  .legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
-  #legend-controls { padding: 4px 0 8px; }
-  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
-  .legend-item { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
-  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
-  .legend-item.dimmed { opacity: 0.35; }
-  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .legend-count { color: #666; font-size: 11px; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; padding: 4px 0 8px; }
   .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
   .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
   .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
   #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; transform: none; }
-  #stats { flex: 0 0 auto; padding: 9px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #666; }
+  #stats { flex: 0 0 auto; padding: 9px 13px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #666; }
   #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 40px; background: #0f0f1a; }
   #error div { max-width: 520px; color: #cbd5e1; font-size: 15px; line-height: 1.6; }
 </style>
 </head>
 <body>
+<div id="leftbar" class="bar">
+  <div class="scroll">
+    <div class="section">
+      <h3>Search</h3>
+      <input id="search" type="text" placeholder="filter by name or path…" autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+    <div class="section">
+      <h3>Group by</h3>
+      <select id="groupby">
+        <option value="type">Type</option>
+        <option value="area">Area (top folder)</option>
+        <option value="folder">Sub-folder (2 levels)</option>
+        <option value="community">Community</option>
+        <option value="none">None</option>
+      </select>
+      <label class="ck"><input type="checkbox" id="only-orphans"> show only orphans</label>
+    </div>
+    <div class="section">
+      <h3 id="groups-h">Groups</h3>
+      <div id="groups"></div>
+      <div class="reset" id="groups-reset">↺ show all</div>
+    </div>
+    <div class="section">
+      <h3>Node types</h3>
+      <div id="nodetypes"></div>
+    </div>
+  </div>
+  <div id="stats"></div>
+</div>
+
 <div id="graph"></div>
-<div id="sidebar">
+
+<div id="sidebar" class="bar">
   <div id="tabbar">
     <button class="tab active" data-pane="docs" id="tab-docs">Project</button>
     <button class="tab" data-pane="comm">Communities</button>
   </div>
-
   <div class="pane active" id="pane-docs">
-    <div id="search-wrap">
-      <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
-      <div id="search-results"></div>
-    </div>
-    <div class="section">
+    <div class="section" style="border-bottom:none">
       <h3>Node Info</h3>
       <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
     </div>
-    <div class="section" style="border-bottom:none">
-      <h3>Overview</h3>
-      <div id="overview"></div>
-    </div>
   </div>
-
   <div class="pane" id="pane-comm">
     <div class="section" style="border-bottom:none">
-      <div id="legend-controls">
-        <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select all</label>
-      </div>
+      <div id="legend-controls"><label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select all</label></div>
       <div id="legend"></div>
     </div>
   </div>
-
-  <div id="stats"></div>
 </div>
+
 <div id="error"><div><b>Graph library could not be loaded.</b><br>
   The viewer bundles its rendering library inline and works fully offline. If you see this,
   the page may be corrupted; re-run <code>second-brain view</code> to regenerate it.</div></div>
@@ -114,6 +134,13 @@
   }
   function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
     if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
+  function hslToHex(h,s,l){ s/=100; l/=100; var k=function(n){return (n+h/30)%12;}, a=s*Math.min(l,1-l);
+    var f=function(n){ var c=l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+      return Math.round(255*c).toString(16).padStart(2,'0'); }; return '#'+f(0)+f(8)+f(4); }
+  function hashColor(name){ var h=0; for(var i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return hslToHex(h,55,60); }
+
+  var typeColor = {}; SB.types.forEach(function (t) { typeColor[t.type] = t.color; });
+  var commColor = {}; LEGEND.forEach(function (c) { commColor[c.label] = c.color; });
 
   var nodesDS = new vis.DataSet(RAW_NODES.map(function (n) {
     return { id: n.id, label: n.label, color: n.color, size: n.size, font: n.font, title: n.title,
@@ -157,7 +184,26 @@
   window.network = network;
   network.once('stabilizationIterationsDone', function () { network.setOptions({ physics: { enabled: false } }); });
 
-  // ---- hover a listed neighbour -> glow the node + animate the connecting edge ----
+  // ---- combined filter state ----
+  var hiddenTypes = {}, hiddenComms = {}, onlyOrphans = false, groupMode = 'type', groupIsolate = null;
+  function groupKey(n, mode) {
+    if (mode === 'type') return n._file_type || 'unknown';
+    if (mode === 'community') return n._community_name;
+    var parts = (n._source_file || '').split('/');
+    if (mode === 'area') return parts.length > 1 ? parts[0] : '(root)';
+    if (mode === 'folder') return parts.length > 1 ? parts.slice(0, 2).join('/') : '(root)';
+    return null;
+  }
+  function applyFilters() {
+    nodesDS.update(RAW_NODES.map(function (n) {
+      var hidden = !!hiddenTypes[n._file_type] || !!hiddenComms[n.community] ||
+        (onlyOrphans && n._degree > 0) ||
+        (groupIsolate && groupKey(n, groupIsolate.mode) !== groupIsolate.key);
+      return { id: n.id, hidden: hidden };
+    }));
+  }
+
+  // ---- hover a listed neighbour -> glow + animate connecting edge ----
   var currentNode = null, hl = null, hlTimer = null;
   function hoverLink(otherId) {
     if (currentNode == null) return;
@@ -172,17 +218,17 @@
     if (!a || !b) return;
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();          // bright link
-    ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 2 * Math.PI);                              // glow the node
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 2 * Math.PI);
     ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.stroke();
-    var t = (Date.now() % 850) / 850;                                                    // marker travelling along the edge
+    var t = (Date.now() % 850) / 850;
     ctx.beginPath(); ctx.arc(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 4.5, 0, 2 * Math.PI);
     ctx.fillStyle = '#8be9fd'; ctx.fill();
     ctx.restore();
   });
 
-  // ---- tabs ----
+  // ---- right tabs ----
   function activatePane(pane) {
     document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('active', x.dataset.pane === pane); });
     document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('active'); });
@@ -235,9 +281,7 @@
       el.addEventListener('mouseleave', unhoverLink);
     });
   }
-  window.showInfo = showInfo;
   function focusNode(nodeId) { activatePane('docs'); network.focus(nodeId, { scale: 1.4, animation: true }); network.selectNodes([nodeId]); showInfo(nodeId); }
-  window.focusNode = focusNode;
 
   var hoveredNodeId = null;
   network.on('hoverNode', function (params) { hoveredNodeId = params.node; container.style.cursor = 'pointer'; });
@@ -248,22 +292,16 @@
     else if (hoveredNodeId === null) document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
   });
 
-  // ---- overview (general info) ----
-  document.getElementById('overview').innerHTML =
-    '<div class="ov-tot"><b>' + SB.totals.files + '</b> files · <b>' + fmtSize(SB.totals.bytes) + '</b></div>' +
-    SB.types.map(function (t) {
-      return '<div class="ov-row"><span class="legend-dot" style="background:' + esc(t.color) + '"></span>' +
-        '<span class="nm">' + esc(t.type) + '</span><span class="ct">' + t.count + '</span><span class="sz">' + fmtSize(t.bytes) + '</span></div>';
-    }).join('');
-
-  // ---- search ----
+  // ---- search (left) ----
   var searchInput = document.getElementById('search');
   var searchResults = document.getElementById('search-results');
   searchInput.addEventListener('input', function () {
     var q = searchInput.value.toLowerCase().trim();
     searchResults.innerHTML = '';
     if (!q) { searchResults.style.display = 'none'; return; }
-    var matches = RAW_NODES.filter(function (n) { return n.label.toLowerCase().indexOf(q) !== -1; }).slice(0, 20);
+    var matches = RAW_NODES.filter(function (n) {
+      return n.label.toLowerCase().indexOf(q) !== -1 || (n.source_file || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 20);
     if (!matches.length) { searchResults.style.display = 'none'; return; }
     searchResults.style.display = 'block';
     matches.forEach(function (n) {
@@ -278,42 +316,94 @@
     if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
   });
 
-  // ---- communities legend ----
-  var hiddenCommunities = new Set();
+  // ---- GROUP BY + Groups list (left) ----
+  function groupColorOf(mode, key) {
+    if (mode === 'type') return typeColor[key] || '#888888';
+    if (mode === 'community') return commColor[key] || '#888888';
+    return hashColor(String(key));
+  }
+  function renderGroups() {
+    var box = document.getElementById('groups');
+    var h = document.getElementById('groups-h');
+    box.innerHTML = '';
+    if (groupMode === 'none') { h.textContent = 'Groups'; box.innerHTML = '<div class="ct">(grouping off)</div>'; return; }
+    h.textContent = 'Groups · by ' + groupMode;
+    var stat = {};
+    RAW_NODES.forEach(function (n) {
+      var k = groupKey(n, groupMode); if (k == null) return;
+      var e = stat[k] || (stat[k] = { count: 0, bytes: 0 }); e.count++; e.bytes += n.bytes || 0;
+    });
+    Object.keys(stat).sort(function (a, b) { return stat[b].count - stat[a].count; }).forEach(function (k) {
+      var row = document.createElement('div'); row.className = 'row' + (groupIsolate && groupIsolate.key === k ? ' active' : '');
+      row.innerHTML = '<span class="dot" style="background:' + esc(groupColorOf(groupMode, k)) + '"></span>' +
+        '<span class="nm" title="' + esc(k) + '">' + esc(k) + '</span><span class="ct">' + stat[k].count + '</span><span class="sz">' + fmtSize(stat[k].bytes) + '</span>';
+      row.onclick = function () {
+        if (groupIsolate && groupIsolate.key === k && groupIsolate.mode === groupMode) groupIsolate = null;
+        else groupIsolate = { mode: groupMode, key: k };
+        document.getElementById('groups-reset').style.display = groupIsolate ? 'block' : 'none';
+        renderGroups(); applyFilters();
+      };
+      box.appendChild(row);
+    });
+  }
+  document.getElementById('groupby').addEventListener('change', function (e) {
+    groupMode = e.target.value; groupIsolate = null;
+    document.getElementById('groups-reset').style.display = 'none'; renderGroups(); applyFilters();
+  });
+  document.getElementById('groups-reset').addEventListener('click', function () {
+    groupIsolate = null; this.style.display = 'none'; renderGroups(); applyFilters();
+  });
+  document.getElementById('only-orphans').addEventListener('change', function (e) { onlyOrphans = e.target.checked; applyFilters(); });
+
+  // ---- Node types filter (left) ----
+  (function () {
+    var box = document.getElementById('nodetypes');
+    SB.types.forEach(function (t) {
+      var row = document.createElement('div'); row.className = 'row';
+      row.innerHTML = '<span class="dot" style="background:' + esc(t.color) + '"></span>' +
+        '<span class="nm">' + esc(t.type) + '</span><span class="ct">' + t.count + '</span>';
+      row.onclick = function () {
+        if (hiddenTypes[t.type]) { delete hiddenTypes[t.type]; row.classList.remove('off'); }
+        else { hiddenTypes[t.type] = true; row.classList.add('off'); }
+        applyFilters();
+      };
+      box.appendChild(row);
+    });
+  })();
+
+  // ---- Communities legend (right tab) ----
   var selectAllCb = document.getElementById('select-all-cb');
   function updateSelectAllState() {
-    var total = LEGEND.length, hidden = hiddenCommunities.size;
-    selectAllCb.checked = hidden === 0;
-    selectAllCb.indeterminate = hidden > 0 && hidden < total;
+    var total = LEGEND.length, hidden = Object.keys(hiddenComms).length;
+    selectAllCb.checked = hidden === 0; selectAllCb.indeterminate = hidden > 0 && hidden < total;
   }
   function toggleAllCommunities(hide) {
-    document.querySelectorAll('.legend-item').forEach(function (item) { hide ? item.classList.add('dimmed') : item.classList.remove('dimmed'); });
+    document.querySelectorAll('#legend .row').forEach(function (item) { hide ? item.classList.add('off') : item.classList.remove('off'); });
     document.querySelectorAll('.legend-cb').forEach(function (cb) { cb.checked = !hide; });
-    LEGEND.forEach(function (c) { if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid); });
-    nodesDS.update(RAW_NODES.map(function (n) { return { id: n.id, hidden: hide }; }));
-    updateSelectAllState();
+    hiddenComms = {}; if (hide) LEGEND.forEach(function (c) { hiddenComms[c.cid] = true; });
+    applyFilters(); updateSelectAllState();
   }
   window.toggleAllCommunities = toggleAllCommunities;
-
-  var legendEl = document.getElementById('legend');
-  LEGEND.forEach(function (c) {
-    var item = document.createElement('div');
-    item.className = 'legend-item';
-    var cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.className = 'legend-cb'; cb.checked = true;
-    cb.addEventListener('change', function (ev) {
-      ev.stopPropagation();
-      if (cb.checked) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); }
-      else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); }
-      nodesDS.update(RAW_NODES.filter(function (n) { return n.community === c.cid; }).map(function (n) { return { id: n.id, hidden: !cb.checked }; }));
-      updateSelectAllState();
+  (function () {
+    var legendEl = document.getElementById('legend');
+    LEGEND.forEach(function (c) {
+      var item = document.createElement('div'); item.className = 'row';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'legend-cb'; cb.checked = true;
+      cb.addEventListener('change', function (ev) {
+        ev.stopPropagation();
+        if (cb.checked) { delete hiddenComms[c.cid]; item.classList.remove('off'); }
+        else { hiddenComms[c.cid] = true; item.classList.add('off'); }
+        applyFilters(); updateSelectAllState();
+      });
+      item.innerHTML = '<span class="dot" style="background:' + esc(c.color) + '"></span>' +
+        '<span class="nm">' + esc(c.label) + '</span><span class="ct">' + c.count + '</span>';
+      item.prepend(cb);
+      item.onclick = function (ev) { if (ev.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
+      legendEl.appendChild(item);
     });
-    item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div>' +
-      '<span class="legend-label">' + esc(c.label) + '</span><span class="legend-count">' + c.count + '</span>';
-    item.prepend(cb);
-    item.onclick = function (ev) { if (ev.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
-    legendEl.appendChild(item);
-  });
+  })();
+
+  renderGroups();
 })();
 </script>
 </body>
