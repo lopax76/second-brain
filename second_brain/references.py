@@ -40,8 +40,15 @@ _PATH_RE = re.compile(
 # Stripped only for link/wikilink extraction; path-in-prose still runs on the full text,
 # because file paths written in backticks (e.g. `src/app.py`) ARE genuine references — the
 # core thing Second Brain is meant to catch. (Regression 2026-06-14: graph-format.md -> target.)
+#
+# Inline code follows the CommonMark rule: an opening run of N backticks is closed by the next
+# run of exactly N backticks, and inner backticks are literal. So a doc that shows a single-
+# backtick example inside a double-backtick span — `` `[label](target)` `` — keeps the inner
+# `[label](target)` as code, not a link. A plain `+[^`\n]*`+ regex mispairs those delimiters
+# and leaks the inner link; the backreference pairs equal-length runs. Bounded length keeps it
+# from backtracking pathologically on a line full of stray backticks.
 _FENCE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
-_INLINE_CODE_RE = re.compile(r"`+[^`\n]*`+")
+_INLINE_CODE_RE = re.compile(r"(`+)[^\n]{0,2000}?\1")
 
 
 def _blank_code(text: str) -> str:

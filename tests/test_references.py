@@ -35,3 +35,19 @@ def test_dedup_preserves_order():
 
 def test_backslash_paths_normalized():
     assert extract_references(r"see src\pkg\mod.py here") == ["src/pkg/mod.py"]
+
+
+def test_single_backtick_example_link_not_extracted():
+    # showing markdown-link SYNTAX in a code span is not a real link
+    assert extract_references("write `[label](target)` inline") == []
+
+
+def test_double_backtick_codespan_inner_link_not_extracted():
+    # CommonMark: `` `[label](target)` `` is a code span whose inner backticks are literal;
+    # the inner link must NOT leak out (regression: CHANGELOG.md -> target).
+    assert extract_references("such as `` `[label](target)` `` ok") == []
+
+
+def test_real_path_in_backticks_is_still_a_reference():
+    # a genuine file path in backticks IS a prose reference — the core feature must survive
+    assert extract_references("entry point is `src/app.py`") == ["src/app.py"]

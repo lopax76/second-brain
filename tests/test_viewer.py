@@ -14,13 +14,16 @@ def _tiny_graph() -> Graph:
     return g
 
 
-def test_render_view_inlines_data_and_local_library() -> None:
+def test_render_view_is_single_self_contained_file() -> None:
     html = render_view(_tiny_graph())
     assert "__SB_DATA__" not in html  # placeholder token was replaced
     assert '"demo"' in html  # the project name is present in the inlined payload
-    # the 3D library is referenced locally (vendored next to the page), never from a remote URL
-    assert '<script src="3d-force-graph.min.js">' in html
-    assert "cdnjs" not in html and "unpkg" not in html and "https://" not in html
+    # the 3D library is INLINED — not referenced as a sibling/external file or a remote URL,
+    # so the single HTML renders even when moved or shared on its own.
+    assert "<script src=" not in html
+    assert "ForceGraph3D" in html  # the library is present in the page
+    assert "3d-force-graph" in html  # the library source itself is embedded
+    assert "cdnjs" not in html and "unpkg" not in html
 
 
 def test_template_does_not_claim_a_cdn_dependency() -> None:
@@ -31,13 +34,15 @@ def test_template_does_not_claim_a_cdn_dependency() -> None:
     assert "visibilitychange" in text
 
 
-def test_write_view_emits_offline_assets(tmp_path) -> None:
+def test_write_view_is_self_contained_single_file(tmp_path) -> None:
     write_view(tmp_path, _tiny_graph())
     d = tmp_path / ".secondbrain"
     assert (d / "view.html").is_file()
-    # the vendored 3D library is copied next to the page -> the viewer works offline
-    assert (d / "3d-force-graph.min.js").is_file()
-    assert "__SB_DATA__" not in (d / "view.html").read_text(encoding="utf-8")
+    # no sibling library file is needed: everything is inlined in the one HTML
+    assert not (d / "3d-force-graph.min.js").exists()
+    html = (d / "view.html").read_text(encoding="utf-8")
+    assert "__SB_DATA__" not in html
+    assert "ForceGraph3D" in html and "<script src=" not in html
 
 
 def test_render_view_escapes_script_breakout() -> None:

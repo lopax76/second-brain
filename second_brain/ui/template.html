@@ -198,20 +198,66 @@
     .linkWidth(l => knowledge(l) ? 0.5 : 0.2)
     .onNodeClick(handleClick)
     .cooldownTicks(150)
-    .onEngineStop(() => G.zoomToFit(700, 50))
+    .onEngineStop(() => fit())
     .graphData(visibleData());
   window.G = G;  // exposed for scripting / debugging
 
-  // If the page is opened in a background tab/window, the WebGL loop is throttled and the
-  // one-shot fit (onEngineStop -> zoomToFit) may run before anything is on screen, leaving a
-  // blank-looking graph. Re-fit the first time the page actually becomes visible/focused.
-  let _fitted = false;
-  function _refit(){ if (_fitted) return; _fitted = true;
-    try { G.d3ReheatSimulation(); G.zoomToFit(700, 50); } catch (e) {} }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) _refit(); });
-  window.addEventListener('focus', _refit);
+  // ForceGraph3D sizes its canvas to the WINDOW by default, ignoring the #graph container — so
+  // in this sidebar layout the aspect ratio is wrong. Pin the canvas to the container's real
+  // size and keep it in sync on resize.
+  function _size(){ const el = $('graph');
+    const w = el.clientWidth || el.offsetWidth, h = el.clientHeight || el.offsetHeight;
+    if (w && h) { G.width(w).height(h); } }
+  _size();
+  window.addEventListener('resize', _size);
+  if (window.ResizeObserver) { new ResizeObserver(_size).observe($('graph')); }
 
-  function refresh(){ G.graphData(visibleData()); applyCluster(); }
+  // Frame the whole graph. ForceGraph3D's zoomToFit relies on its internal animation loop, which
+  // (see the render loop below) can never start when the page is first painted in a background
+  // tab — so we set the camera distance directly from the node cloud's radius instead.
+  function fit(){
+    const ns = G.graphData().nodes; if (!ns.length) return;
+    let r = 0; for (const n of ns){ const d = Math.hypot(n.x||0, n.y||0, n.z||0); if (d > r) r = d; }
+    const dist = (r || 80) * 2.2 + 80;
+    try { G.cameraPosition({ x:0, y:0, z:dist }, { x:0, y:0, z:0 }, 0); } catch (e) {}
+  }
+
+  // CRITICAL: ForceGraph3D drives rendering with requestAnimationFrame started in its constructor.
+  // If the page is first painted while hidden (opened in a background tab/window), that rAF chain
+  // never fires and is not reliably resumed — the d3 force simulation still settles on its own
+  // timer, but NOTHING is ever drawn (0 WebGL draw calls => a blank canvas over correct data).
+  // We drive our own render+controls loop so the graph always paints, in any tab state.
+  // The library copies each node's layout coordinates onto its 3D mesh, and each link's onto its
+  // line geometry, INSIDE that dead render loop — so without it every mesh stays at the origin and
+  // all 123 nodes overlap into a single blob. We sync positions ourselves every frame, then render.
+  function _syncAndRender(){
+    const gd = G.graphData();
+    for (const n of gd.nodes){ const o = n.__threeObj;
+      if (o) o.position.set(n.x || 0, n.y || 0, n.z || 0); }
+    for (const l of gd.links){
+      const s = l.source, t = l.target; if (!s || !t) continue;
+      const line = l.__lineObj; const arrow = l.__arrowObj;
+      if (line && line.geometry){
+        const pos = line.geometry.getAttribute('position');
+        if (pos && pos.count >= 2){
+          pos.setXYZ(0, s.x||0, s.y||0, s.z||0);
+          pos.setXYZ(pos.count - 1, t.x||0, t.y||0, t.z||0);
+          pos.needsUpdate = true; line.geometry.computeBoundingSphere();
+        }
+      }
+      if (arrow){ arrow.position.set(((s.x||0)+(t.x||0))/2, ((s.y||0)+(t.y||0))/2, ((s.z||0)+(t.z||0))/2); }
+    }
+    const c = G.controls && G.controls(); if (c && c.update) c.update();
+    G.renderer().render(G.scene(), G.camera());
+  }
+  (function _renderLoop(){ requestAnimationFrame(_renderLoop); try { _syncAndRender(); } catch (e) {} })();
+
+  // Re-fit a few times while the simulation settles, and whenever the page becomes visible.
+  setTimeout(fit, 300); setTimeout(fit, 1200); setTimeout(fit, 2600);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { _size(); fit(); } });
+  window.addEventListener('focus', () => { _size(); fit(); });
+
+  function refresh(){ G.graphData(visibleData()); applyCluster(); setTimeout(fit, 400); }
 
   // ---- double-click opens details; clicks never move the camera (no zoom in/out churn) ----
   let last = { id:null, t:0 };
