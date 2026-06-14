@@ -19,7 +19,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from second_brain import communities
-from second_brain.model import EdgeType, Graph, NodeType
+from second_brain.model import NODE_COLORS, EdgeType, Graph, NodeType
 from second_brain.store import store_dir
 
 _UI_DIR = Path(__file__).parent / "ui"
@@ -114,11 +114,27 @@ def _build_payload(graph: Graph) -> dict:
     legend = [{"cid": cid_of[lbl], "color": COMMUNITY_COLORS[cid_of[lbl] % len(COMMUNITY_COLORS)],
                "label": cname(lbl), "count": members[lbl]} for lbl in ordered]
 
+    # Overview ("general info"): per file-type count + total size, over all file nodes.
+    type_colors = {k.value: v for k, v in NODE_COLORS.items()}
+    type_stat: dict[str, dict[str, int]] = {}
+    for n in graph.nodes.values():
+        if n.path is None:
+            continue
+        e = type_stat.setdefault(n.type.value, {"count": 0, "bytes": 0})
+        e["count"] += 1
+        e["bytes"] += int(n.meta.get("size", 0) or 0)
+    types = [{"type": t, "count": v["count"], "bytes": v["bytes"],
+              "color": type_colors.get(t, "#888888")}
+             for t, v in sorted(type_stat.items(), key=lambda kv: (-kv[1]["count"], kv[0]))]
+
     return {
         "project": graph.project,
         "nodes": vis_nodes,
         "edges": vis_edges,
         "legend": legend,
+        "types": types,
+        "totals": {"files": sum(v["count"] for v in type_stat.values()),
+                   "bytes": sum(v["bytes"] for v in type_stat.values())},
         "stats": {"nodes": len(vis_nodes), "edges": len(vis_edges), "communities": len(ordered)},
     }
 

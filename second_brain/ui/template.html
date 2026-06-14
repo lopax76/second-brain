@@ -13,42 +13,47 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
-  #graph { flex: 1; }
-  #sidebar { width: 300px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
-  #title-wrap { padding: 12px 12px 0; }
-  #title-wrap .title { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #graph { flex: 1; min-width: 0; }
+  #sidebar { width: 320px; flex: 0 0 320px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
+  #tabbar { display: flex; border-bottom: 1px solid #2a2a4e; flex: 0 0 auto; }
+  .tab { flex: 1; min-width: 0; background: none; border: none; color: #888; padding: 13px 8px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab.active { color: #e0e0e0; box-shadow: inset 0 -2px 0 #4E79A7; }
+  .pane { display: none; flex: 1; overflow-y: auto; }
+  .pane.active { display: block; }
   #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
   #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
   #search:focus { border-color: #4E79A7; }
-  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
+  #search-results { max-height: 160px; overflow-y: auto; margin-top: 6px; display: none; }
   .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .search-item:hover { background: #2a2a4e; }
-  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
-  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
-  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
-  #info-content .field { margin-bottom: 5px; }
+  .section { padding: 12px 14px; border-bottom: 1px solid #2a2a4e; }
+  .section h3 { font-size: 12px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: #ccc; line-height: 1.55; }
+  #info-content .field { margin-bottom: 4px; }
   #info-content .field b { color: #e0e0e0; }
   #info-content .empty { color: #555; font-style: italic; }
   .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
   .neighbor-link:hover { background: #2a2a4e; }
-  #neighbors-list { max-height: 200px; overflow-y: auto; margin-top: 4px; }
-  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
-  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .ov-tot { font-size: 12px; color: #ccc; margin-bottom: 8px; }
+  .ov-tot b { color: #e0e0e0; }
+  .ov-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
+  .ov-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov-row .ct { color: #888; font-size: 11px; }
+  .ov-row .sz { color: #666; font-size: 11px; min-width: 58px; text-align: right; }
+  .legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  #legend-controls { padding: 4px 0 8px; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
+  .legend-item { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
   .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
   .legend-item.dimmed { opacity: 0.35; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
   .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .legend-count { color: #666; font-size: 11px; }
-  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
-  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
-  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
-  #legend-controls label:hover { color: #e0e0e0; }
   .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
   .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
   .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
-  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
+  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; transform: none; }
+  #stats { flex: 0 0 auto; padding: 9px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #666; }
   #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 40px; background: #0f0f1a; }
   #error div { max-width: 520px; color: #cbd5e1; font-size: 15px; line-height: 1.6; }
 </style>
@@ -56,22 +61,35 @@
 <body>
 <div id="graph"></div>
 <div id="sidebar">
-  <div id="title-wrap"><div class="title" id="title"></div></div>
-  <div id="search-wrap">
-    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
-    <div id="search-results"></div>
+  <div id="tabbar">
+    <button class="tab active" data-pane="docs" id="tab-docs">Project</button>
+    <button class="tab" data-pane="comm">Communities</button>
   </div>
-  <div id="info-panel">
-    <h3>Node Info</h3>
-    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
-  </div>
-  <div id="legend-wrap">
-    <h3>Communities</h3>
-    <div id="legend-controls">
-      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
+
+  <div class="pane active" id="pane-docs">
+    <div id="search-wrap">
+      <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+      <div id="search-results"></div>
     </div>
-    <div id="legend"></div>
+    <div class="section">
+      <h3>Node Info</h3>
+      <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+    </div>
+    <div class="section" style="border-bottom:none">
+      <h3>Overview</h3>
+      <div id="overview"></div>
+    </div>
   </div>
+
+  <div class="pane" id="pane-comm">
+    <div class="section" style="border-bottom:none">
+      <div id="legend-controls">
+        <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select all</label>
+      </div>
+      <div id="legend"></div>
+    </div>
+  </div>
+
   <div id="stats"></div>
 </div>
 <div id="error"><div><b>Graph library could not be loaded.</b><br>
@@ -87,33 +105,31 @@
   if (typeof vis === 'undefined' || !vis.Network) { document.getElementById('error').style.display = 'flex'; return; }
 
   var RAW_NODES = SB.nodes, RAW_EDGES = SB.edges, LEGEND = SB.legend;
-  document.getElementById('title').textContent = SB.project || 'Second Brain';
+  document.getElementById('tab-docs').textContent = SB.project || 'Project';
   document.getElementById('stats').textContent =
     SB.stats.nodes + ' nodes · ' + SB.stats.edges + ' edges · ' + SB.stats.communities + ' communities';
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
+  function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
 
   var nodesDS = new vis.DataSet(RAW_NODES.map(function (n) {
     return { id: n.id, label: n.label, color: n.color, size: n.size, font: n.font, title: n.title,
       community: n.community, _community_name: n.community_name, _source_file: n.source_file,
-      _file_type: n.file_type, _degree: n.degree,
-      _bytes: n.bytes, _description: n.description, _broken: n.broken };
+      _file_type: n.file_type, _degree: n.degree, _bytes: n.bytes, _description: n.description, _broken: n.broken };
   }));
   var edgesDS = new vis.DataSet(RAW_EDGES.map(function (e, i) {
     return { id: i, from: e.from, to: e.to, title: e.title, dashes: e.dashes, width: e.width,
       color: e.color, arrows: { to: { enabled: true, scaleFactor: 0.5 } } };
   }));
 
-  // Adjacency (direction + edge type) for the inspect panel, from the rendered edges.
   var outAdj = {}, inAdj = {};
   RAW_EDGES.forEach(function (e) {
     (outAdj[e.from] = outAdj[e.from] || []).push({ other: e.to, type: e.title });
     (inAdj[e.to] = inAdj[e.to] || []).push({ other: e.from, type: e.title });
   });
-  function fmtSize(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB';
-    if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
   var IMPACT_TYPES = { imports:1, references:1, mentions:1 };
   function impactBFS(startId, adj){
     var seen = {}; seen[startId] = 1; var frontier = [startId], layers = [];
@@ -139,21 +155,51 @@
     edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
   });
   window.network = network;
+  network.once('stabilizationIterationsDone', function () { network.setOptions({ physics: { enabled: false } }); });
 
-  network.once('stabilizationIterationsDone', function () {
-    network.setOptions({ physics: { enabled: false } });
+  // ---- hover a listed neighbour -> glow the node + animate the connecting edge ----
+  var currentNode = null, hl = null, hlTimer = null;
+  function hoverLink(otherId) {
+    if (currentNode == null) return;
+    hl = { from: currentNode, to: otherId };
+    if (!hlTimer) hlTimer = setInterval(function () { network.redraw(); }, 33);
+    network.redraw();
+  }
+  function unhoverLink() { hl = null; if (hlTimer) { clearInterval(hlTimer); hlTimer = null; } network.redraw(); }
+  network.on('afterDrawing', function (ctx) {
+    if (!hl) return;
+    var p = network.getPositions([hl.from, hl.to]); var a = p[hl.from], b = p[hl.to];
+    if (!a || !b) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();          // bright link
+    ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 2 * Math.PI);                              // glow the node
+    ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    var t = (Date.now() % 850) / 850;                                                    // marker travelling along the edge
+    ctx.beginPath(); ctx.arc(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 4.5, 0, 2 * Math.PI);
+    ctx.fillStyle = '#8be9fd'; ctx.fill();
+    ctx.restore();
   });
 
+  // ---- tabs ----
+  function activatePane(pane) {
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('active', x.dataset.pane === pane); });
+    document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('active'); });
+    document.getElementById('pane-' + pane).classList.add('active');
+  }
+  document.querySelectorAll('.tab').forEach(function (b) { b.addEventListener('click', function () { activatePane(b.dataset.pane); }); });
+
+  // ---- node info ----
   function connRow(other, type) {
     var nb = nodesDS.get(other);
     var color = nb ? nb.color.background : '#555';
     var et = type ? ' <span style="color:#666;font-size:10px">' + esc(type) + '</span>' : '';
-    return '<span class="neighbor-link" style="border-left-color:' + esc(color) + '" onclick="focusNode(' + JSON.stringify(other) + ')">' + esc(nb ? nb.label : other) + et + '</span>';
+    return '<span class="neighbor-link" data-id="' + esc(other) + '" style="border-left-color:' + esc(color) + '">' + esc(nb ? nb.label : other) + et + '</span>';
   }
   function connList(arr) {
     if (!arr.length) return '<div style="color:#555;font-size:11px">none</div>';
-    return '<div style="max-height:160px;overflow-y:auto;margin-top:2px">' +
-      arr.map(function (c) { return connRow(c.other, c.type); }).join('') + '</div>';
+    return '<div style="max-height:170px;overflow-y:auto;margin-top:2px">' + arr.map(function (c) { return connRow(c.other, c.type); }).join('') + '</div>';
   }
   function impactRows(layers) {
     if (!layers.length) return '<div style="color:#555;font-size:11px">none</div>';
@@ -166,8 +212,11 @@
   function showInfo(nodeId) {
     var n = nodesDS.get(nodeId);
     if (!n) return;
+    currentNode = nodeId;
     var out = outAdj[nodeId] || [], inc = inAdj[nodeId] || [];
-    var h = '<div class="field"><b>' + esc(n.label) + '</b></div>' +
+    var box = document.getElementById('info-content');
+    box.innerHTML =
+      '<div class="field"><b>' + esc(n.label) + '</b></div>' +
       '<div class="field">Type: ' + esc(n._file_type || 'unknown') + '</div>' +
       '<div class="field">Community: ' + esc(n._community_name) + '</div>' +
       (n._source_file ? '<div class="field">Path: ' + esc(n._source_file) + '</div>' : '') +
@@ -179,28 +228,35 @@
       '<div class="field" style="margin-top:6px;color:#aaa;font-size:11px">Incoming (' + inc.length + ')</div>' + connList(inc) +
       '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Impact · upstream (what breaks if changed)</div>' + impactRows(impactBFS(nodeId, inAdj)) +
       '<div class="field" style="margin-top:6px;color:#aaa;font-size:11px">Impact · downstream (what it depends on)</div>' + impactRows(impactBFS(nodeId, outAdj));
-    document.getElementById('info-content').innerHTML = h;
+    box.querySelectorAll('.neighbor-link').forEach(function (el) {
+      var id = el.getAttribute('data-id');
+      el.addEventListener('click', function () { focusNode(id); });
+      el.addEventListener('mouseenter', function () { hoverLink(id); });
+      el.addEventListener('mouseleave', unhoverLink);
+    });
   }
   window.showInfo = showInfo;
-
-  function focusNode(nodeId) {
-    network.focus(nodeId, { scale: 1.4, animation: true });
-    network.selectNodes([nodeId]);
-    showInfo(nodeId);
-  }
+  function focusNode(nodeId) { activatePane('docs'); network.focus(nodeId, { scale: 1.4, animation: true }); network.selectNodes([nodeId]); showInfo(nodeId); }
   window.focusNode = focusNode;
 
   var hoveredNodeId = null;
   network.on('hoverNode', function (params) { hoveredNodeId = params.node; container.style.cursor = 'pointer'; });
   network.on('blurNode', function () { hoveredNodeId = null; container.style.cursor = 'default'; });
-  container.addEventListener('click', function () {
-    if (hoveredNodeId !== null) { showInfo(hoveredNodeId); network.selectNodes([hoveredNodeId]); }
-  });
+  container.addEventListener('click', function () { if (hoveredNodeId !== null) { activatePane('docs'); showInfo(hoveredNodeId); network.selectNodes([hoveredNodeId]); } });
   network.on('click', function (params) {
-    if (params.nodes.length > 0) showInfo(params.nodes[0]);
+    if (params.nodes.length > 0) { activatePane('docs'); showInfo(params.nodes[0]); }
     else if (hoveredNodeId === null) document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
   });
 
+  // ---- overview (general info) ----
+  document.getElementById('overview').innerHTML =
+    '<div class="ov-tot"><b>' + SB.totals.files + '</b> files · <b>' + fmtSize(SB.totals.bytes) + '</b></div>' +
+    SB.types.map(function (t) {
+      return '<div class="ov-row"><span class="legend-dot" style="background:' + esc(t.color) + '"></span>' +
+        '<span class="nm">' + esc(t.type) + '</span><span class="ct">' + t.count + '</span><span class="sz">' + fmtSize(t.bytes) + '</span></div>';
+    }).join('');
+
+  // ---- search ----
   var searchInput = document.getElementById('search');
   var searchResults = document.getElementById('search-results');
   searchInput.addEventListener('input', function () {
@@ -212,15 +268,9 @@
     searchResults.style.display = 'block';
     matches.forEach(function (n) {
       var el = document.createElement('div');
-      el.className = 'search-item';
-      el.textContent = n.label;
-      el.style.borderLeft = '3px solid ' + n.color.background;
-      el.style.paddingLeft = '8px';
-      el.onclick = function () {
-        network.focus(n.id, { scale: 1.5, animation: true });
-        network.selectNodes([n.id]); showInfo(n.id);
-        searchResults.style.display = 'none'; searchInput.value = '';
-      };
+      el.className = 'search-item'; el.textContent = n.label;
+      el.style.borderLeft = '3px solid ' + n.color.background; el.style.paddingLeft = '8px';
+      el.onclick = function () { focusNode(n.id); searchResults.style.display = 'none'; searchInput.value = ''; };
       searchResults.appendChild(el);
     });
   });
@@ -228,6 +278,7 @@
     if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
   });
 
+  // ---- communities legend ----
   var hiddenCommunities = new Set();
   var selectAllCb = document.getElementById('select-all-cb');
   function updateSelectAllState() {
@@ -236,9 +287,7 @@
     selectAllCb.indeterminate = hidden > 0 && hidden < total;
   }
   function toggleAllCommunities(hide) {
-    document.querySelectorAll('.legend-item').forEach(function (item) {
-      hide ? item.classList.add('dimmed') : item.classList.remove('dimmed');
-    });
+    document.querySelectorAll('.legend-item').forEach(function (item) { hide ? item.classList.add('dimmed') : item.classList.remove('dimmed'); });
     document.querySelectorAll('.legend-cb').forEach(function (cb) { cb.checked = !hide; });
     LEGEND.forEach(function (c) { if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid); });
     nodesDS.update(RAW_NODES.map(function (n) { return { id: n.id, hidden: hide }; }));
@@ -252,19 +301,17 @@
     item.className = 'legend-item';
     var cb = document.createElement('input');
     cb.type = 'checkbox'; cb.className = 'legend-cb'; cb.checked = true;
-    cb.addEventListener('change', function (e) {
-      e.stopPropagation();
+    cb.addEventListener('change', function (ev) {
+      ev.stopPropagation();
       if (cb.checked) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); }
       else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); }
-      nodesDS.update(RAW_NODES.filter(function (n) { return n.community === c.cid; })
-        .map(function (n) { return { id: n.id, hidden: !cb.checked }; }));
+      nodesDS.update(RAW_NODES.filter(function (n) { return n.community === c.cid; }).map(function (n) { return { id: n.id, hidden: !cb.checked }; }));
       updateSelectAllState();
     });
     item.innerHTML = '<div class="legend-dot" style="background:' + esc(c.color) + '"></div>' +
-      '<span class="legend-label">' + esc(c.label) + '</span>' +
-      '<span class="legend-count">' + c.count + '</span>';
+      '<span class="legend-label">' + esc(c.label) + '</span><span class="legend-count">' + c.count + '</span>';
     item.prepend(cb);
-    item.onclick = function (e) { if (e.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
+    item.onclick = function (ev) { if (ev.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
     legendEl.appendChild(item);
   });
 })();
