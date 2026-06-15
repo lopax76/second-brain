@@ -7,7 +7,7 @@ an OPTIONAL extra so the core stays dependency-free:
     second-brain-mcp [PROJECT_PATH]      # defaults to the current directory
 
 Read-only on your sources. Exposes small, budgeted tools (project_map / find / neighbors /
-subgraph / impact / report / health) over stdio.
+subgraph / impact / focus / report / health) over stdio.
 """
 
 from __future__ import annotations

@@ -132,6 +132,35 @@ def test_rebuild_failure_degrades_not_crashes(tmp_path, monkeypatch):
     assert "a.py" in g.nodes  # served the already-loaded (stale) graph
 
 
+def test_no_false_fresh_when_file_appears_during_build(tmp_path, monkeypatch):
+    # A file that lands AFTER the signature is captured (during the walk) must be picked up by
+    # the NEXT query — the signature is captured before reading contents, so the race degrades to
+    # false-stale (rebuild), never a permanent false-fresh.
+    import second_brain.freshness as fr
+
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    real_index = fr.index
+
+    def index_then_change(root, **kw):
+        g, m = real_index(root, **kw)
+        (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # appears after the walk
+        return g, m
+
+    monkeypatch.setattr(fr, "index", index_then_change)
+    fr.load_or_refresh(tmp_path)  # builds {a.py}; b.py created during build
+    monkeypatch.undo()
+    g2 = fr.load_or_refresh(tmp_path)
+    assert "b.py" in g2.nodes  # not masked as fresh
+
+
+def test_refresh_ttl_non_finite_does_not_freeze(monkeypatch):
+    import second_brain.freshness as fr
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "inf")
+    assert fr._refresh_ttl() == 0.0
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "nan")
+    assert fr._refresh_ttl() == 0.0
+
+
 def test_refresh_preserves_symbols_mode(tmp_path):
     (tmp_path / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
     g, m = index(tmp_path, symbols=True)

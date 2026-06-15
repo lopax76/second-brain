@@ -55,7 +55,11 @@ def find_broken(graph: Graph) -> list[tuple[str, str]]:
 
 
 def find_orphans(graph: Graph) -> list[str]:
-    """File nodes with no import/reference edge (area membership does not count)."""
+    """File nodes with no import/reference edge.
+
+    Only file-backed nodes are considered (area and symbol nodes have no ``path`` and are
+    excluded); area membership and git ``touches`` do not count as a knowledge connection.
+    """
     connected: set[str] = set()
     for e in graph.edges:
         if e.type in (EdgeType.IMPORTS, EdgeType.REFERENCES):

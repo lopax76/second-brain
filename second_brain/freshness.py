@@ -10,6 +10,7 @@ brain is still in sync with the project.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import time
 from pathlib import Path
@@ -176,9 +177,10 @@ def auto_refresh_enabled() -> bool:
 
 def _refresh_ttl() -> float:
     try:
-        return max(0.0, float(os.environ.get("SECOND_BRAIN_REFRESH_TTL", "0")))
+        ttl = float(os.environ.get("SECOND_BRAIN_REFRESH_TTL", "0"))
     except ValueError:
         return 0.0
+    return max(0.0, ttl) if math.isfinite(ttl) else 0.0  # inf/nan -> always check (never freeze)
 
 
 def _should_check(root: str | os.PathLike[str]) -> bool:
@@ -200,12 +202,13 @@ def _has_symbols(graph: Graph) -> bool:
 
 
 def _save_quiet(
-    root: str | os.PathLike[str], g: Graph, m: dict[str, str], *, symbols: bool
+    root: str | os.PathLike[str], g: Graph, m: dict[str, str], *,
+    symbols: bool, signature: dict[str, str],
 ) -> None:
     """Persist the store, ignoring write errors (read-only checkout / locked store)."""
     from second_brain import store
     try:
-        store.save(root, g, m, signature=fast_signature(root), symbols=symbols)
+        store.save(root, g, m, signature=signature, symbols=symbols)
     except OSError:
         pass  # degrade gracefully: the in-memory graph is still served
 
@@ -229,18 +232,23 @@ def load_or_refresh(
 
     g = store.load_graph(root)
     if g is None:  # first touch: build + persist (graph, manifest, signature, mode)
+        # Capture the signature BEFORE reading file contents: if a file changes during the walk,
+        # the stored signature is then "older" than the change, so the next query sees a mismatch
+        # and rebuilds (false-stale = safe) — instead of a permanent false-fresh.
+        sig = fast_signature(root)
         built, m = index(root)
-        _save_quiet(root, built, m, symbols=False)
+        _save_quiet(root, built, m, symbols=False, signature=sig)
         return built
     if refresh and _should_check(root) and is_stale(root):
         # Prefer the persisted build mode; fall back to "are there symbol nodes?" only if the
         # store predates mode.json (so a --symbols build of a then-symbol-less tree is preserved).
         mode = store.load_symbols_mode(root)
         use_symbols = mode if mode is not None else _has_symbols(g)
+        sig = fast_signature(root)  # before the walk (see first-touch note)
         try:
             rebuilt, m = index(root, symbols=use_symbols)
         except Exception:
             return g  # any rebuild failure -> serve the loaded graph (stale but alive), never crash
-        _save_quiet(root, rebuilt, m, symbols=use_symbols)
+        _save_quiet(root, rebuilt, m, symbols=use_symbols, signature=sig)
         return rebuilt
     return g

@@ -98,7 +98,8 @@ def render_report(
         {"id": nid, "type": graph.nodes[nid].type.value, "score": s}
         for nid, s in rank.top(
             graph, _GOD_NODES, scores=scores,
-            predicate=lambda n: n.path is not None and n.type is not NodeType.AREA,
+            predicate=lambda n: (n.path is not None and n.type not in
+                                 (NodeType.AREA, NodeType.SESSION, NodeType.DECISION)),
         )
     ]
     fams = _decision_families(graph)
@@ -137,7 +138,7 @@ def render_report(
             "", "## Most-changed files (recent churn)", "",
             "How often each file changed across the indexed commits — historical hot spots.", "",
         ]
-        out += [f"- `{nid}` — {c} commits" for nid, c in top_churn]
+        out += [f"- `{nid}` — {c} commit{'s' if c != 1 else ''}" for nid, c in top_churn]
 
     out += [
         "", "## Communities", "",

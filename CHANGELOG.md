@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] - 2026-06-15
 
 ### Added
 
@@ -48,6 +48,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Final pre-0.4.0 gate (30-agent audit).** The auto-refresh signature is now captured *before*
+  the build walk, so an edit landing mid-build degrades to a safe rebuild (false-stale) instead of
+  a permanent false-fresh; `SECOND_BRAIN_REFRESH_TTL=inf`/`nan` no longer freezes the staleness
+  check; the report's god-node filter excludes session/decision nodes to match its docstring; the
+  CI matrix now also tests Python 3.14 (claimed in the classifiers).
 - **Hardening (roadmap items).** `Graph` keeps a lazily-built adjacency index, so
   `neighbors()` / `degree()` are O(degree) per call instead of re-scanning every edge (behavior
   identical, including per-edge-type and self-loop counting). `agent install` / `hook install`

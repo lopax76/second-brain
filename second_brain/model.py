@@ -240,6 +240,8 @@ class Graph:
         }
 
     def to_json(self, *, indent: int | None = 2) -> str:
+        # Determinism comes from sorting nodes/edges (see to_dict) + stable meta insertion order;
+        # keys are kept in their readable order (id first), not alphabetized.
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
     @classmethod
