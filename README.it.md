@@ -31,10 +31,11 @@ assistente AI **perde il filo tra una chat e l'altra** — così ogni sessione r
 ri-cercando i file. È lento, incompleto e **brucia token ripetutamente** — e peggiora man mano che
 il progetto cresce.
 
-Second Brain costruisce il grafo del progetto **una volta sola** e lo mantiene fresco in modo
-incrementale (fuori dal modello, a costo di token quasi nullo). L'assistente lo **interroga** e
-ottiene risposte compatte; una persona apre la **mappa 2D a community** e vede l'intero progetto a
-colpo d'occhio.
+Second Brain costruisce il grafo del progetto e lo mantiene onesto man mano che il progetto
+cambia — un **gate** per content-hash segnala esattamente cosa è andato fuori sync, e il rebuild è
+un re-walk completo veloce (fuori dal modello, a costo di token quasi nullo). L'assistente lo
+**interroga** e ottiene risposte compatte; una persona apre la **mappa 2D a community** e vede
+l'intero progetto a colpo d'occhio.
 
 **Non è un sistema RAG**: niente embedding, niente vector store, nessun LLM per costruire il grafo.
 Mappa le relazioni *strutturali* tra i file, il che lo rende complementare al RAG e mirato a una
@@ -136,28 +137,74 @@ pip install -e .                            # oppure da un clone
 runtime: **nessuna** (solo libreria standard). Il pacchetto installa il comando `second-brain`
 e il modulo di import `second_brain`.
 
-## Avvio rapido
+## Comandi
 
+Ogni comando accetta un path di progetto opzionale (default `.`). **Le query si auto-aggiornano** —
+fanno il build al primo uso e ricostruiscono solo quando il progetto è davvero cambiato — così un
+assistente non risponde mai da una mappa stantia (vedi *Sempre fresco* sotto).
+
+**Build & freschezza**
 ```bash
-second-brain build  .          # indicizza un progetto -> .secondbrain/graph.json
-second-brain gate   .          # check anti-deriva: ref rotte, file stantii, orfani
-second-brain view   .          # scrive il viewer mappa 2D a community offline -> view.html
-second-brain stats  .          # conteggi rapidi per tipo nodo/arco
-second-brain map    .          # digest compatto: aree, dimensioni, file più connessi
-second-brain find   util .     # trova nodi per nome o path
-second-brain neighbors second_brain/model.py .   # un nodo e le sue connessioni
-second-brain impact second_brain/model.py .      # raggio d'impatto: cosa si rompe / da cosa dipende
-second-brain report .          # scrive GRAPH_REPORT.md: god node, community, decisioni, problemi
-second-brain assess .          # report prima/dopo: problemi + risparmio token
-second-brain symbols second_brain/model.py       # firme funzioni/classi di un file Python
-second-brain agent install .   # aggiunge la direttiva SB a CLAUDE.md/AGENTS.md + un hook Claude Code
-second-brain hook install .    # git post-commit/post-checkout: tiene il grafo fresco da solo
+second-brain build .              # indicizza il progetto -> .secondbrain/ (grafo + GRAPH_REPORT.md)
+second-brain build . --symbols    # indicizza anche il layer simboli Python (funzioni/classi + calls)
+second-brain gate .               # check anti-deriva: ref rotte, file stantii, orfani (exit≠0 se derivato)
 ```
 
-**Drill-down** puntando lo strumento su una sottocartella — `second-brain view ./src/api`
-renderizza solo quell'area in pieno dettaglio, mentre la vista d'insieme resta leggera grazie alla
-modalità *backbone* (aree + nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul
-nodo-area).
+**Orientarsi — leggi questi per primi**
+```bash
+second-brain report .   # GRAPH_REPORT.md: god node (PageRank), community, churn, decisioni, problemi
+second-brain map .      # digest compatto: aree, dimensioni, file più connessi
+second-brain assess .   # prima/dopo: problemi + risparmio token
+second-brain stats .    # conteggi rapidi per tipo nodo/arco
+```
+
+**Interrogare**
+```bash
+second-brain find util .                            # nodi il cui nome/path contiene "util"
+second-brain neighbors second_brain/model.py .      # un nodo e le sue connessioni
+second-brain impact second_brain/model.py .         # raggio d'impatto: cosa si rompe / da cosa dipende
+second-brain impact second_brain/model.py . --up    # solo chi dipende da esso (eseguilo prima di modificare!)
+second-brain focus "budget token nel report" .      # mirato al compito: il sottografo minimo che conta
+second-brain focus "flusso di auth" . --budget 4000 #   ...entro ~4000 token (default 2000)
+second-brain symbols second_brain/model.py .        # firme funzioni/classi di un file Python
+```
+
+**Vedere & esportare**
+```bash
+second-brain view .             # viewer mappa 2D a community offline -> .secondbrain/view.html
+second-brain view ./src/api     # drill-down su un'area in pieno dettaglio (la vista d'insieme resta leggera)
+second-brain export . --format graphml --out graph.graphml   # GraphML per Gephi/yEd/Cytoscape/networkx
+```
+
+**Integrazione agente & freschezza automatica**
+```bash
+second-brain agent install .    # aggiunge la direttiva SB a CLAUDE.md/AGENTS.md + un hook Claude Code
+second-brain hook install .     # git post-commit/post-checkout: ricostruisce il grafo a ogni commit
+```
+
+**Drill-down** puntando qualsiasi comando su una sottocartella — `second-brain map ./src/api`
+lavora solo su quell'area; la vista d'insieme resta leggera grazie alla modalità *backbone* (aree +
+nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul nodo-area).
+
+### Sempre fresco (auto-refresh)
+
+Le query (`map` / `find` / `neighbors` / `impact` / `focus` / `report`, e i tool MCP) controllano
+una **firma leggera size+mtime** prima di rispondere e **ricostruiscono solo se il progetto è
+cambiato** — modifiche **non ancora committate** incluse. Così la mappa è aggiornata ogni volta che
+l'assistente la usa, **senza scheduler e senza dipendenze**. Il primo uso di un progetto fa il build
+da solo. Per servire il grafo salvato così com'è (saltando il controllo): `SECOND_BRAIN_AUTO_REFRESH=0`.
+Su un progetto a grafo unico enorme puoi limitare il controllo con `SECOND_BRAIN_REFRESH_TTL=<secondi>`.
+Il controllo solo-`stat` ha un unico punto cieco — una modifica a parità di dimensione entro lo stesso
+tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash) cattura con precisione.
+
+| Interruttore | Effetto |
+|--------------|---------|
+| `SECOND_BRAIN_AUTO_REFRESH=0` | disattiva l'auto-refresh (serve il grafo salvato, più veloce, può essere stantio) |
+| `SECOND_BRAIN_REFRESH_TTL=<sec>` | limita il controllo di freschezza a una volta per finestra (grafi monorepo enormi) |
+| `build --symbols` | include il layer funzioni/classi + chiamate (off di default per tenere la mappa leggera) |
+| `focus … --budget N` | dimensiona il contesto-compito restituito da `focus` (default 2000 token) |
+| `impact … --up` / `--down` / `--depth N` | restringe/limita la camminata del raggio d'impatto |
+| `view --backbone` | forza il rendering backbone a qualsiasi dimensione (automatico oltre ~8000 nodi) |
 
 ### Aprire il grafo
 
@@ -173,13 +220,13 @@ nodo-area).
 
 ## Layer di query (per gli assistenti AI)
 
-`second-brain map`, `find`, `neighbors`, `impact` e `report` restituiscono risposte compatte e
-budgettate (id, tipi, dimensioni, connessioni — mai il contenuto dei file). Un **server MCP**
-opzionale espone le stesse query agli assistenti compatibili MCP:
+`second-brain map`, `find`, `neighbors`, `impact`, `focus` e `report` restituiscono risposte
+compatte e budgettate (id, tipi, dimensioni, connessioni — mai il contenuto dei file). Un **server
+MCP** opzionale espone le stesse query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .      # serve project_map / find / neighbors / subgraph / impact / report / health
+second-brain-mcp .   # serve project_map / find / neighbors / subgraph / impact / focus / report / health
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -191,10 +238,12 @@ Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
    `[[wikilink]]` e **menzioni di path in prosa** — il pezzo che gli strumenti standard mancano) e
    appartenenza ad area. Vengono aggiunti anche i nodi operativi (decisioni trovate nei documenti,
    sessioni dai commit git).
-2. **Stay fresh** — il diffing per content-hash ricostruisce solo ciò che è cambiato (fuori dal
-   modello).
-3. **Query / view** — una persona ottiene la mappa 2D a community; un assistente interroga il layer a basso
-   costo di token.
+2. **Stay fresh** — il diffing per content-hash dice al **gate** esattamente cosa è cambiato
+   dall'ultimo build; il rebuild è un re-walk completo veloce (fuori dal modello). Le query inoltre
+   si **auto-aggiornano**: ricostruiscono da sole quando il progetto è cambiato (modifiche non
+   committate incluse), così un assistente non lavora mai su una mappa stantia.
+3. **Query / view** — una persona ottiene la mappa 2D a community; un assistente interroga il layer a
+   basso costo di token, e chiede `focus "<compito>"` per la sola fetta che serve al lavoro in corso.
 
 **Sui falsi positivi:** le menzioni di path in prosa sono intrinsecamente rumorose. Second Brain
 le gestisce in modo asimmetrico — link markdown e wikilink sono intenzionali (uno non risolto è

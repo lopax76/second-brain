@@ -13,7 +13,8 @@ half-written graph.
 | File | Produced by | Purpose |
 |------|-------------|---------|
 | `graph.json` | `build` | The graph itself (nodes + edges). The thing you consume. |
-| `manifest.json` | `build` | `{ "<relative/path>": "<content-hash>" }`, sorted. Drives incremental rebuilds and the anti-drift gate's *stale* check. |
+| `manifest.json` | `build` | `{ "<relative/path>": "<content-hash>" }`, sorted. Powers the anti-drift gate's *stale* check — which files changed since the last build. |
+| `signature.json` | `build` | `{ "<relative/path>": "<size>:<mtime>" }`, sorted. A cheap stat-only signature that lets queries detect "did anything change?" without hashing, powering self-refreshing reads. |
 | `view.html` | `view` | A self-contained **2D community-map** viewer with the graph data *and* the rendering library both inlined — a single file that works fully offline (see note below). |
 | `GRAPH_REPORT.md` | `build`, `report` | A read-only Markdown one-pager: scale + token cost, god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The artifact an assistant reads first. |
 

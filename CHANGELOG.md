@@ -4,6 +4,61 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Self-refreshing reads (always fresh by default).** Every query (`map` / `find` / `neighbors` /
+  `impact` / `focus` / `report` and the MCP tools) checks a cheap size+mtime signature and rebuilds
+  the graph only when the project actually changed — including *uncommitted* edits — so an assistant
+  never answers from a stale map. First use of a project auto-builds. No scheduler, no dependencies.
+  Disable with `SECOND_BRAIN_AUTO_REFRESH=0`; throttle on a huge single graph with
+  `SECOND_BRAIN_REFRESH_TTL=<seconds>`. A failed store write (read-only checkout) degrades to
+  serving the in-memory graph instead of crashing. The store now also keeps a `signature.json`
+  for the stat-only staleness check.
+- **PageRank ranking (`second_brain.rank`).** Structural importance over the knowledge graph
+  (imports/references), pure-Python, deterministic, with dangling-mass handling and an optional
+  personalised restart vector. The `report` "god nodes" now rank by importance instead of raw
+  degree.
+- **Task-aware budgeted retrieval — `second-brain focus "<task>" [path] --budget N`** (and the
+  `focus` MCP tool). Anchors the task to matching files, runs personalised PageRank from them, and
+  returns the minimal high-value subgraph within a token budget (seeds first) plus the knowledge
+  edges among the chosen nodes — the context for a task, not the whole digest. Falls back to
+  globally important nodes when nothing matches. Personalised-PageRank scores are cached
+  (structurally-keyed, LRU-bounded) for fast repeated queries in a long-running MCP server.
+- **Opt-in Python symbol layer — `second-brain build --symbols`.** Adds function/class nodes
+  (`symbol`) and intra-file `calls` edges via `ast`. Resolution is deliberately conservative
+  (`self.m()` → the enclosing class's method; bare `f()` only when unique in the file; a class
+  never inherits its methods' calls; non-`self` attribute calls are not guessed) to avoid
+  name-based false edges. Off by default; symbol nodes carry no path, so file counts/areas/orphans
+  are unaffected.
+- **GraphML export — `second-brain export [path] --format graphml [--out file]`.** Deterministic
+  XML for Gephi / yEd / Cytoscape / networkx. Pure stdlib.
+- **Churn in the report.** A "Most-changed files (recent churn)" section derived from git
+  `touches` edges — historical hot spots, complementary to PageRank's structural importance
+  (shown only when the project has git history).
+
+### Changed
+
+- **Honest docs on rebuild cost.** The README (EN + IT) and `docs/graph-format.md` previously
+  said the build "rebuilds only what changed" / "drives incremental rebuilds". It does not: a
+  build is a full re-walk (fast). The content-hash manifest powers the anti-drift **gate**'s
+  staleness check (which files changed since the last build), not a partial rebuild. Wording
+  corrected to match the code. (A truly incremental build remains a possible future feature.)
+
+### Fixed
+
+- **`symbols` CLI consistency.** `second-brain symbols <file> [path]` now takes an optional
+  project root (default `.`), like `find` / `neighbors` / `impact`, and resolves the file under
+  it. Previously a second argument raised `unrecognized arguments`. Missing files still fail
+  loudly (exit 2 + `not a file` on stderr), never silently. Verified argparse-compatible on
+  Python 3.12.
+- **Conservative broken-reference resolution.** A markdown/wikilink is reported as *broken* only
+  when its target looks like a project file (path separator or a letter-initial extension). This
+  removes false positives from code fragments in HTML docs (minified JS `](A)` / `](this.easingTime)`)
+  and from version strings (`[v1.2](v1.2)`), while still catching genuine broken file links.
+  (On this repo: 9 false "broken refs" → 0.)
+
 ## [0.3.0] - 2026-06-14
 
 ### Added
