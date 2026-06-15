@@ -79,6 +79,22 @@ def test_cache_no_structural_collision():
     assert r2["c"] > r1["c"]
 
 
+def test_cache_no_isolated_node_collision():
+    # Two graphs with same project/node-count/edges but differing ONLY in an isolated node
+    # must not collide (the fingerprint must include nodes, not just edges).
+    def _mk(extra_isolated: str) -> Graph:
+        g = Graph(project="p")
+        for x in ("a", "b", "c", extra_isolated):
+            g.add_node(Node(id=x, type=NodeType.PROGRAM, label=x, path=x))
+        g.add_edge(Edge("a", "b", EdgeType.IMPORTS))
+        return g
+
+    query.clear_focus_cache()
+    query.focus(_mk("d"), "zz", budget_tokens=9999)            # caches under g_a's key
+    nodes_b = {n["id"] for n in query.focus(_mk("e"), "zz", budget_tokens=9999)["nodes"]}
+    assert "e" in nodes_b and "d" not in nodes_b               # g_b not served g_a's cached scores
+
+
 def test_cache_is_bounded():
     g = _g()
     query.clear_focus_cache()

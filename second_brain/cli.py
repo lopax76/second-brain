@@ -38,8 +38,9 @@ def _load_or_build(path: str) -> Graph:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    g, m = _build(args.path, symbols=getattr(args, "symbols", False))
-    store.save(args.path, g, m, signature=fast_signature(args.path))
+    sym = getattr(args, "symbols", False)
+    g, m = _build(args.path, symbols=sym)
+    store.save(args.path, g, m, signature=fast_signature(args.path), symbols=sym)
     # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
     rp = report.write_report(args.path, g, scan=False)
     c = g.counts()

@@ -16,7 +16,10 @@ import re
 
 _URL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://|^mailto:", re.IGNORECASE)
 
-_MD_LINK_RE = re.compile(r"\]\(\s*<?([^)\s>]+)>?\s*(?:\"[^\"]*\"|'[^']*')?\s*\)")
+# A link target never contains ']' (and excluding it makes a pathological run of unclosed `](`
+# fail fast — no backtracking, so no ReDoS). The length cap is defense-in-depth, mirroring the
+# wikilink/inline-code regexes below.
+_MD_LINK_RE = re.compile(r"\]\(\s*<?([^)\s>\]]{1,2000})>?\s*(?:\"[^\"]*\"|'[^']*')?\s*\)")
 # Bounded + single-line: a wikilink name/anchor/alias is short and never spans a newline.
 # The length caps and `\n` exclusion keep matching linear even on a pathological document full
 # of unclosed `[[` (no quadratic backtracking on large files).

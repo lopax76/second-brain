@@ -95,6 +95,7 @@ A directed `source → target` between node ids, de-duplicated by `(source, targ
 | `config` | `#EA580C` | Configuration files. |
 | `area` | `#6B7280` | A logical cluster (a top-level folder). |
 | `session` | `#92400E` | A work session / git commit (operational layer). |
+| `symbol` | `#0EA5E9` | A function/class inside a code file (opt-in symbol layer; `build --symbols`). |
 
 ## Edge types
 
@@ -105,6 +106,8 @@ A directed `source → target` between node ids, de-duplicated by `(source, targ
 | `belongs_to` | `#6B7280` | A file belongs to an area. |
 | `mentions` | `#DC2626` | A document mentions a decision. |
 | `touches` | `#92400E` | A session/commit touched a file. |
+| `defines` | `#0EA5E9` | A code file defines a symbol (opt-in symbol layer). |
+| `calls` | `#0284C7` | A symbol calls another symbol, same-file, conservative (opt-in symbol layer). |
 
 ## How files are classified
 

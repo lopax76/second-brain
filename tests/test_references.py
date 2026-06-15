@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from second_brain.references import extract_references
+import time
+
+from second_brain.references import extract_references, extract_references_tagged
+
+
+def test_md_link_regex_no_redos_on_unclosed_runs():
+    # A pathological run of unclosed `](` must not blow up (ReDoS): the length-capped regex
+    # keeps it linear. 30k repeats finish in well under a second.
+    t0 = time.perf_counter()
+    extract_references_tagged("](" * 30000)
+    assert time.perf_counter() - t0 < 2.0
 
 
 def test_markdown_link():

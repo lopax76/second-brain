@@ -201,7 +201,7 @@ tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash)
 |--------------|---------|
 | `SECOND_BRAIN_AUTO_REFRESH=0` | disattiva l'auto-refresh (serve il grafo salvato, più veloce, può essere stantio) |
 | `SECOND_BRAIN_REFRESH_TTL=<sec>` | limita il controllo di freschezza a una volta per finestra (grafi monorepo enormi) |
-| `build --symbols` | include il layer funzioni/classi + chiamate (off di default per tenere la mappa leggera) |
+| `build --symbols` | include il layer di funzioni/classi + chiamate (off di default per tenere la mappa leggera) |
 | `focus … --budget N` | dimensiona il contesto-compito restituito da `focus` (default 2000 token) |
 | `impact … --up` / `--down` / `--depth N` | restringe/limita la camminata del raggio d'impatto |
 | `view --backbone` | forza il rendering backbone a qualsiasi dimensione (automatico oltre ~8000 nodi) |

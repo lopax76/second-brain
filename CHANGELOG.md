@@ -48,6 +48,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Cross-check hardening (15-agent review).** `focus`'s cache fingerprint now includes the node
+  set (not just edges), so two graphs differing only by an isolated-node turnover can't collide;
+  the markdown-link regex excludes `]` and is length-capped (no ReDoS on pathological `](` runs);
+  the build mode (`--symbols`) is persisted in `mode.json` so a self-refresh keeps indexing symbols
+  even when the stored graph had none yet; a self-refresh rebuild that fails for *any* reason (not
+  just I/O) degrades to the loaded graph instead of crashing. `focus` is now listed in
+  `docs/mcp.md`, and the `symbol` / `defines` / `calls` types in `docs/graph-format.md`.
 - **`symbols` CLI consistency.** `second-brain symbols <file> [path]` now takes an optional
   project root (default `.`), like `find` / `neighbors` / `impact`, and resolves the file under
   it. Previously a second argument raised `unrecognized arguments`. Missing files still fail

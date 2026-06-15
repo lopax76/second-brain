@@ -29,6 +29,7 @@ The server lazily loads the stored graph (or builds it on first use), so it star
 | `neighbors` | `node_id` | A node and its incoming/outgoing connections (imports, references, area membership), size, description, and any broken refs. Returns `{ "error": "node not found", ... }` for an unknown id, so an assistant can tell "no edges" from "no node". |
 | `subgraph` | `node_id`, `hops` (default 1) | A small subgraph (nodes + edges) within `hops` of `node_id`. |
 | `impact` | `node_id`, `direction` (`up`/`down`/`both`, default `both`), `max_depth` (default 2) | Blast radius grouped by depth: `upstream` = who depends on `node_id` (what breaks if you change it), `downstream` = what it depends on. |
+| `focus` | `task`, `budget` (default 2000) | Task-aware retrieval: the minimal high-value subgraph for `task` within ~`budget` tokens. Anchors the task to matching files, runs personalised PageRank from them, and returns the top nodes + the knowledge edges among them — the context for a task, not the whole digest. Falls back to globally important nodes when nothing matches. |
 | `report` | – | The full `GRAPH_REPORT.md` as Markdown: god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The cheapest way to orient before grepping. |
 | `health` | – | Anti-drift status: `ok` (bool), `broken` (list of `[source, target]` pairs), `stale` (`{added, removed, changed}` lists vs the last build), and `orphans` (count). |
 

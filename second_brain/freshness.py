@@ -195,11 +195,13 @@ def _has_symbols(graph: Graph) -> bool:
     return any(n.type is NodeType.SYMBOL for n in graph.nodes.values())
 
 
-def _save_quiet(root: str | os.PathLike[str], g: Graph, m: dict[str, str]) -> None:
+def _save_quiet(
+    root: str | os.PathLike[str], g: Graph, m: dict[str, str], *, symbols: bool
+) -> None:
     """Persist the store, ignoring write errors (read-only checkout / locked store)."""
     from second_brain import store
     try:
-        store.save(root, g, m, signature=fast_signature(root))
+        store.save(root, g, m, signature=fast_signature(root), symbols=symbols)
     except OSError:
         pass  # degrade gracefully: the in-memory graph is still served
 
@@ -222,15 +224,19 @@ def load_or_refresh(
         refresh = auto_refresh_enabled()
 
     g = store.load_graph(root)
-    if g is None:  # first touch: build + persist (graph, manifest, signature)
+    if g is None:  # first touch: build + persist (graph, manifest, signature, mode)
         built, m = index(root)
-        _save_quiet(root, built, m)
+        _save_quiet(root, built, m, symbols=False)
         return built
     if refresh and _should_check(root) and is_stale(root):
+        # Prefer the persisted build mode; fall back to "are there symbol nodes?" only if the
+        # store predates mode.json (so a --symbols build of a then-symbol-less tree is preserved).
+        mode = store.load_symbols_mode(root)
+        use_symbols = mode if mode is not None else _has_symbols(g)
         try:
-            rebuilt, m = index(root, symbols=_has_symbols(g))
-        except OSError:
-            return g  # can't re-read the tree -> serve the loaded graph (stale but alive)
-        _save_quiet(root, rebuilt, m)
+            rebuilt, m = index(root, symbols=use_symbols)
+        except Exception:
+            return g  # any rebuild failure -> serve the loaded graph (stale but alive), never crash
+        _save_quiet(root, rebuilt, m, symbols=use_symbols)
         return rebuilt
     return g

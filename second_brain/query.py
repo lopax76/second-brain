@@ -304,8 +304,16 @@ def clear_focus_cache() -> None:
 
 
 def _graph_fingerprint(graph: Graph) -> int:
-    """Cheap structural fingerprint of the edge set (order-independent, O(edges))."""
-    return hash(frozenset((e.source, e.target, e.type.value) for e in graph.edges))
+    """Cheap structural fingerprint of nodes + edges (order-independent, O(nodes+edges)).
+
+    Includes the node-id set, not just edges: isolated nodes (orphans) carry no edge, so an
+    edges-only fingerprint would alias two graphs that differ only by an isolated-node turnover
+    at equal counts — serving cached scores that silently drop the new node.
+    """
+    return hash((
+        frozenset(graph.nodes),
+        frozenset((e.source, e.target, e.type.value) for e in graph.edges),
+    ))
 
 
 def _task_tokens(task: str) -> list[str]:

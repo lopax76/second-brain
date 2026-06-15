@@ -38,6 +38,7 @@ def save(
     manifest: dict[str, str],
     *,
     signature: dict[str, str] | None = None,
+    symbols: bool | None = None,
 ) -> Path:
     d = store_dir(root)
     d.mkdir(parents=True, exist_ok=True)
@@ -53,6 +54,12 @@ def save(
             d / "signature.json",
             json.dumps(signature, ensure_ascii=False, indent=2, sort_keys=True),
         )
+    # Persist the build mode so a self-refresh rebuilds in the same mode even when the current
+    # graph happens to contain zero symbol nodes (e.g. a --symbols build of a docs-only tree).
+    if symbols is not None:
+        _atomic_write(
+            d / "mode.json", json.dumps({"symbols": bool(symbols)}, indent=2)
+        )
     return d
 
 
@@ -66,6 +73,18 @@ def load_signature(root: str | os.PathLike[str]) -> dict[str, str] | None:
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def load_symbols_mode(root: str | os.PathLike[str]) -> bool | None:
+    """Load the persisted build mode (``symbols`` on/off), or ``None`` if unknown/corrupt."""
+    p = store_dir(root) / "mode.json"
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return bool(data.get("symbols")) if isinstance(data, dict) and "symbols" in data else None
 
 
 def load_graph(root: str | os.PathLike[str]) -> Graph | None:

@@ -100,6 +100,38 @@ def test_refresh_ttl_throttles_check(tmp_path, monkeypatch):
     assert "b.py" not in g.nodes                               # throttled -> not refreshed yet
 
 
+def test_symbols_mode_persisted_even_with_zero_symbols(tmp_path):
+    # A --symbols build of a docs-only tree stores 0 symbol nodes; when code is later added,
+    # the auto-refresh must STILL index symbols (mode is persisted, not inferred from nodes).
+    (tmp_path / "readme.md").write_text("# docs only\n", encoding="utf-8")
+    g, m = index(tmp_path, symbols=True)
+    store.save(tmp_path, g, m, signature=fast_signature(tmp_path), symbols=True)
+    assert not any(n.type is NodeType.SYMBOL for n in g.nodes.values())  # nothing to extract yet
+    assert (tmp_path / ".secondbrain" / "mode.json").is_file()
+    (tmp_path / "core.py").write_text(
+        "def f():\n    return 1\n\n\nclass A:\n    def m(self):\n        pass\n", encoding="utf-8"
+    )
+    g2 = load_or_refresh(tmp_path)
+    assert any(n.type is NodeType.SYMBOL for n in g2.nodes.values())  # symbols mode preserved
+
+
+def test_rebuild_failure_degrades_not_crashes(tmp_path, monkeypatch):
+    # If the rebuild itself raises (not just I/O), the query must still answer with the loaded
+    # graph instead of crashing.
+    import second_brain.freshness as fr
+
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    load_or_refresh(tmp_path)
+    (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # -> stale
+
+    def _boom(*a, **k):
+        raise ValueError("parser exploded")
+
+    monkeypatch.setattr(fr, "index", _boom)
+    g = load_or_refresh(tmp_path)  # must NOT raise
+    assert "a.py" in g.nodes  # served the already-loaded (stale) graph
+
+
 def test_refresh_preserves_symbols_mode(tmp_path):
     (tmp_path / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
     g, m = index(tmp_path, symbols=True)

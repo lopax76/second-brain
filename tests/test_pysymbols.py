@@ -104,5 +104,14 @@ def test_nested_class_self_resolves_within_its_own_class():
     assert ("A.B.caller", "A.B.helper") in calls
 
 
+def test_async_def_extracted_and_calls_resolve():
+    defs, calls = extract("async def fetch():\n    helper()\n\n\ndef helper():\n    pass\n")
+    names = {d.qualname for d in defs}
+    kinds = {d.qualname: d.kind for d in defs}
+    assert {"fetch", "helper"} <= names
+    assert kinds["fetch"] == "async def"
+    assert ("fetch", "helper") in calls
+
+
 def test_syntax_error_returns_empty():
     assert extract("def (:\n") == ([], [])

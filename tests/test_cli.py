@@ -115,6 +115,17 @@ def test_cli_query_auto_refreshes(tmp_path, capsys):
     assert "newmod.py" in capsys.readouterr().out  # query saw it without a manual rebuild
 
 
+def test_build_symbols_cli_e2e(tmp_path):
+    import json
+    proj = tmp_path / "p"
+    proj.mkdir()
+    (proj / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    assert main(["build", "--symbols", str(proj)]) == 0
+    g = json.loads((proj / ".secondbrain" / "graph.json").read_text(encoding="utf-8"))
+    assert any(n["type"] == "symbol" for n in g["nodes"])
+    assert (proj / ".secondbrain" / "mode.json").is_file()
+
+
 def test_focus_cli_runs(tmp_path):
     proj = _project(tmp_path)
     assert main(["build", str(proj)]) == 0
