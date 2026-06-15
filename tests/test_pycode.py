@@ -5,6 +5,16 @@ from __future__ import annotations
 from second_brain.pycode import js_imports, python_imports
 
 
+def test_js_imports_ignores_comments() -> None:
+    src = "// import h from './helper'\nimport a from './real'\n/* import x from './blk' */\n"
+    assert js_imports(src) == ["./real"]
+
+
+def test_js_imports_dynamic_and_backtick() -> None:
+    assert js_imports("const m = await import('./dyn')") == ["./dyn"]
+    assert js_imports("import x from `./tmpl`") == ["./tmpl"]
+
+
 def test_python_imports_absolute_and_aliases() -> None:
     imps = python_imports("import os\nimport a, b\n")
     mods = {(i.level, i.module) for i in imps}

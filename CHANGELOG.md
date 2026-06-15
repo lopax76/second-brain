@@ -48,6 +48,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Deep-audit hardening (30-agent review).** `iter_files` skips Windows junctions/reparse points
+  (no index loop/explosion) and `_is_external` treats absolute POSIX paths (`/etc/...`) as external
+  (no false broken refs); the wikilink regex is ReDoS-hardened like the markdown one (9s → ~0 on a
+  pathological `[[` run); `js_imports` ignores comments and also matches dynamic `import()` and
+  backtick specifiers; the symbol call-graph no longer attributes decorator / default-argument /
+  annotation calls to the function; `classify` recognises plural folder names (`designs/`,
+  `reports/`, `specs/`); `assess` no longer flags `py.typed` as empty; `store.load_graph` degrades
+  to `None` on non-dict JSON (e.g. a top-level array); `Node`/`Edge` copy their `meta` (no caller
+  aliasing); `.py` files are read once in `--symbols` mode; `rank` type hints tightened (no
+  `type: ignore`); CONTRIBUTING / PR-template ruff command corrected (`second_brain`).
 - **Cross-check hardening (15-agent review).** `focus`'s cache fingerprint now includes the node
   set (not just edges), so two graphs differing only by an isolated-node turnover can't collide;
   the markdown-link regex excludes `]` and is length-capped (no ReDoS on pathological `](` runs);

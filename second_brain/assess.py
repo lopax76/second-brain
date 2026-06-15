@@ -67,7 +67,8 @@ def scan_integrity(root: str | os.PathLike[str], graph: Graph) -> dict[str, list
         except OSError:
             continue
         if sz == 0:
-            if os.path.basename(n.path) != "__init__.py":
+            # __init__.py and py.typed are conventionally zero-byte markers, not real problems.
+            if os.path.basename(n.path) not in ("__init__.py", "py.typed"):
                 empty.append(n.path)
             continue
         if _ext(n.path) in _TEXT_EXTS:

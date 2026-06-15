@@ -24,7 +24,7 @@ _MD_LINK_RE = re.compile(r"\]\(\s*<?([^)\s>\]]{1,2000})>?\s*(?:\"[^\"]*\"|'[^']*
 # The length caps and `\n` exclusion keep matching linear even on a pathological document full
 # of unclosed `[[` (no quadratic backtracking on large files).
 _WIKILINK_RE = re.compile(
-    r"\[\[\s*([^\]|#\n]{1,200}?)\s*(?:#[^\]|\n]{0,200})?(?:\|[^\]\n]{0,200})?\]\]"
+    r"\[\[\s*([^\]\[|#\n]{1,200})\s*(?:#[^\]|\n]{0,200})?(?:\|[^\]\n]{0,200})?\]\]"
 )
 
 # Path-like token ending in a known project extension.

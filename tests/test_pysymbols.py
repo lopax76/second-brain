@@ -113,5 +113,19 @@ def test_async_def_extracted_and_calls_resolve():
     assert ("fetch", "helper") in calls
 
 
+def test_decorator_and_default_calls_not_attributed_to_function():
+    # Decorator calls and default-argument calls run in the enclosing scope, not inside the
+    # function — they must not create CALLS edges from the function.
+    src = (
+        "def register(n):\n    return lambda f: f\n\n\n"
+        "def helper():\n    return 1\n\n\n"
+        "@register('x')\n"
+        "def target(a=helper()):\n    pass\n"
+    )
+    _, calls = extract(src)
+    assert ("target", "register") not in calls
+    assert ("target", "helper") not in calls
+
+
 def test_syntax_error_returns_empty():
     assert extract("def (:\n") == ([], [])

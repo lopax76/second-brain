@@ -6,6 +6,14 @@ from second_brain.classify import classify
 from second_brain.model import NodeType
 
 
+def test_plural_directory_names_classified() -> None:
+    assert classify("designs/notes.md") is NodeType.DESIGN
+    assert classify("specs/api.md") is NodeType.DESIGN
+    assert classify("reports/q1.md") is NodeType.REPORT
+    assert classify("design/notes.md") is NodeType.DESIGN          # singular still works
+    assert classify("designer/profile.md") is NodeType.STRUCTURE   # 'designer' must NOT match
+
+
 def test_decision_design_report_memory() -> None:
     # A decision *file* (an ADR or a "decisioni" doc) classifies as a DESIGN document, NOT a
     # DECISION node: NodeType.DECISION is reserved for the D-XXX/ADR-N/RFC-N identifiers created

@@ -21,6 +21,18 @@ def test_every_node_and_edge_type_has_a_color():
         assert et in EDGE_COLORS and EDGE_COLORS[et].startswith("#")
 
 
+def test_node_and_edge_meta_is_copied_not_aliased():
+    # Mutating the dict passed at construction must NOT corrupt the stored node/edge meta.
+    nm = {"size": 1}
+    n = Node(id="x", type=NodeType.PROGRAM, label="x", path="x", meta=nm)
+    nm["size"] = 99
+    assert n.meta["size"] == 1
+    em = {"w": 1}
+    e = Edge("a", "b", EdgeType.IMPORTS, meta=em)
+    em["w"] = 99
+    assert e.meta["w"] == 1
+
+
 def test_node_to_dict_does_not_persist_color():
     # Color is derived from type (single source of truth), not stored per node.
     n = Node(id="a.py", type=NodeType.PROGRAM, label="a.py", path="a.py")

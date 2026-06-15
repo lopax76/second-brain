@@ -95,22 +95,61 @@ def extract(source: str) -> tuple[list[Def], list[tuple[str, str]]]:
             seen.add((caller, target))
             calls.append((caller, target))
 
-    def walk(node: ast.AST, caller: str | None, klass: str | None, stack: list[str]) -> None:
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, ast.ClassDef):
-                # Entering a class body: caller resets (class-body calls have no symbol caller),
-                # class context becomes this class's FULL qualname (matches the methods table key,
-                # so a nested A.B does not borrow a top-level B's methods).
-                walk(child, None, ".".join(stack + [child.name]), stack + [child.name])
-            elif isinstance(child, _FuncDef):
-                qual = ".".join(stack + [child.name])
-                walk(child, qual, klass, stack + [child.name])
-            else:
-                if isinstance(child, ast.Call):
-                    _record(child, caller, klass)
-                walk(child, caller, klass, stack)
+    def _walk_expr(node: ast.AST, caller: str | None, klass: str | None) -> None:
+        # Record every call in an expression subtree under the ENCLOSING caller. Decorators,
+        # default values and annotations are evaluated in the enclosing scope, NOT inside the
+        # function/class being defined — so their calls must not be attributed to it.
+        for n in ast.walk(node):
+            if isinstance(n, ast.Call):
+                _record(n, caller, klass)
 
-    walk(tree, None, None, [])
+    def _signature(fn: ast.FunctionDef | ast.AsyncFunctionDef,
+                   caller: str | None, klass: str | None) -> None:
+        # Decorators / default values / annotations / return annotation: all enclosing-scope.
+        a = fn.args
+        for dec in fn.decorator_list:
+            _walk_expr(dec, caller, klass)
+        for default in [*a.defaults, *a.kw_defaults]:
+            if default is not None:
+                _walk_expr(default, caller, klass)
+        ann_args = [*a.posonlyargs, *a.args, *a.kwonlyargs]
+        if a.vararg is not None:
+            ann_args.append(a.vararg)
+        if a.kwarg is not None:
+            ann_args.append(a.kwarg)
+        for arg in ann_args:
+            if arg.annotation is not None:
+                _walk_expr(arg.annotation, caller, klass)
+        if fn.returns is not None:
+            _walk_expr(fn.returns, caller, klass)
+
+    def visit(node: ast.AST, caller: str | None, klass: str | None, stack: list[str]) -> None:
+        """Dispatch ONE node: enter new scopes for def/class bodies, record calls otherwise."""
+        if isinstance(node, ast.ClassDef):
+            # Class context = the class's FULL qualname (matches the methods table key, so a
+            # nested A.B doesn't borrow a top-level B's methods). Decorators/bases run enclosing;
+            # only the class body resets the caller.
+            cq = ".".join(stack + [node.name])
+            for dec in node.decorator_list:
+                _walk_expr(dec, caller, klass)
+            for base in node.bases:
+                _walk_expr(base, caller, klass)
+            for kw in node.keywords:
+                _walk_expr(kw.value, caller, klass)
+            for stmt in node.body:
+                visit(stmt, None, cq, stack + [node.name])
+        elif isinstance(node, _FuncDef):
+            qual = ".".join(stack + [node.name])
+            _signature(node, caller, klass)
+            for stmt in node.body:
+                visit(stmt, qual, klass, stack + [node.name])
+        else:
+            if isinstance(node, ast.Call):
+                _record(node, caller, klass)
+            for child in ast.iter_child_nodes(node):
+                visit(child, caller, klass, stack)
+
+    visit(tree, None, None, [])
     return defs, calls
 
 

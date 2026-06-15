@@ -94,8 +94,8 @@ def load_graph(root: str | os.PathLike[str]) -> Graph | None:
         return None
     try:
         return Graph.from_dict(json.loads(p.read_text(encoding="utf-8")))
-    except (OSError, ValueError, KeyError):
-        return None
+    except (OSError, ValueError, KeyError, AttributeError, TypeError):
+        return None  # corrupt / non-dict JSON (e.g. a top-level array) -> degrade, don't crash
 
 
 def load_manifest(root: str | os.PathLike[str]) -> dict[str, str] | None:

@@ -6,7 +6,7 @@
 
 ## How I verified it
 
-- [ ] `ruff check second-brain tests` passes
+- [ ] `ruff check second_brain tests` passes
 - [ ] `pytest -q` passes
 - [ ] Added/updated tests for the change
 

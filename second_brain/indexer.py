@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import posixpath
 import re
+import stat
 from pathlib import Path
 
 from second_brain.classify import classify, rules_from_config
@@ -51,15 +52,33 @@ def _ext(name: str) -> str:
     return os.path.splitext(name)[1].lower()
 
 
+def _is_reparse(path: str) -> bool:
+    """True for symlinks and Windows junctions/reparse points (must not be descended into).
+
+    ``os.walk`` skips POSIX directory symlinks, but on Windows a *junction* is not a symlink
+    and ``os.walk`` would follow it — causing infinite loops / file explosion on a self- or
+    parent-pointing junction. Detect the reparse-point attribute and skip it.
+    """
+    try:
+        if os.path.islink(path):
+            return True
+        attrs = getattr(os.stat(path, follow_symlinks=False), "st_file_attributes", 0)
+        return bool(attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+    except OSError:
+        return True  # unreadable -> safest to skip
+
+
 def iter_files(root: Path, patterns: list[str]) -> list[str]:
     """Return sorted POSIX relative paths of indexable files under ``root``.
 
-    ``os.walk`` does not follow directory symlinks (loop-safe). An entry that cannot be
-    expressed relative to ``root`` (exotic symlink/junction) is skipped, never aborting.
+    ``os.walk`` does not follow directory symlinks, and junctions/reparse points are pruned
+    explicitly (loop-safe on Windows too). An entry that cannot be expressed relative to
+    ``root`` (exotic symlink/junction) is skipped, never aborting.
     """
     rels: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not is_ignored_dir(d)]
+        dirnames[:] = [d for d in dirnames
+                       if not is_ignored_dir(d) and not _is_reparse(os.path.join(dirpath, d))]
         for fn in filenames:
             try:
                 rel = (Path(dirpath) / fn).relative_to(root).as_posix()
@@ -162,12 +181,14 @@ def _looks_like_path(target: str) -> bool:
 
 
 def _is_external(target: str) -> bool:
-    """True for URLs, Windows drive-letter paths, and UNC paths (cleaned form uses '/')."""
+    """True for URLs, Windows drive-letter paths, UNC paths, and POSIX absolute paths."""
     if "://" in target:
         return True
     if len(target) >= 2 and target[1] == ":" and target[0].isalpha():
         return True  # e.g. C:/Users/...
-    return target.startswith("//")  # UNC (\\server\share -> //server/share after cleaning)
+    # Any leading '/' is outside the project: POSIX absolute (/etc/hosts) or UNC (//server/share,
+    # from a cleaned \\server\share). Marking these broken was a false positive in the gate.
+    return target.startswith("/")
 
 
 def _resolve_ref(
@@ -278,6 +299,7 @@ def build_graph(
         stem_index.setdefault(stem, []).append(rel)
     py_files = [r for r in rels if _ext(r) == ".py"]
     module_map = _python_module_map(py_files)
+    py_text: dict[str, str] = {}  # .py contents cached during edge build, reused by the symbol pass
 
     # 3. Edges from file contents. Only code (imports) and docs (references) are ever READ;
     #    data/config/binaries are never opened - the graph needs only their type/size/area.
@@ -292,6 +314,7 @@ def build_graph(
         if text is None:
             continue
         if ext == ".py":
+            py_text[rel] = text  # reuse in the symbol pass (3b) instead of reading twice
             for imp in python_imports(text):
                 for tgt in _resolve_py(imp, rel, module_map):
                     g.add_edge(Edge(rel, tgt, EdgeType.IMPORTS))
@@ -319,7 +342,7 @@ def build_graph(
     #     calls are intentionally not linked (no type inference) — `imports` already carries that.
     if symbols:
         for rel in py_files:
-            text = _read_text(root_p / rel)
+            text = py_text.get(rel)  # already read during the edge pass (no second disk read)
             if text is None:
                 continue
             sym_defs, sym_calls = extract_symbol_calls(text)

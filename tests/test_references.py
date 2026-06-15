@@ -15,6 +15,13 @@ def test_md_link_regex_no_redos_on_unclosed_runs():
     assert time.perf_counter() - t0 < 2.0
 
 
+def test_wikilink_regex_no_redos_on_unclosed_runs():
+    # The wikilink regex must also fail fast on a pathological run of unclosed `[[`.
+    t0 = time.perf_counter()
+    extract_references_tagged("[[" * 200000)
+    assert time.perf_counter() - t0 < 2.0
+
+
 def test_markdown_link():
     assert extract_references("see [the guide](docs/guide.md) now") == ["docs/guide.md"]
 

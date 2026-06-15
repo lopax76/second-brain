@@ -44,13 +44,26 @@ def python_imports(source: str) -> list[PyImport]:
     return out
 
 
+# Matches static `import ... from '.x'`, bare `import '.x'`, dynamic `import('.x')`,
+# `export ... from '.x'`, and `require('.x')`. Quote may be ' " or ` (static template). Only
+# relative specifiers (starting with `.`) are captured — those that point at project files.
 _JS_IMPORT_RE = re.compile(
-    r"""(?:import\s[^'"]*?from\s*|import\s*|export\s[^'"]*?from\s*|require\(\s*)['"](\.[^'"]+)['"]""",
+    r"(?:import\s[^'\"`]*?from\s*|import\s*\(?\s*|export\s[^'\"`]*?from\s*|require\(\s*)"
+    r"['\"`](\.[^'\"`]+)['\"`]",
 )
+# Strip comments first so an import mentioned in a comment isn't extracted as a real edge.
+_JS_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+_JS_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 
 
 def js_imports(source: str) -> list[str]:
-    """Return relative JS/TS import specifiers (starting with ``.``), best-effort."""
+    """Return relative JS/TS import specifiers (starting with ``.``), best-effort.
+
+    Comments are stripped before matching, so a specifier written inside a ``//`` or ``/* */``
+    comment does not produce a phantom import edge.
+    """
+    source = _JS_BLOCK_COMMENT_RE.sub(" ", source)
+    source = _JS_LINE_COMMENT_RE.sub("", source)
     out: list[str] = []
     seen: set[str] = set()
     for m in _JS_IMPORT_RE.finditer(source):

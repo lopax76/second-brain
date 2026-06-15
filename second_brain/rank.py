@@ -12,7 +12,10 @@ distribution, so probability mass is conserved and the scores sum to ~1.
 
 from __future__ import annotations
 
-from second_brain.model import EdgeType, Graph
+from collections.abc import Callable
+from typing import Any
+
+from second_brain.model import EdgeType, Graph, Node
 
 # Importance flows along knowledge edges (A imports/references B -> B gains importance).
 KNOWLEDGE: tuple[EdgeType, ...] = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -79,7 +82,7 @@ def pagerank(
 def personalised(
     graph: Graph,
     seeds: dict[str, float] | list[str] | set[str],
-    **kwargs: object,
+    **kwargs: Any,
 ) -> dict[str, float]:
     """Personalised PageRank: bias the restart toward ``seeds`` (the task's anchor nodes).
 
@@ -89,7 +92,7 @@ def personalised(
         vec = {k: float(v) for k, v in seeds.items()}
     else:
         vec = {s: 1.0 for s in seeds}
-    return pagerank(graph, personalization=vec, **kwargs)  # type: ignore[arg-type]
+    return pagerank(graph, personalization=vec, **kwargs)
 
 
 def top(
@@ -97,19 +100,18 @@ def top(
     k: int,
     *,
     scores: dict[str, float] | None = None,
-    predicate: object = None,
-    **kwargs: object,
+    predicate: Callable[[Node], bool] | None = None,
+    **kwargs: Any,
 ) -> list[tuple[str, float]]:
     """Top-``k`` ``(node_id, score)`` by score desc, tie-broken by id (deterministic).
 
     ``scores`` reuses a precomputed ranking (avoids recomputing); ``predicate`` is an optional
-    ``callable(Node) -> bool`` filter (e.g. only file-backed nodes).
+    ``callable(Node) -> bool`` filter (e.g. only file-backed nodes). Ids absent from the graph are
+    always dropped, so a reused ``scores`` from a larger graph can't leak phantom nodes.
     """
-    rk = scores if scores is not None else pagerank(graph, **kwargs)  # type: ignore[arg-type]
-    items = rk.items()
-    if predicate is not None:
-        items = [(nid, s) for nid, s in items
-                 if nid in graph.nodes and predicate(graph.nodes[nid])]  # type: ignore[operator]
+    rk = scores if scores is not None else pagerank(graph, **kwargs)
+    items = [(nid, s) for nid, s in rk.items() if nid in graph.nodes
+             and (predicate is None or predicate(graph.nodes[nid]))]
     ranked = sorted(items, key=lambda kv: (-kv[1], kv[0]))
     return ranked[: max(0, k)]
 

@@ -30,6 +30,15 @@ def test_real_missing_file_link_is_still_broken(tmp_path):
     assert "docs/missing.md" in _broken(g)
 
 
+def test_absolute_posix_path_link_not_broken(tmp_path):
+    # A link to an absolute POSIX path (outside the project) must not be flagged broken.
+    (tmp_path / "README.md").write_text(
+        "see [hosts](/etc/hosts) and [log](/var/log/app.log)\n", encoding="utf-8"
+    )
+    g = build_graph(tmp_path)
+    assert _broken(g) == []
+
+
 def test_version_strings_are_not_broken_refs(tmp_path):
     # Regression: markdown links to version/number strings (common in CHANGELOG/release notes)
     # must NOT be reported as broken file references.

@@ -33,7 +33,7 @@ pip install -e ".[dev,mcp]"
 Run the same checks CI runs — both must be green:
 
 ```bash
-ruff check second-brain tests
+ruff check second_brain tests
 pytest -q
 ```
 

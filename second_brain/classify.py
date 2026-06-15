@@ -52,9 +52,14 @@ _DATE_RE = re.compile(r"(?<!\d)(?:20\d{2}[-_]?\d{2}[-_]?\d{2}|20\d{2}[-_]\d{2})(
 
 
 def _kw_re(words: tuple[str, ...]) -> re.Pattern[str]:
-    """Boundary-anchored, case-insensitive alternation over path segments. Empty -> never match."""
+    """Boundary-anchored, case-insensitive alternation over path segments. Empty -> never match.
+
+    An optional trailing ``s`` lets a singular keyword also match the regular English plural folder
+    name (``design`` -> ``designs/``, ``report`` -> ``reports/``) without matching ``designer``
+    (no separator after the ``s``).
+    """
     body = "|".join(re.escape(w) for w in words) if words else r"(?!x)x"
-    return re.compile(r"(?i)(?:^|[-_/])(?:" + body + r")(?:[-_/.]|$)")
+    return re.compile(r"(?i)(?:^|[-_/])(?:" + body + r")s?(?:[-_/.]|$)")
 
 
 @dataclass(frozen=True)

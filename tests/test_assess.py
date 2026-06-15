@@ -5,6 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from second_brain import assess
+from second_brain.indexer import build_graph
+
+
+def test_py_typed_not_flagged_empty(tmp_path) -> None:
+    (tmp_path / "py.typed").write_text("", encoding="utf-8")
+    (tmp_path / "real_empty.txt").write_text("", encoding="utf-8")
+    integ = assess.scan_integrity(tmp_path, build_graph(tmp_path))
+    assert "py.typed" not in integ["empty"]
+    assert "real_empty.txt" in integ["empty"]
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 

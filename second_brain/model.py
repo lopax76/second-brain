@@ -83,6 +83,10 @@ class Node:
     path: str | None = None
     meta: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # Copy meta so a caller mutating their dict after construction can't corrupt this node.
+        self.meta = dict(self.meta)
+
     def to_dict(self) -> dict[str, Any]:
         # Color is intentionally NOT persisted: it is derived from ``type`` via NODE_COLORS
         # (single source of truth), keeping the store small and drift-free.
@@ -115,6 +119,9 @@ class Edge:
     target: str
     type: EdgeType
     meta: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.meta = dict(self.meta)  # defensive copy (see Node.__post_init__)
 
     def key(self) -> tuple[str, str, str]:
         """Identity used for de-duplication."""
