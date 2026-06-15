@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from second_brain.store import store_dir
@@ -26,6 +27,13 @@ from second_brain.store import store_dir
 # uninstalling removes exactly our block, leaving any surrounding user content intact.
 _START = "<!-- second-brain:start -->"
 _END = "<!-- second-brain:end -->"
+
+
+def _block_pattern(start: str, end: str) -> re.Pattern[str]:
+    """Match a full ``start ... end`` block (non-greedy, across lines). Used to update/remove our
+    block robustly: it collapses accidental duplicates and never relies on first-occurrence index
+    arithmetic, so a stray marker pasted by the user can't desync the block boundaries."""
+    return re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
 
 _DIRECTIVE = [
     _START,
@@ -68,6 +76,9 @@ _GIT_BODY = (
 )
 _GIT_HOOKS = ("post-commit", "post-checkout")
 
+_CTX_RE = _block_pattern(_START, _END)
+_GIT_RE = _block_pattern(_GIT_START, _GIT_END)
+
 
 # --------------------------------------------------------------------------- context files
 def _block() -> str:
@@ -75,15 +86,20 @@ def _block() -> str:
 
 
 def _upsert_block(path: Path, block: str) -> str:
-    """Insert or replace the marked block in ``path``; return created|updated|appended."""
+    """Insert or replace the marked block in ``path``; return created|updated|appended.
+
+    Replaces the first existing block in place and drops any duplicate blocks after it, so the
+    file always ends up with exactly one current block.
+    """
     if not path.exists():
         path.write_text(block + "\n", encoding="utf-8", newline="\n")
         return "created"
     text = path.read_text(encoding="utf-8")
-    if _START in text and _END in text and text.index(_START) < text.index(_END):
-        pre = text[: text.index(_START)]
-        post = text[text.index(_END) + len(_END):]
-        path.write_text(pre + block + post, encoding="utf-8", newline="\n")
+    first = _CTX_RE.search(text)
+    if first is not None:
+        head = text[: first.start()]
+        tail = _CTX_RE.sub("", text[first.end():])  # remove any duplicate blocks after the first
+        path.write_text(head + block + tail, encoding="utf-8", newline="\n")
         return "updated"
     sep = "" if text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
     path.write_text(text + sep + block + "\n", encoding="utf-8", newline="\n")
@@ -107,12 +123,10 @@ def remove_context_files(root: str | os.PathLike[str]) -> dict[str, str]:
             out[name] = "absent"
             continue
         text = p.read_text(encoding="utf-8")
-        if _START not in text or _END not in text or text.index(_START) >= text.index(_END):
-            out[name] = "absent"  # markers missing or inverted -> don't touch the file
+        if not _CTX_RE.search(text):
+            out[name] = "absent"  # no complete block -> don't touch the file
             continue
-        pre = text[: text.index(_START)]
-        post = text[text.index(_END) + len(_END):]
-        new = (pre.rstrip("\n") + "\n" + post.lstrip("\n")).strip("\n")
+        new = re.sub(r"\n{3,}", "\n\n", _CTX_RE.sub("", text)).strip("\n")
         if new:
             p.write_text(new + "\n", encoding="utf-8", newline="\n")
         else:
@@ -222,10 +236,13 @@ def _install_git_hook_file(hooks_dir: Path, name: str) -> str:
     block = _git_block()
     if p.is_file():
         text = p.read_text(encoding="utf-8", errors="ignore")
-        if _GIT_START in text:
-            return "present"
-        sep = "" if text.endswith("\n") else "\n"
-        new, action = text + sep + block + "\n", "appended"
+        first = _GIT_RE.search(text)
+        if first is not None:  # refresh our block in place (idempotent), dropping duplicates
+            new = text[: first.start()] + block + _GIT_RE.sub("", text[first.end():])
+            action = "updated"
+        else:
+            sep = "" if text.endswith("\n") else "\n"
+            new, action = text + sep + block + "\n", "appended"
     else:
         new, action = "#!/bin/sh\n" + block + "\n", "created"
     p.write_text(new, encoding="utf-8", newline="\n")
@@ -251,12 +268,9 @@ def _uninstall_git_hook_file(hooks_dir: Path, name: str) -> str:
     if not p.is_file():
         return "absent"
     text = p.read_text(encoding="utf-8", errors="ignore")
-    if (_GIT_START not in text or _GIT_END not in text
-            or text.index(_GIT_START) >= text.index(_GIT_END)):
-        return "absent"  # markers missing or inverted -> don't touch the file
-    pre = text[: text.index(_GIT_START)]
-    post = text[text.index(_GIT_END) + len(_GIT_END):]
-    new = (pre.rstrip("\n") + "\n" + post.lstrip("\n")).strip("\n")
+    if not _GIT_RE.search(text):
+        return "absent"  # no complete block -> don't touch the file
+    new = re.sub(r"\n{3,}", "\n\n", _GIT_RE.sub("", text)).strip("\n")
     if new in ("", "#!/bin/sh"):
         p.unlink()
     else:

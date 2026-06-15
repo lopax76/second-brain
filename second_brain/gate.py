@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from second_brain.freshness import diff_manifest
 from second_brain.model import EdgeType, Graph
 
+__all__ = ["GateReport", "find_broken", "find_orphans", "evaluate"]
+
 
 @dataclass
 class GateReport:

@@ -36,6 +36,10 @@ _TEXT_HASH_EXTS = {
 _CONTENT_HASH_CAP = 1_000_000
 
 
+__all__ = ["file_hash", "build_manifest", "index", "diff_manifest", "fast_signature",
+           "is_stale", "auto_refresh_enabled", "load_or_refresh"]
+
+
 def _ext(name: str) -> str:
     return os.path.splitext(name)[1].lower()
 

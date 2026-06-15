@@ -39,6 +39,9 @@ COMMUNITY_COLORS = [
 _TYPE_COMMUNITY_NAMES = {"decision": "Decisions", "session": "Sessions"}
 
 
+__all__ = ["write_view"]
+
+
 def _build_payload(graph: Graph) -> dict:
     """Shape the graph into vis-network nodes/edges/legend (the Graphify viewer's data model).
 
@@ -46,7 +49,8 @@ def _build_payload(graph: Graph) -> dict:
     into a hairball and carry no community signal. Communities come from
     :mod:`second_brain.communities` (files); decision/session nodes form their own groups.
     """
-    rendered = [n for n in graph.nodes.values() if n.type is not NodeType.AREA]
+    rendered = sorted((n for n in graph.nodes.values() if n.type is not NodeType.AREA),
+                      key=lambda n: n.id)  # explicit order -> deterministic viewer payload
     rid = {n.id for n in rendered}
     comm = communities.detect(graph)
     cnames = communities.names(comm)

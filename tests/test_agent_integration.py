@@ -8,6 +8,22 @@ from second_brain import agent_integration as ai
 
 
 # --------------------------------------------------------------------------- context files
+def test_install_collapses_duplicate_blocks(tmp_path):
+    # Two stale SB blocks around user content must collapse to exactly one on (re)install,
+    # and uninstall must remove all of ours while keeping the user content.
+    block = ai._block()
+    (tmp_path / "CLAUDE.md").write_text(
+        block + "\n\nUSER TEXT\n\n" + block + "\n", encoding="utf-8"
+    )
+    ai.write_context_files(tmp_path)
+    text = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+    assert text.count(ai._START) == 1 and text.count(ai._END) == 1
+    assert "USER TEXT" in text
+    ai.remove_context_files(tmp_path)
+    text2 = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+    assert ai._START not in text2 and "USER TEXT" in text2
+
+
 def test_write_context_files_creates_and_is_idempotent(tmp_path):
     res = ai.write_context_files(tmp_path)
     assert res == {"CLAUDE.md": "created", "AGENTS.md": "created"}
@@ -113,7 +129,8 @@ def test_install_git_hook_creates_and_idempotent(tmp_path):
     pc = tmp_path / ".git" / "hooks" / "post-commit"
     assert pc.is_file() and "second-brain build" in pc.read_text(encoding="utf-8")
     res2 = ai.install_git_hook(tmp_path)
-    assert res2["post-commit"] == "present"
+    assert res2["post-commit"] == "updated"  # idempotent re-write of our block (no duplication)
+    assert pc.read_text(encoding="utf-8").count("second-brain build") == 1
 
 
 def test_install_git_hook_appends_to_existing(tmp_path):

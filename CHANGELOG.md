@@ -48,6 +48,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Hardening (roadmap items).** `Graph` keeps a lazily-built adjacency index, so
+  `neighbors()` / `degree()` are O(degree) per call instead of re-scanning every edge (behavior
+  identical, including per-edge-type and self-loop counting). `agent install` / `hook install`
+  match their managed block by regex — collapsing accidental duplicates and staying robust to a
+  stray marker pasted by the user (re-install is idempotent). The viewer payload and
+  `project_map` use an explicit `sorted()` for guaranteed determinism. `__all__` added to the
+  public modules (`model` / `store` / `query` / `gate` / `freshness` / `viewer`).
 - **Deep-audit hardening (30-agent review).** `iter_files` skips Windows junctions/reparse points
   (no index loop/explosion) and `_is_external` treats absolute POSIX paths (`/etc/...`) as external
   (no false broken refs); the wikilink regex is ReDoS-hardened like the markdown one (9s → ~0 on a

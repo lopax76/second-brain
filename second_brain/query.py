@@ -24,6 +24,10 @@ KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
 IMPACT_RELATIONS = (EdgeType.IMPORTS, EdgeType.REFERENCES, EdgeType.MENTIONS)
 
 
+__all__ = ["project_map", "find", "neighbors", "backbone", "subgraph", "impact",
+           "focus", "clear_focus_cache"]
+
+
 def _area_of(path: str | None) -> str:
     if not path:
         return "(root)"
@@ -47,7 +51,8 @@ def project_map(graph: Graph, *, top: int = 8) -> dict[str, Any]:
     Returns areas (with file counts, total size, dominant types), type/edge tallies, the
     most-connected files, and orphan/broken counts. Lists are capped by ``top``.
     """
-    files = [n for n in graph.nodes.values() if n.path is not None and n.type is not NodeType.AREA]
+    files = sorted((n for n in graph.nodes.values()
+                    if n.path is not None and n.type is not NodeType.AREA), key=lambda n: n.id)
     areas: dict[str, dict] = {}
     for n in files:
         a = _area_of(n.path)

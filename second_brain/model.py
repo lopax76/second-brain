@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+__all__ = ["NodeType", "EdgeType", "NODE_COLORS", "EDGE_COLORS", "Node", "Edge", "Graph"]
+
 
 class NodeType(str, Enum):
     """The typology of a node. Drives the node color in the graph viewer."""
@@ -153,6 +155,9 @@ class Graph:
         self.nodes: dict[str, Node] = {}
         self.edges: list[Edge] = []
         self._edge_keys: set[tuple[str, str, str]] = set()
+        # Lazily-built adjacency index (out-neighbors, in-neighbors, incident-edge degree),
+        # invalidated on add_edge. Makes neighbors()/degree() O(deg) instead of O(edges)/call.
+        self._adj: tuple[dict[str, set[str]], dict[str, set[str]], dict[str, int]] | None = None
 
     # -- mutation -----------------------------------------------------------
     def add_node(self, node: Node) -> Node:
@@ -170,7 +175,27 @@ class Graph:
             return False
         self._edge_keys.add(k)
         self.edges.append(edge)
+        self._adj = None  # invalidate the adjacency index
         return True
+
+    def _adjacency(self) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, int]]:
+        """Build (or reuse) the adjacency index: out-neighbors, in-neighbors, incident degree.
+
+        ``degree`` counts incident *edges* (so two edge types between the same pair count twice,
+        matching the old scan), and a self-loop counts once — identical to the previous behavior.
+        """
+        if self._adj is None:
+            out_n: dict[str, set[str]] = {}
+            in_n: dict[str, set[str]] = {}
+            deg: dict[str, int] = {}
+            for e in self.edges:
+                out_n.setdefault(e.source, set()).add(e.target)
+                in_n.setdefault(e.target, set()).add(e.source)
+                deg[e.source] = deg.get(e.source, 0) + 1
+                if e.target != e.source:  # a self-loop is one incident edge, not two
+                    deg[e.target] = deg.get(e.target, 0) + 1
+            self._adj = (out_n, in_n, deg)
+        return self._adj
 
     # -- queries ------------------------------------------------------------
     def has_node(self, node_id: str) -> bool:
@@ -181,8 +206,9 @@ class Graph:
 
     def neighbors(self, node_id: str, direction: str = "both") -> list[str]:
         """Return ids of neighboring nodes. ``direction`` in {out, in, both}."""
-        out = {e.target for e in self.edges if e.source == node_id}
-        inc = {e.source for e in self.edges if e.target == node_id}
+        out_n, in_n, _ = self._adjacency()
+        out = out_n.get(node_id, set())
+        inc = in_n.get(node_id, set())
         if direction == "out":
             return sorted(out)
         if direction == "in":
@@ -190,7 +216,7 @@ class Graph:
         return sorted(out | inc)
 
     def degree(self, node_id: str) -> int:
-        return sum(1 for e in self.edges if e.source == node_id or e.target == node_id)
+        return self._adjacency()[2].get(node_id, 0)
 
     def counts(self) -> dict[str, dict[str, int]]:
         """Counts by node type and edge type (string keys, for reporting)."""

@@ -33,6 +33,30 @@ def test_node_and_edge_meta_is_copied_not_aliased():
     assert e.meta["w"] == 1
 
 
+def test_degree_counts_edges_per_type_and_self_loops():
+    g = Graph(project="t")
+    for x in ("a", "b"):
+        g.add_node(Node(id=x, type=NodeType.PROGRAM, label=x, path=x))
+    g.add_edge(Edge("a", "b", EdgeType.IMPORTS))
+    g.add_edge(Edge("a", "b", EdgeType.REFERENCES))  # second type, same pair -> counts again
+    g.add_edge(Edge("a", "a", EdgeType.CALLS))       # self-loop -> one incident edge
+    assert g.degree("a") == 3
+    assert g.degree("b") == 2
+    assert g.neighbors("a") == ["a", "b"]
+    assert g.neighbors("a", "out") == ["a", "b"]
+    assert g.neighbors("b", "in") == ["a"]
+
+
+def test_adjacency_cache_invalidated_on_add_edge():
+    g = Graph(project="t")
+    for x in ("a", "b", "c"):
+        g.add_node(Node(id=x, type=NodeType.PROGRAM, label=x, path=x))
+    g.add_edge(Edge("a", "b", EdgeType.IMPORTS))
+    assert g.degree("a") == 1 and g.neighbors("a") == ["b"]  # builds the cache
+    g.add_edge(Edge("a", "c", EdgeType.IMPORTS))             # must invalidate it
+    assert g.degree("a") == 2 and g.neighbors("a") == ["b", "c"]
+
+
 def test_node_to_dict_does_not_persist_color():
     # Color is derived from type (single source of truth), not stored per node.
     n = Node(id="a.py", type=NodeType.PROGRAM, label="a.py", path="a.py")
