@@ -13,8 +13,8 @@ import os
 import re
 from pathlib import Path
 
-from second_brain import assess, communities, query
-from second_brain.model import Graph, NodeType
+from second_brain import assess, communities, query, rank
+from second_brain.model import EdgeType, Graph, NodeType
 from second_brain.store import store_dir
 
 _GOD_NODES = 10
@@ -90,7 +90,17 @@ def render_report(
     comm = communities.detect(graph)
     summaries = communities.summarize(graph, comm, key_files=_KEY_FILES)
     surprising = communities.surprising_edges(graph, comm, top=_SURPRISING)
-    god = m["most_connected"]
+    # God nodes by PageRank (structural importance), not raw degree: a file the *important*
+    # files depend on outranks one merely linked by many trivial files. Restricted to real
+    # file nodes (areas/sessions/decisions are not "god files").
+    scores = rank.pagerank(graph)
+    god = [
+        {"id": nid, "type": graph.nodes[nid].type.value, "score": s}
+        for nid, s in rank.top(
+            graph, _GOD_NODES, scores=scores,
+            predicate=lambda n: n.path is not None and n.type is not NodeType.AREA,
+        )
+    ]
     fams = _decision_families(graph)
 
     size = m["size"]
@@ -109,10 +119,25 @@ def render_report(
         f"- orient an assistant: ~**{tokens_all:,} tokens** to read every file "
         f"-> ~**{_DIGEST_SENTINEL} tokens** to read this report",
         "",
-        "## God nodes (most connected)",
+        "## God nodes (by importance — PageRank)",
         "",
     ]
-    out += [f"- `{x['id']}` ({x['type']}) — {x['degree']} links" for x in god] or ["- (none)"]
+    out += [f"- `{x['id']}` ({x['type']}) — importance {x['score']:.3f}"
+            for x in god] or ["- (none)"]
+
+    # Churn (historical importance): how often each file was touched by recent git commits —
+    # a different signal from PageRank (structural). Only shown when the project has git history.
+    churn: dict[str, int] = {}
+    for e in graph.edges:
+        if e.type is EdgeType.TOUCHES:
+            churn[e.target] = churn.get(e.target, 0) + 1
+    top_churn = sorted(churn.items(), key=lambda kv: (-kv[1], kv[0]))[:_GOD_NODES]
+    if top_churn:
+        out += [
+            "", "## Most-changed files (recent churn)", "",
+            "How often each file changed across the indexed commits — historical hot spots.", "",
+        ]
+        out += [f"- `{nid}` — {c} commits" for nid, c in top_churn]
 
     out += [
         "", "## Communities", "",

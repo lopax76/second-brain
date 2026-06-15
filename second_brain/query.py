@@ -9,9 +9,11 @@ tens of thousands. Pure functions over a :class:`~second_brain.model.Graph`; no 
 
 from __future__ import annotations
 
+import re
+from collections import OrderedDict
 from typing import Any
 
-from second_brain import communities
+from second_brain import communities, rank
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -284,3 +286,122 @@ def impact(
         out["downstream"] = groups
         out["downstream_truncated"] = trunc
     return out
+
+
+# -- focus: task-aware, budgeted retrieval -----------------------------------------------------
+# The personalised-PageRank scores for a (graph, seeds) pair are cached so repeated focus calls
+# in a long-running MCP server don't recompute the walk each time. The key includes a structural
+# fingerprint of the edge set (NOT just the edge count) so two different graphs with the same
+# project/node/edge counts never collide and serve stale scores after a rebuild. The cache is
+# bounded (LRU eviction) so it can't grow without limit across many distinct queries.
+_FOCUS_CACHE: OrderedDict[Any, dict[str, float]] = OrderedDict()
+_FOCUS_CACHE_MAX = 256
+
+
+def clear_focus_cache() -> None:
+    """Drop the cached personalised-PageRank scores (call after rebuilding in-process)."""
+    _FOCUS_CACHE.clear()
+
+
+def _graph_fingerprint(graph: Graph) -> int:
+    """Cheap structural fingerprint of the edge set (order-independent, O(edges))."""
+    return hash(frozenset((e.source, e.target, e.type.value) for e in graph.edges))
+
+
+def _task_tokens(task: str) -> list[str]:
+    return [t for t in re.split(r"[^a-z0-9_]+", task.lower()) if len(t) >= 3]
+
+
+def _focus_seeds(graph: Graph, task: str) -> dict[str, float]:
+    """Anchor nodes for a task: file/entity nodes whose label or path contains a task token.
+
+    Weight = number of distinct task tokens matched (a file hit by more of the query is a
+    stronger anchor). Areas are excluded — they are containers, not answers.
+    """
+    toks = _task_tokens(task)
+    if not toks:
+        return {}
+    seeds: dict[str, float] = {}
+    for n in graph.nodes.values():
+        if n.type is NodeType.AREA:
+            continue
+        hay = n.label.lower() + " " + (n.path or "").lower()
+        hits = sum(1 for t in set(toks) if t in hay)
+        if hits:
+            seeds[n.id] = float(hits)
+    return seeds
+
+
+def _node_token_cost(node: Node) -> int:
+    """Rough token cost of a node's compact entry (id+type+path). chars/4 is an estimate."""
+    chars = len(node.id) + len(node.type.value) + len(node.path or "") + 12
+    return max(1, round(chars / 4))
+
+
+def focus(
+    graph: Graph,
+    task: str,
+    *,
+    budget_tokens: int = 2000,
+    damping: float = 0.85,
+    use_cache: bool = True,
+) -> dict[str, Any]:
+    """Return the minimal high-value subgraph for a task, within a token budget.
+
+    Anchors the task to seed nodes (name/path match), runs **personalised PageRank** from them,
+    and fills a token budget with the highest-scoring nodes (seeds first), plus the knowledge
+    edges among the chosen nodes. With no seed match it falls back to global importance, so the
+    assistant always gets *something* relevant rather than the whole digest.
+    """
+    seeds = _focus_seeds(graph, task)
+    fallback = not seeds
+    key = (graph.project, len(graph.nodes), _graph_fingerprint(graph),
+           frozenset(seeds.items()), round(damping, 6))
+    scores = _FOCUS_CACHE.get(key) if use_cache else None
+    if scores is None:
+        scores = (rank.personalised(graph, seeds, damping=damping) if seeds
+                  else rank.pagerank(graph, damping=damping))
+        if use_cache:
+            _FOCUS_CACHE[key] = scores
+            _FOCUS_CACHE.move_to_end(key)
+            while len(_FOCUS_CACHE) > _FOCUS_CACHE_MAX:
+                _FOCUS_CACHE.popitem(last=False)  # evict oldest (LRU)
+    elif use_cache:
+        _FOCUS_CACHE.move_to_end(key)  # mark as recently used
+
+    ranked = sorted(
+        ((nid, s) for nid, s in scores.items()
+         if nid in graph.nodes and graph.nodes[nid].type is not NodeType.AREA),
+        key=lambda kv: (-kv[1], kv[0]),
+    )
+    seed_ids = set(seeds)
+    order = ([nid for nid, _ in ranked if nid in seed_ids]
+             + [nid for nid, _ in ranked if nid not in seed_ids])
+
+    chosen: list[str] = []
+    seen: set[str] = set()
+    spent = 0
+    for nid in order:
+        cost = _node_token_cost(graph.nodes[nid])
+        if chosen and spent + cost > budget_tokens:
+            break
+        chosen.append(nid)
+        seen.add(nid)
+        spent += cost
+
+    nodes_out = [{"id": nid, "type": graph.nodes[nid].type.value,
+                  "path": graph.nodes[nid].path, "score": round(scores[nid], 6),
+                  "seed": nid in seed_ids}
+                 for nid in chosen]
+    edges_out = [{"source": e.source, "target": e.target, "type": e.type.value}
+                 for e in graph.edges
+                 if e.type in KNOWLEDGE and e.source in seen and e.target in seen]
+    return {
+        "task": task,
+        "seeds": sorted(seeds),
+        "fallback": fallback,
+        "budget_tokens": budget_tokens,
+        "token_estimate": spent,
+        "nodes": nodes_out,
+        "edges": edges_out,
+    }

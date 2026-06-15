@@ -18,7 +18,7 @@ from typing import Any
 
 from second_brain import gate, query, store
 from second_brain import report as _report
-from second_brain.freshness import build_manifest, index
+from second_brain.freshness import build_manifest, load_or_refresh
 from second_brain.model import Graph
 
 try:  # pragma: no cover - import-guard
@@ -32,7 +32,8 @@ _NO_MCP = 'The MCP server needs the optional "mcp" extra: pip install "second-br
 
 
 def _graph(project: str) -> Graph:
-    return store.load_graph(project) or index(project)[0]
+    # Self-refreshing read: auto-build on first touch, rebuild only if the project changed.
+    return load_or_refresh(project)
 
 
 def build_server(project: str):
@@ -79,6 +80,14 @@ def build_server(project: str):
         to see the blast radius without reading every dependent.
         """
         return query.impact(_graph(project), node_id, direction=direction, max_depth=max_depth)
+
+    @server.tool()
+    def focus(task: str, budget: int = 2000) -> dict[str, Any]:
+        """Task-aware retrieval: the minimal high-value subgraph for ``task``, within ~``budget``
+        tokens. Anchors the task to matching files, runs personalised PageRank from them, and
+        returns the top nodes + the knowledge edges among them — the context for a task, not the
+        whole digest. Falls back to globally important nodes when nothing matches the task."""
+        return query.focus(_graph(project), task, budget_tokens=budget)
 
     @server.tool()
     def report() -> str:

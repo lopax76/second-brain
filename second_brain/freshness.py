@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import hashlib
 import os
+import time
 from pathlib import Path
 
 from second_brain.ignore import load_ignore_patterns
 from second_brain.indexer import build_graph, iter_files
-from second_brain.model import Graph
+from second_brain.model import Graph, NodeType
 
 _CHUNK = 65536
 # Above this size a text file is hashed raw instead of normalized: it bounds memory, and a
@@ -89,17 +90,17 @@ def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:
 
 
 def index(
-    root: str | os.PathLike[str], *, operational: bool = True
+    root: str | os.PathLike[str], *, operational: bool = True, symbols: bool = False
 ) -> tuple[Graph, dict[str, str]]:
     """Build the graph and the manifest from one directory walk.
 
     The filesystem is enumerated once (``iter_files``); file *contents* are still read again to
     hash them for the manifest, so this is not zero double-I/O - just a single directory listing
-    shared by graph build and manifest.
+    shared by graph build and manifest. ``symbols=True`` adds the opt-in symbol/call layer.
     """
     root_p = Path(root).resolve()
     rels = iter_files(root_p, load_ignore_patterns(root_p))
-    graph = build_graph(root_p, _rels=rels)
+    graph = build_graph(root_p, symbols=symbols, _rels=rels)
     if operational:
         from second_brain.operational import enrich
         enrich(graph, root_p)
@@ -119,3 +120,117 @@ def diff_manifest(old: dict[str, str], new: dict[str, str]) -> dict[str, list[st
         "removed": sorted(old_k - new_k),
         "changed": sorted(k for k in (old_k & new_k) if old[k] != new[k]),
     }
+
+
+# -- self-refreshing reads ---------------------------------------------------------------------
+# A query should never answer from a stale map. Instead of re-hashing every file on each query
+# (expensive on big repos), we keep a cheap signature — size+mtime per file, stat() only, no
+# bytes read — and rebuild only when it differs. This makes "always fresh" the default behavior
+# of the tool itself, with no external scheduler and no dependencies.
+
+_OFF_VALUES = {"0", "false", "no", "off"}
+# Throttle: in a long-running server, re-stat'ing every file on every query costs O(files).
+# With SECOND_BRAIN_REFRESH_TTL=<seconds> the staleness check is skipped if it ran within that
+# window for the same project. Default 0 = always check (freshness-first). Per-repo graphs (the
+# recommended layout) keep the check cheap; raise the TTL only for a huge single monorepo graph.
+_LAST_CHECK: dict[str, float] = {}
+
+
+def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
+    """Cheap per-file signature ``{relpath: "size:mtime_ns"}`` using stat only (no file reads).
+
+    ``st_mtime_ns`` (nanoseconds) is used rather than whole seconds so an edit made shortly after
+    a build is still detected; the only blind spot is a same-size edit within the *same filesystem
+    tick* as the build (a real but very narrow window — ``second-brain gate``'s content-hash check
+    catches it exactly).
+    """
+    root_p = Path(root).resolve()
+    rels = iter_files(root_p, load_ignore_patterns(root_p))
+    out: dict[str, str] = {}
+    for rel in rels:
+        try:
+            st = (root_p / rel).stat()
+        except OSError:
+            continue
+        out[rel] = f"{st.st_size}:{st.st_mtime_ns}"
+    return out
+
+
+def is_stale(root: str | os.PathLike[str]) -> bool:
+    """True if the project changed since the stored signature (or there is no signature yet)."""
+    from second_brain import store
+    old = store.load_signature(root)
+    if old is None:
+        return True  # no baseline -> rebuild once (which writes the signature)
+    return old != fast_signature(root)
+
+
+def auto_refresh_enabled() -> bool:
+    """Whether self-refreshing reads are on (env ``SECOND_BRAIN_AUTO_REFRESH``, default on)."""
+    return os.environ.get("SECOND_BRAIN_AUTO_REFRESH", "1").strip().lower() not in _OFF_VALUES
+
+
+def _refresh_ttl() -> float:
+    try:
+        return max(0.0, float(os.environ.get("SECOND_BRAIN_REFRESH_TTL", "0")))
+    except ValueError:
+        return 0.0
+
+
+def _should_check(root: str | os.PathLike[str]) -> bool:
+    """Throttle the staleness check to at most once per TTL window per project (if TTL > 0)."""
+    ttl = _refresh_ttl()
+    if ttl <= 0:
+        return True
+    key = str(Path(root).resolve())
+    now = time.monotonic()
+    last = _LAST_CHECK.get(key)
+    if last is not None and (now - last) < ttl:
+        return False
+    _LAST_CHECK[key] = now
+    return True
+
+
+def _has_symbols(graph: Graph) -> bool:
+    return any(n.type is NodeType.SYMBOL for n in graph.nodes.values())
+
+
+def _save_quiet(root: str | os.PathLike[str], g: Graph, m: dict[str, str]) -> None:
+    """Persist the store, ignoring write errors (read-only checkout / locked store)."""
+    from second_brain import store
+    try:
+        store.save(root, g, m, signature=fast_signature(root))
+    except OSError:
+        pass  # degrade gracefully: the in-memory graph is still served
+
+
+def load_or_refresh(
+    root: str | os.PathLike[str], *, refresh: bool | None = None
+) -> Graph:
+    """Return the project graph, rebuilt **iff** the project changed since the last build.
+
+    This is the read path for every query: it auto-builds on first touch and silently refreshes
+    a stale store before answering, so an assistant always sees the current project — including
+    *uncommitted* edits — without a manual rebuild. The staleness check is a stat-only signature
+    diff (cheap). Set ``refresh=False`` (or env ``SECOND_BRAIN_AUTO_REFRESH=0``) to serve the
+    stored graph as-is; ``SECOND_BRAIN_REFRESH_TTL=<seconds>`` throttles the check on huge graphs.
+    The rebuild preserves the stored mode (file-level or ``--symbols``), and a store write that
+    fails (read-only checkout) degrades to serving the in-memory graph instead of crashing.
+    """
+    from second_brain import store
+    if refresh is None:
+        refresh = auto_refresh_enabled()
+
+    g = store.load_graph(root)
+    if g is None:  # first touch: build + persist (graph, manifest, signature)
+        built, m = index(root)
+        _save_quiet(root, built, m)
+        return built
+    if refresh and _should_check(root) and is_stale(root):
+        try:
+            rebuilt, m = index(root, symbols=_has_symbols(g))
+        except OSError:
+            return g  # can't re-read the tree -> serve the loaded graph (stale but alive)
+        _save_quiet(root, rebuilt, m)
+        return rebuilt
+    return g

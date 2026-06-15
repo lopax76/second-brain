@@ -106,6 +106,35 @@ def test_hook_cli_requires_git_then_installs(tmp_path):
     assert main(["hook-context", str(proj)]) == 0
 
 
+def test_cli_query_auto_refreshes(tmp_path, capsys):
+    proj = _project(tmp_path)
+    assert main(["build", str(proj)]) == 0
+    (proj / "newmod.py").write_text("z = 1\n", encoding="utf-8")  # change after build
+    capsys.readouterr()
+    assert main(["find", "newmod", str(proj)]) == 0
+    assert "newmod.py" in capsys.readouterr().out  # query saw it without a manual rebuild
+
+
+def test_focus_cli_runs(tmp_path):
+    proj = _project(tmp_path)
+    assert main(["build", str(proj)]) == 0
+    assert main(["focus", "util", str(proj)]) == 0
+    assert main(["focus", "util", str(proj), "--budget", "500"]) == 0
+
+
+def test_symbols_cli_accepts_optional_path(tmp_path):
+    """symbols takes an optional project root like the other commands (file resolved under it)."""
+    proj = _project(tmp_path)
+    # second positional must NOT be 'unrecognized arguments' (the B1 regression)
+    assert main(["symbols", "src/app.py", str(proj)]) == 0
+
+
+def test_symbols_cli_missing_file_returns_2_loudly(tmp_path, capsys):
+    """A missing file fails loudly (exit 2 + stderr), never silently."""
+    assert main(["symbols", "nope.py", str(tmp_path)]) == 2
+    assert "not a file" in capsys.readouterr().err
+
+
 def test_gate_passes_on_clean_project(tmp_path):
     proj = tmp_path / "clean"
     proj.mkdir()

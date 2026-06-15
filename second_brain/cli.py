@@ -11,7 +11,7 @@ import shutil
 import sys
 
 from second_brain import __version__, agent_integration, assess, gate, query, report, store
-from second_brain.freshness import build_manifest, index
+from second_brain.freshness import build_manifest, fast_signature, index, load_or_refresh
 from second_brain.model import Graph
 from second_brain.viewer import write_view
 
@@ -25,18 +25,21 @@ def _human(n: int) -> str:
     return f"{f:.1f} TB"
 
 
-def _build(path: str) -> tuple[Graph, dict[str, str]]:
+def _build(path: str, *, symbols: bool = False) -> tuple[Graph, dict[str, str]]:
     # Single filesystem walk produces both the graph and the manifest.
-    return index(path)
+    return index(path, symbols=symbols)
 
 
 def _load_or_build(path: str) -> Graph:
-    return store.load_graph(path) or _build(path)[0]
+    # Self-refreshing: auto-builds on first touch and rebuilds only if the project changed
+    # (stat-only staleness check), so queries never answer from a stale map. Disable with
+    # SECOND_BRAIN_AUTO_REFRESH=0.
+    return load_or_refresh(path)
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    g, m = _build(args.path)
-    store.save(args.path, g, m)
+    g, m = _build(args.path, symbols=getattr(args, "symbols", False))
+    store.save(args.path, g, m, signature=fast_signature(args.path))
     # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
     rp = report.write_report(args.path, g, scan=False)
     c = g.counts()
@@ -163,6 +166,22 @@ def cmd_impact(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_focus(args: argparse.Namespace) -> int:
+    res = query.focus(_load_or_build(args.path), args.task, budget_tokens=args.budget)
+    if res["fallback"]:
+        print(f"focus '{args.task}': no name/path match — showing globally important nodes "
+              f"(~{res['token_estimate']} tokens / budget {args.budget})")
+    else:
+        print(f"focus '{args.task}': {len(res['seeds'])} seed(s), {len(res['nodes'])} nodes, "
+              f"~{res['token_estimate']} tokens / budget {args.budget}")
+    for x in res["nodes"]:
+        mark = "*" if x["seed"] else " "
+        print(f" {mark}{x['score']:.3f}  {x['type']:9} {x['id']}")
+    if not res["nodes"]:
+        print("  (no nodes)")
+    return 0
+
+
 def cmd_assess(args: argparse.Namespace) -> int:
     r = assess.assess(args.path)
     out = store.store_dir(args.path)
@@ -187,6 +206,21 @@ def cmd_report(args: argparse.Namespace) -> int:
           f"{m['node_types'].get('decision', 0)} decisions, "
           f"{m['orphans']} orphans, {m['broken_refs']} broken refs")
     print(f"report written: {out}")
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from second_brain.export import to_graphml
+
+    g = _load_or_build(args.path)
+    text = to_graphml(g)  # only 'graphml' supported for now (argparse choices)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8", newline="\n")
+        print(f"exported {len(g.nodes)} nodes, {len(g.edges)} edges -> {args.out}")
+    else:
+        print(text)
     return 0
 
 
@@ -235,7 +269,9 @@ def cmd_symbols(args: argparse.Namespace) -> int:
 
     from second_brain.symbols import extract_symbols, render
 
-    p = Path(args.file)
+    # The file is resolved under the optional project root (default '.'), so symbols is
+    # consistent with the other commands: `symbols <file> [path]`.
+    p = Path(args.path) / args.file
     if not p.is_file():
         print(f"not a file: {p}", file=sys.stderr)
         return 2
@@ -255,8 +291,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"second-brain {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
+    sp = sub.add_parser("build", help="index the project -> .secondbrain/graph.json")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--symbols", action="store_true",
+                    help="also index the Python symbol layer (function/class nodes + calls)")
+    sp.set_defaults(func=cmd_build)
+
     for name, fn, help_text in [
-        ("build", cmd_build, "index the project -> .secondbrain/graph.json"),
         ("gate", cmd_gate, "anti-drift check (broken refs, stale files, orphans)"),
         ("stats", cmd_stats, "quick counts by node/edge type"),
         ("map", cmd_map, "compact project digest (areas, sizes, most connected)"),
@@ -296,9 +337,25 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--depth", type=int, default=2, help="max BFS depth (default: 2)")
     sp.set_defaults(func=cmd_impact)
 
+    sp = sub.add_parser("focus",
+                        help="task-aware retrieval: minimal high-value subgraph within a budget")
+    sp.add_argument("task", help="what you are working on (e.g. \"token budget in the report\")")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--budget", type=int, default=2000,
+                    help="approx token budget for the returned node set (default: 2000)")
+    sp.set_defaults(func=cmd_focus)
+
     sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")
-    sp.add_argument("file", help="path to a .py file")
+    sp.add_argument("file", help="path to a .py file (resolved under the project root)")
+    sp.add_argument("path", nargs="?", default=".",
+                    help="project root the file is resolved against (default: .)")
     sp.set_defaults(func=cmd_symbols)
+
+    sp = sub.add_parser("export", help="export the graph to an interchange format (GraphML)")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--format", choices=["graphml"], default="graphml", help="output format")
+    sp.add_argument("--out", help="write to this file instead of stdout")
+    sp.set_defaults(func=cmd_export)
 
     sp = sub.add_parser("agent",
                         help="install/remove SB directive in CLAUDE.md/AGENTS.md + Claude hook")

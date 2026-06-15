@@ -32,7 +32,13 @@ def _atomic_write(path: Path, text: str) -> None:
             os.remove(tmp)
 
 
-def save(root: str | os.PathLike[str], graph: Graph, manifest: dict[str, str]) -> Path:
+def save(
+    root: str | os.PathLike[str],
+    graph: Graph,
+    manifest: dict[str, str],
+    *,
+    signature: dict[str, str] | None = None,
+) -> Path:
     d = store_dir(root)
     d.mkdir(parents=True, exist_ok=True)
     _atomic_write(d / "graph.json", graph.to_json())
@@ -40,7 +46,26 @@ def save(root: str | os.PathLike[str], graph: Graph, manifest: dict[str, str]) -
         d / "manifest.json",
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
     )
+    # Optional cheap freshness signature (size+mtime per file) — lets queries detect "did
+    # anything change?" with stat() only (no hashing), powering self-refreshing reads.
+    if signature is not None:
+        _atomic_write(
+            d / "signature.json",
+            json.dumps(signature, ensure_ascii=False, indent=2, sort_keys=True),
+        )
     return d
+
+
+def load_signature(root: str | os.PathLike[str]) -> dict[str, str] | None:
+    """Load the cheap freshness signature, or ``None`` if missing or corrupt."""
+    p = store_dir(root) / "signature.json"
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def load_graph(root: str | os.PathLike[str]) -> Graph | None:

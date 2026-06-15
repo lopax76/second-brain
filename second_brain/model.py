@@ -26,6 +26,7 @@ class NodeType(str, Enum):
     CONFIG = "config"         # configuration files
     AREA = "area"             # logical cluster / container
     SESSION = "session"       # a work session / git commit
+    SYMBOL = "symbol"         # a function/class inside a code file (opt-in symbol layer)
 
 
 class EdgeType(str, Enum):
@@ -36,6 +37,8 @@ class EdgeType(str, Enum):
     BELONGS_TO = "belongs_to"  # a node belongs to an area
     MENTIONS = "mentions"      # a document mentions a decision
     TOUCHES = "touches"        # a session/commit touched a file
+    DEFINES = "defines"        # a code file defines a symbol (function/class)
+    CALLS = "calls"            # a symbol calls another symbol (same-file, conservative)
 
 
 # Single source of truth for colors (matches docs/SB-design-brief.md).
@@ -50,6 +53,7 @@ NODE_COLORS: dict[NodeType, str] = {
     NodeType.CONFIG: "#EA580C",
     NodeType.AREA: "#6B7280",
     NodeType.SESSION: "#92400E",
+    NodeType.SYMBOL: "#0EA5E9",
 }
 
 EDGE_COLORS: dict[EdgeType, str] = {
@@ -58,6 +62,8 @@ EDGE_COLORS: dict[EdgeType, str] = {
     EdgeType.BELONGS_TO: "#6B7280",
     EdgeType.MENTIONS: "#DC2626",
     EdgeType.TOUCHES: "#92400E",
+    EdgeType.DEFINES: "#0EA5E9",
+    EdgeType.CALLS: "#0284C7",
 }
 
 

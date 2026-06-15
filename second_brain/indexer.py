@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+import re
 from pathlib import Path
 
 from second_brain.classify import classify, rules_from_config
@@ -25,6 +26,7 @@ from second_brain.ignore import (
 )
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 from second_brain.pycode import PyImport, js_imports, python_imports
+from second_brain.pysymbols import extract as extract_symbol_calls
 from second_brain.references import extract_references_tagged
 
 _TEXT_EXTS = {
@@ -145,6 +147,20 @@ def _resolve_js(spec: str, from_rel: str, node_ids: set[str]) -> str | None:
     return None
 
 
+# A reference target only "looks like a project file" if it has a path separator or a short
+# file-like extension. This is the conservative guard that stops minified/inline code fragments
+# in HTML docs (e.g. `](A)`, `](this.easingTime)` parsed as markdown links) from being reported
+# as broken references. A real broken file link almost always has a '/' or a '.ext'.
+# The extension must START with a letter, so version/number strings like `v1.2`, `1.2.3`, `2.36s`
+# (a `.2` / `.36s` tail) are NOT mistaken for files (avoids false-positive broken refs in
+# CHANGELOG/release notes). Real extensions like .md/.gz/.md5 still match.
+_FILE_EXT_RE = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,4}$")
+
+
+def _looks_like_path(target: str) -> bool:
+    return "/" in target or bool(_FILE_EXT_RE.search(target))
+
+
 def _is_external(target: str) -> bool:
     """True for URLs, Windows drive-letter paths, and UNC paths (cleaned form uses '/')."""
     if "://" in target:
@@ -193,6 +209,8 @@ def _resolve_ref(
         return None, False  # escapes the project root
     if kind == "wikilink" and not ("/" in target or "." in base):
         return None, False  # bare [[Concept]] is a concept link, not a file
+    if not _looks_like_path(target):
+        return None, False  # bare token (e.g. code fragment in an HTML doc), not a file ref
     # The target is not an indexed node, but it may be a REAL file we simply do not
     # index as a graph node (image/pdf/binary asset). A reference to an existing file
     # is NOT broken — only a reference to a missing file is. (Regression 2026-06-14:
@@ -215,12 +233,14 @@ def build_graph(
     root: str | os.PathLike[str],
     *,
     project: str | None = None,
+    symbols: bool = False,
     _rels: list[str] | None = None,
 ) -> Graph:
     """Index the project at ``root`` and return its graph. Never modifies the project.
 
-    ``_rels`` lets a caller pass a precomputed file list to avoid walking the tree twice
-    (see :func:`second_brain.freshness.index`).
+    ``symbols=True`` adds the opt-in symbol layer (function/class nodes + intra-file ``calls``
+    edges) for Python files. ``_rels`` lets a caller pass a precomputed file list to avoid
+    walking the tree twice (see :func:`second_brain.freshness.index`).
     """
     root_p = Path(root).resolve()
     if not root_p.is_dir():
@@ -292,6 +312,26 @@ def build_graph(
                     broken.append(target)
             if broken:
                 g.nodes[rel].meta["broken_refs"] = broken
+
+    # 3b. Optional symbol layer: function/class nodes + intra-file `calls` edges (opt-in; off by
+    #     default to keep the file-level map small). Symbol nodes carry no `path` (they are
+    #     sub-file entities, not files), so file counts/areas/orphans are unaffected. Cross-file
+    #     calls are intentionally not linked (no type inference) — `imports` already carries that.
+    if symbols:
+        for rel in py_files:
+            text = _read_text(root_p / rel)
+            if text is None:
+                continue
+            sym_defs, sym_calls = extract_symbol_calls(text)
+            for d in sym_defs:
+                sid = f"{rel}::{d.qualname}"
+                g.add_node(Node(id=sid, type=NodeType.SYMBOL,
+                                label=d.qualname.rsplit(".", 1)[-1],
+                                meta={"file": rel, "line": d.line, "kind": d.kind,
+                                      "qualname": d.qualname}))
+                g.add_edge(Edge(rel, sid, EdgeType.DEFINES))
+            for caller_q, callee_q in sym_calls:
+                g.add_edge(Edge(f"{rel}::{caller_q}", f"{rel}::{callee_q}", EdgeType.CALLS))
 
     # 4. Descriptions (after edges, so we can include inbound counts).
     inbound: dict[str, int] = {}
