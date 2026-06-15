@@ -63,7 +63,20 @@ cosa sola: **consapevolezza del contesto a costo di token bassissimo.**
   con ricerca, pannello nodo cliccabile con navigazione dei vicini e legenda community con
   mostra/nascondi. Dati e libreria sono inline in un unico file HTML, quindi funziona completamente
   offline. Il viewer è **adattato da [Graphify](https://github.com/safishamsi/graphify)** (MIT) —
-  vedi [Riconoscimenti](#riconoscimenti).
+  vedi [Riferimenti & fonti](#riferimenti--fonti).
+- **Ranking per importanza (PageRank)** — i "god node" sono ordinati per *importanza strutturale*
+  (i file da cui dipendono i file importanti), non per numero di link — implementazione pura-Python,
+  deterministica.
+- **Recupero mirato al compito (`focus`)** — gli dai un compito e restituisce il *sottografo minimo
+  di valore* per quel compito entro un budget di token (PageRank personalizzato seedato sui file che
+  matchano), invece dell'intero digest.
+- **Query auto-aggiornanti** — ogni query controlla una firma leggera size+mtime e ricostruisce solo
+  quando il progetto è davvero cambiato (modifiche non committate incluse): a un assistente non viene
+  mai servita una mappa stantia — senza scheduler e senza dipendenze.
+- **Call-graph dei simboli opzionale** — `build --symbols` aggiunge nodi funzione/classe e archi
+  `calls` intra-file per Python (risoluzione conservativa, nessun arco indovinato); off di default
+  per tenere la mappa leggera.
+- **Export GraphML** — `export --format graphml` apre il grafo in Gephi / yEd / Cytoscape / networkx.
 - **Server MCP opzionale** — espone le stesse query a basso costo agli assistenti MCP, dietro un
   extra opzionale così il core resta senza dipendenze.
 
@@ -282,19 +295,52 @@ e leggi /path/al/progetto/.secondbrain/assessment.md. Rispondi alle stesse 4 dom
 dimmi tempo e token consumati.
 ```
 
+## Architettura & moduli
+
+Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel package
+`second_brain/` — ogni modulo pubblico e cosa fa:
+
+| Modulo | Responsabilità |
+|--------|----------------|
+| [`cli.py`](second_brain/cli.py) | Interfaccia a riga di comando — ogni comando `second-brain`. |
+| [`mcp_server.py`](second_brain/mcp_server.py) | Server MCP opzionale: i tool di query a basso costo su stdio (extra `[mcp]`). |
+| [`model.py`](second_brain/model.py) | Modello dati del grafo: nodi/archi tipizzati, colori, contenitore JSON + indice di adiacenza. |
+| [`indexer.py`](second_brain/indexer.py) | Costruisce il grafo: nodi-file, aree, archi import/riferimento, layer simboli opzionale. |
+| [`classify.py`](second_brain/classify.py) | Classifica ogni file in un nodo tipizzato (euristica, configurabile per progetto). |
+| [`config.py`](second_brain/config.py) | Config per-progetto `.secondbrain.json` (estende/sostituisce la tassonomia). |
+| [`ignore.py`](second_brain/ignore.py) | Pattern `.secondbrainignore` + ignore di default sensati. |
+| [`references.py`](second_brain/references.py) | Estrae i riferimenti dai documenti: link markdown, `[[wikilink]]`, path-in-prosa. |
+| [`pycode.py`](second_brain/pycode.py) | Archi import: Python via `ast`, JS/TS best-effort (commenti rimossi). |
+| [`pysymbols.py`](second_brain/pysymbols.py) | Call-graph Python intra-file (funzioni/classi + `calls` conservativo). |
+| [`symbols.py`](second_brain/symbols.py) | Firme funzioni/classi di un singolo file Python (comando `symbols`). |
+| [`freshness.py`](second_brain/freshness.py) | Manifest content-hash, firma leggera e query auto-aggiornanti. |
+| [`gate.py`](second_brain/gate.py) | Il gate anti-deriva: ref rotte / file stantii / orfani. |
+| [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode). |
+| [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` / `focus`. |
+| [`rank.py`](second_brain/rank.py) | PageRank per importanza (globale + personalizzato) — motore dietro god-node e `focus`. |
+| [`communities.py`](second_brain/communities.py) | Community detection (label propagation deterministica) + archi cross-community sorprendenti. |
+| [`operational.py`](second_brain/operational.py) | Nodi operativi: decisioni dai documenti, sessioni dai commit git. |
+| [`report.py`](second_brain/report.py) | Genera `GRAPH_REPORT.md` (god node, community, churn, decisioni, problemi). |
+| [`assess.py`](second_brain/assess.py) | Valutazione prima/dopo one-shot: problemi nascosti + risparmio token. |
+| [`viewer.py`](second_brain/viewer.py) | Viewer mappa 2D a community offline (vis-network, adattato da Graphify). |
+| [`export.py`](second_brain/export.py) | Esporta il grafo in GraphML. |
+| [`agent_integration.py`](second_brain/agent_integration.py) | Integra SB negli agent AI: direttiva CLAUDE.md/AGENTS.md, hook Claude Code, hook git. |
+
+Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.md) e i
+[tool MCP](docs/mcp.md).
+
 ## Stato & roadmap
 
-Alpha. Funzionante oggi: grafo tipizzato, gate anti-deriva, viewer **mappa 2D a community**
-offline, layer di query a basso costo (`map`/`find`/`neighbors` da CLI; `subgraph` via MCP),
-nodi operativi
-(decisioni/sessioni) e server MCP opzionale. **v0.3** aggiunge il **rilevamento delle community**
-(i moduli reali scoperti da come i file si collegano), le **query d'impatto** (`impact` — cosa si
-rompe se tocchi un nodo), il **`GRAPH_REPORT.md` one-pager** (`report`, rigenerato a ogni build) e
-l'**integrazione con gli agent** (`agent install` scrive una direttiva in CLAUDE.md/AGENTS.md + un
-hook `PreToolUse` di Claude Code; `hook install` aggiunge hook git che ricostruiscono il grafo
-gratis). Porta avanti anche la **tassonomia configurabile `.secondbrain.json`** e il **layer di
-simboli Python** (`symbols`) di v0.2. Prossimi passi: risoluzione dei riferimenti più ricca e layer
-di simboli per altri linguaggi.
+Beta — **v0.4.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
+**mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
+`subgraph` / `impact` / **`focus`**); il ranking per importanza **PageRank**; il **rilevamento delle
+community**; le query **impact**; il **`GRAPH_REPORT.md`** one-pager; i nodi operativi
+(decisioni/sessioni); il **call-graph dei simboli Python** opzionale (`build --symbols`); l'**export
+GraphML**; la tassonomia configurabile `.secondbrain.json`; l'**integrazione con gli agent**
+(`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: un build
+davvero incrementale per grafi molto grandi, risoluzione dei riferimenti più ricca, layer di simboli
+per altri linguaggi e un layer semantico locale opzionale.
 
 ## Sviluppo
 
@@ -308,12 +354,37 @@ I contributi sono benvenuti — vedi [CONTRIBUTING.md](CONTRIBUTING.md) e i
 [principi di design](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
 zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SECURITY.md](SECURITY.md).
 
-## Riconoscimenti
+## Riferimenti & fonti
 
-Il viewer interattivo del grafo è **adattato da [Graphify](https://github.com/safishamsi/graphify)**
-di Safi Shamsi (Licenza MIT) — è il suo viewer ad aver ispirato questo, e gliene siamo grati. Il
-rendering usa [vis-network](https://github.com/visjs/vis-network) (Apache-2.0 OR MIT), incluso
-offline. Dettagli e testi di licenza completi in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+**Basato su / adattato da**
+
+- **[Graphify](https://github.com/safishamsi/graphify)** di Safi Shamsi (MIT) — il viewer
+  interattivo è modellato sul viewer di Graphify; con gratitudine.
+- **[vis-network](https://github.com/visjs/vis-network)** (Apache-2.0 OR MIT) — la libreria di
+  rendering, inclusa offline. Testi di licenza completi in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+**Concetti & specifiche**
+
+- **PageRank** — S. Brin & L. Page, *The Anatomy of a Large-Scale Hypertextual Web Search Engine*
+  (1998); vedi [PageRank](https://it.wikipedia.org/wiki/PageRank). Usato per il ranking d'importanza
+  e per `focus` mirato al compito (PageRank personalizzato).
+- **Label propagation** — Raghavan, Albert & Kumara, *Near linear time algorithm to detect community
+  structures* (2007); vedi [Label propagation](https://en.wikipedia.org/wiki/Label_propagation_algorithm).
+  Usato per il rilevamento deterministico delle community.
+- **Model Context Protocol** — [modelcontextprotocol.io](https://modelcontextprotocol.io); il server
+  MCP lo parla.
+- **GraphML** — [graphml.graphdrawing.org](http://graphml.graphdrawing.org); il formato di `export`.
+- **`ast` di Python** — [docs.python.org/3/library/ast](https://docs.python.org/3/library/ast.html);
+  parsing preciso di import e simboli Python.
+- **BLAKE2** — [blake2.net](https://www.blake2.net); l'hash di contenuto (stdlib) usato per la freschezza.
+- **Keep a Changelog** — [keepachangelog.com](https://keepachangelog.com) ·
+  **Semantic Versioning** — [semver.org](https://semver.org).
+
+**Documentazione del progetto**
+
+- [`docs/graph-format.md`](docs/graph-format.md) — store su disco, tassonomia nodi/archi, schema `graph.json`, regole di classificazione.
+- [`docs/mcp.md`](docs/mcp.md) — tool MCP e forme dei dati.
+- [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## Licenza
 
