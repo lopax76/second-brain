@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-06-15
+
+### Added
+
+- **`impact --diff`** (and the `impact_diff` MCP tool) — the blast radius of your **uncommitted
+  working-tree changes**: reads `git status` (read-only), maps the changed files to nodes, and
+  reports what depends on them (`upstream` — what might break) and what they depend on
+  (`downstream`), unioned and de-duplicated across all changed files. The safety check to run
+  before/after editing. The store dir (`.secondbrain/`) is never counted as a change.
+- **`why <a> <b>`** (and the `why` MCP tool) — the shortest path between two nodes over the
+  knowledge edges (undirected): "how are these two things connected?" Returns the path node-by-node
+  with edge types, deterministic (a tie picks the lexicographically smallest path).
+
 ## [0.4.0] - 2026-06-15
 
 ### Added

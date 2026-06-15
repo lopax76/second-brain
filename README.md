@@ -172,6 +172,8 @@ second-brain find util .                            # nodes whose name/path matc
 second-brain neighbors second_brain/model.py .      # a node and its connections
 second-brain impact second_brain/model.py .         # blast radius: what breaks / what it depends on
 second-brain impact second_brain/model.py . --up    # only what depends on it (run before editing!)
+second-brain impact --diff . --up                    # blast radius of your UNCOMMITTED changes (git diff)
+second-brain why second_brain/cli.py second_brain/model.py .   # shortest path: how are two nodes linked?
 second-brain focus "token budget in the report" .   # task-aware: the minimal high-value subgraph
 second-brain focus "auth flow" . --budget 4000      #   ...within ~4000 tokens (default 2000)
 second-brain symbols second_brain/model.py .        # function/class signatures of one Python file
@@ -228,13 +230,13 @@ same-size edit within the same filesystem tick as the last build — which `seco
 
 ## Query layer (for AI assistants)
 
-`second-brain map`, `find`, `neighbors`, `impact`, `focus`, and `report` return compact, budgeted
-answers (ids, types, sizes, connections — never file contents). An optional **MCP server** exposes
-the same queries to MCP-aware assistants:
+`second-brain map`, `find`, `neighbors`, `impact`, `why`, `focus`, and `report` return compact,
+budgeted answers (ids, types, sizes, connections — never file contents). An optional **MCP server**
+exposes the same queries to MCP-aware assistants:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .   # serves project_map / find / neighbors / subgraph / impact / focus / report / health
+second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / focus / report / health
 ```
 
 See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
@@ -326,11 +328,12 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.4.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.5.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
-`impact` / **`focus`**); **PageRank** importance ranking; **community detection**; **impact**
-queries; the **`GRAPH_REPORT.md`** one-pager; operational nodes (decisions/sessions); the opt-in
+`impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**
+(shortest path between two nodes) / **`focus`**); **PageRank** importance ranking; **community
+detection**; the **`GRAPH_REPORT.md`** one-pager; operational nodes (decisions/sessions); the opt-in
 **Python symbol call-graph** (`build --symbols`); **GraphML export**; configurable
 `.secondbrain.json` taxonomy; **agent integration** (`agent install` + git `hook install`); and the
 optional **MCP server**. Next: a truly incremental build for very large graphs, richer

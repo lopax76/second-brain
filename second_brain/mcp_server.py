@@ -82,6 +82,21 @@ def build_server(project: str):
         return query.impact(_graph(project), node_id, direction=direction, max_depth=max_depth)
 
     @server.tool()
+    def impact_diff(direction: str = "both", max_depth: int = 2) -> dict[str, Any]:
+        """Blast radius of the project's UNCOMMITTED working-tree changes: what the current edits
+        affect (``upstream`` = who depends on them) and what they depend on (``downstream``).
+        Reads ``git status`` (read-only) — the safety check to run before/after editing."""
+        from second_brain import operational
+        return query.impact_diff(_graph(project), operational.working_changes(project),
+                                 direction=direction, max_depth=max_depth)
+
+    @server.tool()
+    def why(source: str, target: str) -> dict[str, Any]:
+        """Shortest path between two nodes (how are they connected?), over the knowledge edges
+        (imports/references), undirected. Returns the path node-by-node with the edge types."""
+        return query.why(_graph(project), source, target)
+
+    @server.tool()
     def focus(task: str, budget: int = 2000) -> dict[str, Any]:
         """Task-aware retrieval: the minimal high-value subgraph for ``task``, within ~``budget``
         tokens. Anchors the task to matching files, runs personalised PageRank from them, and

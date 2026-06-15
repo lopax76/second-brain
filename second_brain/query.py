@@ -25,7 +25,7 @@ IMPACT_RELATIONS = (EdgeType.IMPORTS, EdgeType.REFERENCES, EdgeType.MENTIONS)
 
 
 __all__ = ["project_map", "find", "neighbors", "backbone", "subgraph", "impact",
-           "focus", "clear_focus_cache"]
+           "impact_diff", "why", "focus", "clear_focus_cache"]
 
 
 def _area_of(path: str | None) -> str:
@@ -291,6 +291,155 @@ def impact(
         out["downstream"] = groups
         out["downstream_truncated"] = trunc
     return out
+
+
+def _impact_walk_multi(
+    graph: Graph,
+    starts: list[str],
+    *,
+    incoming: bool,
+    max_depth: int,
+    relations: tuple[EdgeType, ...],
+    cap: int,
+) -> tuple[dict[int, list[dict[str, Any]]], bool]:
+    """Multi-source BFS of the dependency graph from a SET of starts (used by impact_diff).
+
+    Same shape as :func:`_impact_walk` but seeded from several nodes at once and grouping each
+    reached node at its shallowest depth across all seeds. All seeds are excluded from results.
+    """
+    adj: dict[str, list[tuple[str, str]]] = {}
+    for e in graph.edges:
+        if e.type not in relations:
+            continue
+        if incoming:
+            adj.setdefault(e.target, []).append((e.source, e.type.value))
+        else:
+            adj.setdefault(e.source, []).append((e.target, e.type.value))
+
+    seen = set(starts)
+    frontier = list(starts)
+    groups: dict[int, list[dict[str, Any]]] = {}
+    truncated = False
+    depth = 1
+    while frontier and depth <= max_depth:
+        level: dict[str, dict[str, Any]] = {}
+        for node in frontier:
+            for other, etype in adj.get(node, ()):
+                if other in seen or other in level:
+                    continue
+                n = graph.nodes.get(other)
+                level[other] = {"depth": depth, "id": other,
+                                "type": n.type.value if n else "?",
+                                "path": n.path if n else None, "edge": etype, "via": node}
+        entries = sorted(level.values(), key=lambda r: (r["id"], r["edge"]))
+        for nid in level:
+            seen.add(nid)
+        if len(entries) > cap:
+            entries = entries[:cap]
+            truncated = True
+        if entries:
+            groups[depth] = entries
+        frontier = [r["id"] for r in entries]
+        depth += 1
+    return groups, truncated
+
+
+def impact_diff(
+    graph: Graph,
+    changed_paths: list[str],
+    *,
+    direction: str = "both",
+    max_depth: int = 2,
+    relations: tuple[EdgeType, ...] = IMPACT_RELATIONS,
+    cap: int = 200,
+) -> dict[str, Any]:
+    """Combined blast radius of a set of changed files (e.g. the working-tree diff).
+
+    Walks the impact graph from every changed path that is a node and merges the results, so the
+    *current uncommitted changes* show their full reach in one view. ``upstream`` = who depends on
+    the changed files (what might break); ``downstream`` = what they depend on. ``unindexed`` lists
+    changed paths that aren't graph nodes (new/ignored/data files).
+    """
+    if direction not in ("up", "down", "both"):
+        raise ValueError(f"direction must be 'up', 'down' or 'both' (got {direction!r})")
+    seeds = sorted(p for p in changed_paths if p in graph.nodes)
+    out: dict[str, Any] = {
+        "direction": direction, "max_depth": max_depth,
+        "changed": sorted(set(changed_paths)), "seeds": seeds,
+        "unindexed": sorted(p for p in set(changed_paths) if p not in graph.nodes),
+    }
+    if direction in ("up", "both"):
+        groups, trunc = _impact_walk_multi(graph, seeds, incoming=True,
+                                           max_depth=max_depth, relations=relations, cap=cap)
+        out["upstream"] = groups
+        out["upstream_truncated"] = trunc
+    if direction in ("down", "both"):
+        groups, trunc = _impact_walk_multi(graph, seeds, incoming=False,
+                                           max_depth=max_depth, relations=relations, cap=cap)
+        out["downstream"] = groups
+        out["downstream_truncated"] = trunc
+    return out
+
+
+def why(
+    graph: Graph,
+    source: str,
+    target: str,
+    *,
+    relations: tuple[EdgeType, ...] = KNOWLEDGE,
+    max_depth: int = 12,
+) -> dict[str, Any]:
+    """Shortest path between two nodes over knowledge edges (undirected) — "how are these linked?".
+
+    Returns ``{"exists": False}`` if either id is unknown; ``connected: False`` with an empty path
+    if there is no link within ``max_depth``; otherwise the ``path`` (node by node) and the
+    ``edges`` along it. Deterministic (neighbours visited in id order, so a tie picks the
+    lexicographically smallest path).
+    """
+    if source not in graph.nodes or target not in graph.nodes:
+        return {"exists": False, "source": source, "target": target}
+    if source == target:
+        n = graph.nodes[source]
+        return {"exists": True, "connected": True, "source": source, "target": target,
+                "length": 0, "path": [{"id": source, "type": n.type.value}], "edges": []}
+
+    adj: dict[str, set[str]] = {}
+    edge_of: dict[tuple[str, str], str] = {}
+    for e in graph.edges:
+        if e.type in relations:
+            adj.setdefault(e.source, set()).add(e.target)
+            adj.setdefault(e.target, set()).add(e.source)
+            edge_of.setdefault((e.source, e.target), e.type.value)
+
+    prev: dict[str, str | None] = {source: None}
+    frontier = [source]
+    depth = 0
+    while frontier and target not in prev and depth < max_depth:
+        nxt: list[str] = []
+        for node in frontier:
+            for other in sorted(adj.get(node, ())):
+                if other not in prev:
+                    prev[other] = node
+                    nxt.append(other)
+        frontier = nxt
+        depth += 1
+
+    if target not in prev:
+        return {"exists": True, "connected": False, "source": source, "target": target,
+                "length": None, "path": [], "edges": []}
+    ids: list[str] = []
+    cur: str | None = target
+    while cur is not None:
+        ids.append(cur)
+        cur = prev[cur]
+    ids.reverse()
+    path = [{"id": nid, "type": graph.nodes[nid].type.value} for nid in ids]
+    edges = []
+    for a, b in zip(ids, ids[1:], strict=False):
+        et = edge_of.get((a, b)) or edge_of.get((b, a)) or "?"
+        edges.append({"source": a, "target": b, "type": et})
+    return {"exists": True, "connected": True, "source": source, "target": target,
+            "length": len(ids) - 1, "path": path, "edges": edges}
 
 
 # -- focus: task-aware, budgeted retrieval -----------------------------------------------------

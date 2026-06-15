@@ -138,32 +138,73 @@ def cmd_neighbors(args: argparse.Namespace) -> int:
     return 0
 
 
+def _emit_impact(title: str, groups: dict, truncated: bool) -> None:
+    print(f"{title}:")
+    if not groups:
+        print("  (none)")
+        return
+    for depth in sorted(groups):
+        for r in groups[depth]:
+            print(f"  d{depth}  -{r['edge']}- {r['id']} ({r['type']})")
+    if truncated:
+        print("  ...(capped)")
+
+
 def cmd_impact(args: argparse.Namespace) -> int:
     direction = "up" if args.up else ("down" if args.down else "both")
+
+    if getattr(args, "diff", False):
+        from second_brain import operational
+        root = args.node or "."  # with --diff the optional positional is the project path
+        res = query.impact_diff(_load_or_build(root), operational.working_changes(root),
+                                direction=direction, max_depth=args.depth)
+        print(f"working-tree changes: {len(res['changed'])} file(s) — "
+              f"{len(res['seeds'])} in graph, {len(res['unindexed'])} unindexed")
+        for c in res["seeds"]:
+            print(f"  * {c}")
+        if res["unindexed"]:
+            tail = " …" if len(res["unindexed"]) > 10 else ""
+            print(f"  (unindexed: {', '.join(res['unindexed'][:10])}{tail})")
+        if "upstream" in res:
+            _emit_impact("affected — depends on the changes",
+                         res["upstream"], res["upstream_truncated"])
+        if "downstream" in res:
+            _emit_impact("the changes depend on",
+                         res["downstream"], res["downstream_truncated"])
+        return 0
+
+    if not args.node:
+        print("impact: give a node id, or use --diff for the working-tree changes", file=sys.stderr)
+        return 2
     res = query.impact(_load_or_build(args.path), args.node,
                        direction=direction, max_depth=args.depth)
     if not res.get("exists"):
         print(f"node not found: {args.node}", file=sys.stderr)
         return 1
     print(f"{res['id']} ({res['type']})")
-
-    def _emit(title: str, groups: dict, truncated: bool) -> None:
-        print(f"{title}:")
-        if not groups:
-            print("  (none)")
-            return
-        for depth in sorted(groups):
-            for r in groups[depth]:
-                print(f"  d{depth}  -{r['edge']}- {r['id']} ({r['type']})")
-        if truncated:
-            print("  ...(capped)")
-
     if "upstream" in res:
-        _emit("upstream (who depends on this)",
-              res["upstream"], res.get("upstream_truncated", False))
+        _emit_impact("upstream (who depends on this)",
+                     res["upstream"], res.get("upstream_truncated", False))
     if "downstream" in res:
-        _emit("downstream (what this depends on)",
-              res["downstream"], res.get("downstream_truncated", False))
+        _emit_impact("downstream (what this depends on)",
+                     res["downstream"], res.get("downstream_truncated", False))
+    return 0
+
+
+def cmd_why(args: argparse.Namespace) -> int:
+    res = query.why(_load_or_build(args.path), args.source, args.target)
+    if not res.get("exists"):
+        print(f"node not found: one or both of {args.source!r}, {args.target!r}", file=sys.stderr)
+        return 1
+    if not res.get("connected"):
+        print(f"no path between {args.source} and {args.target} (within knowledge links)")
+        return 0
+    print(f"{args.source}  ->  {args.target}   ({res['length']} hops)")
+    edges = res["edges"]
+    for i, node in enumerate(res["path"]):
+        print(f"  {node['id']} ({node['type']})")
+        if i < len(edges):
+            print(f"    -{edges[i]['type']}->")
     return 0
 
 
@@ -330,13 +371,22 @@ def main(argv: list[str] | None = None) -> int:
     sp.set_defaults(func=cmd_neighbors)
 
     sp = sub.add_parser("impact", help="impact radius: who depends on a node / what it depends on")
-    sp.add_argument("node", help="node id (relative path or decision:ID)")
+    sp.add_argument("node", nargs="?", default=None,
+                    help="node id (path or decision:ID); with --diff, the project path instead")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--diff", action="store_true",
+                    help="blast radius of the uncommitted working-tree changes (no node needed)")
     grp = sp.add_mutually_exclusive_group()
     grp.add_argument("--up", action="store_true", help="only upstream (who depends on it)")
     grp.add_argument("--down", action="store_true", help="only downstream (what it depends on)")
     sp.add_argument("--depth", type=int, default=2, help="max BFS depth (default: 2)")
     sp.set_defaults(func=cmd_impact)
+
+    sp = sub.add_parser("why", help="shortest path between two nodes (how are they connected?)")
+    sp.add_argument("source", help="start node id (relative path or decision:ID)")
+    sp.add_argument("target", help="end node id")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.set_defaults(func=cmd_why)
 
     sp = sub.add_parser("focus",
                         help="task-aware retrieval: minimal high-value subgraph within a budget")

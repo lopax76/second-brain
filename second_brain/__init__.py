@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from second_brain.model import EDGE_COLORS, NODE_COLORS, Edge, EdgeType, Graph, Node, NodeType
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "EDGE_COLORS",

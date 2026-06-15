@@ -177,6 +177,8 @@ second-brain find util .                            # nodi il cui nome/path cont
 second-brain neighbors second_brain/model.py .      # un nodo e le sue connessioni
 second-brain impact second_brain/model.py .         # raggio d'impatto: cosa si rompe / da cosa dipende
 second-brain impact second_brain/model.py . --up    # solo chi dipende da esso (eseguilo prima di modificare!)
+second-brain impact --diff . --up                    # raggio d'impatto delle tue modifiche NON committate (git diff)
+second-brain why second_brain/cli.py second_brain/model.py .   # percorso minimo: come sono collegati due nodi?
 second-brain focus "budget token nel report" .      # mirato al compito: il sottografo minimo che conta
 second-brain focus "flusso di auth" . --budget 4000 #   ...entro ~4000 token (default 2000)
 second-brain symbols second_brain/model.py .        # firme funzioni/classi di un file Python
@@ -233,13 +235,13 @@ tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash)
 
 ## Layer di query (per gli assistenti AI)
 
-`second-brain map`, `find`, `neighbors`, `impact`, `focus` e `report` restituiscono risposte
+`second-brain map`, `find`, `neighbors`, `impact`, `why`, `focus` e `report` restituiscono risposte
 compatte e budgettate (id, tipi, dimensioni, connessioni — mai il contenuto dei file). Un **server
 MCP** opzionale espone le stesse query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .   # serve project_map / find / neighbors / subgraph / impact / focus / report / health
+second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / focus / report / health
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -331,11 +333,12 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.4.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.5.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
-`subgraph` / `impact` / **`focus`**); il ranking per importanza **PageRank**; il **rilevamento delle
-community**; le query **impact**; il **`GRAPH_REPORT.md`** one-pager; i nodi operativi
+`subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —
+/ **`why`** (percorso minimo tra due nodi) / **`focus`**); il ranking per importanza **PageRank**; il
+**rilevamento delle community**; il **`GRAPH_REPORT.md`** one-pager; i nodi operativi
 (decisioni/sessioni); il **call-graph dei simboli Python** opzionale (`build --symbols`); l'**export
 GraphML**; la tassonomia configurabile `.secondbrain.json`; l'**integrazione con gli agent**
 (`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: un build

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from second_brain.config import load_config
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
+from second_brain.store import STORE_DIRNAME
 
 _DOC_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
 DECISION_RE = re.compile(r"\b(?:D-[A-Z]{1,8}-\d{1,5}|ADR-\d{1,5}|RFC-\d{1,5})\b")
@@ -107,6 +108,40 @@ def add_sessions(graph: Graph, root: str | os.PathLike[str], *, limit: int = 40)
             fpath = fpath.strip()
             if fpath and fpath in node_ids:
                 graph.add_edge(Edge(nid, fpath, EdgeType.TOUCHES))
+
+
+def working_changes(root: str | os.PathLike[str]) -> list[str]:
+    """Repo-relative POSIX paths changed in the working tree (the uncommitted diff).
+
+    Includes modified, added, staged, renamed (new name) and untracked files, via
+    ``git status --porcelain``. Returns a sorted, de-duplicated list; empty if the project is not
+    a git repo or git is unavailable. Read-only — like the rest of the operational layer.
+    """
+    root_p = Path(root)
+    if not (root_p / ".git").exists():
+        return []
+    try:
+        out = subprocess.run(
+            ["git", "-c", "core.quotePath=false", "-C", str(root_p), "status", "--porcelain"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=20, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if out.returncode != 0:
+        return []
+    seen: set[str] = set()
+    for line in out.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:]  # porcelain v1: 2 status chars + space + path
+        if " -> " in path:  # rename/copy "old -> new": take the new path
+            path = path.split(" -> ", 1)[1]
+        path = path.strip().strip('"').replace("\\", "/")
+        # The derived store dir is the tool's own output, not a project change — never report it.
+        if path and not path.startswith(STORE_DIRNAME + "/"):
+            seen.add(path)
+    return sorted(seen)
 
 
 def enrich(graph: Graph, root: str | os.PathLike[str]) -> None:
