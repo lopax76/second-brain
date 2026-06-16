@@ -7,7 +7,7 @@ an OPTIONAL extra so the core stays dependency-free:
     second-brain-mcp [PROJECT_PATH]      # defaults to the current directory
 
 Read-only on your sources. Exposes small, budgeted tools (project_map / find / neighbors /
-subgraph / impact / focus / report / health) over stdio.
+subgraph / impact / impact_diff / why / communities / focus / report / health) over stdio.
 """
 
 from __future__ import annotations
@@ -109,6 +109,13 @@ def build_server(project: str):
         """The full GRAPH_REPORT.md (god nodes, communities, surprising links, decisions,
         problems) as Markdown — the cheapest way to orient before grepping the project."""
         return _report.render_report(_graph(project), root=project)
+
+    @server.tool()
+    def communities(key_files: int = 5, surprising: int = 10) -> dict[str, Any]:
+        """The project's real modules: clusters from imports+references (not folders), each with
+        size, cohesion, key files and dominant types, plus the top cross-module bridges. The
+        structural lens, far cheaper than loading the full report."""
+        return query.community_summary(_graph(project), key_files=key_files, surprising=surprising)
 
     @server.tool()
     def health() -> dict[str, Any]:

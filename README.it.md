@@ -166,6 +166,7 @@ second-brain gate .               # check anti-deriva: ref rotte, file stantii, 
 **Orientarsi — leggi questi per primi**
 ```bash
 second-brain report .   # GRAPH_REPORT.md: god node (PageRank), community, churn, decisioni, problemi
+second-brain communities .   # i moduli reali del progetto (cluster da import+riferimenti) + ponti tra moduli
 second-brain map .      # digest compatto: aree, dimensioni, file più connessi
 second-brain assess .   # prima/dopo: problemi + risparmio token
 second-brain stats .    # conteggi rapidi per tipo nodo/arco
@@ -200,6 +201,16 @@ second-brain hook install .     # git post-commit/post-checkout: ricostruisce il
 **Drill-down** puntando qualsiasi comando su una sottocartella — `second-brain map ./src/api`
 lavora solo su quell'area; la vista d'insieme resta leggera grazie alla modalità *backbone* (aree +
 nucleo connesso per conoscenza; i file-dati isolati sono riassunti sul nodo-area).
+
+### Personalizzazione per-progetto (`.secondbrain.json`)
+
+Un `.secondbrain.json` nella radice del progetto estende la tassonomia di classificazione o
+fissa il tipo di un file quando l'euristica sbaglia (fail-safe: i nomi-tipo sconosciuti sono
+ignorati, e senza il file il comportamento è byte-identico):
+
+```json
+{ "classify": { "type_overrides": { "data/seed.json": "data", "notes/SPEC.md": "design" } } }
+```
 
 ### Sempre fresco (auto-refresh)
 
@@ -241,7 +252,7 @@ MCP** opzionale espone le stesse query agli assistenti compatibili MCP:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / focus / report / health
+second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / communities / focus / report / health
 ```
 
 Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
@@ -309,7 +320,7 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`model.py`](second_brain/model.py) | Modello dati del grafo: nodi/archi tipizzati, colori, contenitore JSON + indice di adiacenza. |
 | [`indexer.py`](second_brain/indexer.py) | Costruisce il grafo: nodi-file, aree, archi import/riferimento, layer simboli opzionale. |
 | [`classify.py`](second_brain/classify.py) | Classifica ogni file in un nodo tipizzato (euristica, configurabile per progetto). |
-| [`config.py`](second_brain/config.py) | Config per-progetto `.secondbrain.json` (estende/sostituisce la tassonomia). |
+| [`config.py`](second_brain/config.py) | Config per-progetto `.secondbrain.json` (estende/sostituisce la tassonomia + `type_overrides` per-file). |
 | [`ignore.py`](second_brain/ignore.py) | Pattern `.secondbrainignore` + ignore di default sensati. |
 | [`references.py`](second_brain/references.py) | Estrae i riferimenti dai documenti: link markdown, `[[wikilink]]`, path-in-prosa. |
 | [`pycode.py`](second_brain/pycode.py) | Archi import: Python via `ast`, JS/TS best-effort (commenti rimossi). |

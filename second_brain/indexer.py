@@ -250,6 +250,16 @@ def _describe(node: Node, area: str, inbound: int) -> str:
     return f"{node.type.value} · {where}{tail}"
 
 
+def _override_types(cfg) -> dict[str, NodeType]:
+    """Resolve config type-overrides to {posix_path: NodeType}; unknown/AREA names are ignored."""
+    by_value = {nt.value: nt for nt in NodeType}
+    out: dict[str, NodeType] = {}
+    for path, tname in cfg.type_overrides:
+        nt = by_value.get(tname)
+        if nt is not None and nt is not NodeType.AREA:
+            out[path] = nt
+    return out
+
 def build_graph(
     root: str | os.PathLike[str],
     *,
@@ -269,12 +279,14 @@ def build_graph(
 
     rels = _rels if _rels is not None else iter_files(root_p, load_ignore_patterns(root_p))
     g = Graph(project=project or root_p.name)
-    rules = rules_from_config(load_config(root_p))
+    cfg = load_config(root_p)
+    rules = rules_from_config(cfg)
+    overrides = _override_types(cfg)
 
     # 1. File nodes + areas.
     areas: set[str] = set()
     for rel in rels:
-        ntype = classify(rel, rules)
+        ntype = overrides.get(rel) or classify(rel, rules)
         label = rel.rsplit("/", 1)[-1]
         node = Node(id=rel, type=ntype, label=label, path=rel)
         try:

@@ -37,6 +37,7 @@ class ClassifyConfig:
     design_keywords: tuple[str, ...] = ()
     report_keywords: tuple[str, ...] = ()
     decision_id_prefixes: tuple[str, ...] = ()
+    type_overrides: tuple[tuple[str, str], ...] = ()
 
 
 def _str_tuple(value: object) -> tuple[str, ...]:
@@ -45,6 +46,21 @@ def _str_tuple(value: object) -> tuple[str, ...]:
         return ()
     return tuple(str(v).strip() for v in value if isinstance(v, (str, int)) and str(v).strip())
 
+
+def _type_overrides(value: object) -> tuple[tuple[str, str], ...]:
+    """Coerce a JSON {path: type-name} mapping to normalized (posix-path, lower-name) pairs."""
+    if not isinstance(value, dict):
+        return ()
+    out: list[tuple[str, str]] = []
+    for k, v in value.items():
+        if not (isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip()):
+            continue
+        key = k.strip().replace("\\", "/")
+        if key.startswith("./"):
+            key = key[2:]
+        key = key.lstrip("/")
+        out.append((key, v.strip().lower()))
+    return tuple(out)
 
 def load_config(root: str | Path) -> ClassifyConfig:
     """Read ``<root>/.secondbrain.json`` and return its classification overrides.
@@ -70,6 +86,7 @@ def load_config(root: str | Path) -> ClassifyConfig:
         design_keywords=_str_tuple(kw.get("design")),
         report_keywords=_str_tuple(kw.get("report")),
         decision_id_prefixes=_str_tuple(cls.get("decision_id_prefixes")),
+        type_overrides=_type_overrides(cls.get("type_overrides")),
     )
 
 

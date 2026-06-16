@@ -138,10 +138,11 @@ def cmd_neighbors(args: argparse.Namespace) -> int:
     return 0
 
 
-def _emit_impact(title: str, groups: dict, truncated: bool) -> None:
+def _emit_impact(title: str, groups: dict, truncated: bool,
+                 empty_hint: str | None = None) -> None:
     print(f"{title}:")
     if not groups:
-        print("  (none)")
+        print(f"  (none - {empty_hint})" if empty_hint else "  (none)")
         return
     for depth in sorted(groups):
         for r in groups[depth]:
@@ -165,12 +166,14 @@ def cmd_impact(args: argparse.Namespace) -> int:
         if res["unindexed"]:
             tail = " …" if len(res["unindexed"]) > 10 else ""
             print(f"  (unindexed: {', '.join(res['unindexed'][:10])}{tail})")
+        hint = ("every impacted node is already among your changed files"
+                if res["seeds"] else None)
         if "upstream" in res:
             _emit_impact("affected — depends on the changes",
-                         res["upstream"], res["upstream_truncated"])
+                         res["upstream"], res["upstream_truncated"], hint)
         if "downstream" in res:
             _emit_impact("the changes depend on",
-                         res["downstream"], res["downstream_truncated"])
+                         res["downstream"], res["downstream_truncated"], hint)
         return 0
 
     if not args.node:
@@ -250,6 +253,19 @@ def cmd_report(args: argparse.Namespace) -> int:
     print(f"report written: {out}")
     return 0
 
+
+def cmd_communities(args: argparse.Namespace) -> int:
+    res = query.community_summary(_load_or_build(args.path))
+    print(f"{res['count']} communities")
+    for c in res["communities"]:
+        kf = ", ".join(c["key_files"][:3])
+        print(f"  {c['name']:10} {c['size']:4} files  cohesion {c['cohesion']:.2f}  [{kf}]")
+    if res["surprising_edges"]:
+        print("surprising links (cross-module):")
+        for e in res["surprising_edges"][:5]:
+            print(f"  {e['source']} -{e['type']}- {e['target']}  "
+                  f"({e['source_community']} -> {e['target_community']})")
+    return 0
 
 def cmd_export(args: argparse.Namespace) -> int:
     from pathlib import Path
@@ -345,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
         ("map", cmd_map, "compact project digest (areas, sizes, most connected)"),
         ("assess", cmd_assess, "one-shot before/after report: problems + token savings"),
         ("report", cmd_report, "write GRAPH_REPORT.md: god nodes, communities, decisions"),
+        ("communities", cmd_communities,
+         "the project's real modules (clusters) + cross-module bridges"),
     ]:
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")

@@ -161,6 +161,7 @@ second-brain gate .               # anti-drift check: broken refs, stale files, 
 **Orient — read these first**
 ```bash
 second-brain report .   # GRAPH_REPORT.md: god nodes (PageRank), communities, churn, decisions, problems
+second-brain communities .   # the project's real modules (clusters from imports+refs) + cross-module bridges
 second-brain map .      # compact digest: areas, sizes, most-connected files
 second-brain assess .   # before/after: problems + token savings
 second-brain stats .    # quick counts by node/edge type
@@ -195,6 +196,16 @@ second-brain hook install .     # git post-commit/post-checkout: rebuild the gra
 **Drill down** by pointing any command at a subfolder — `second-brain map ./src/api` works on just
 that area; the top-level view stays light via *backbone* mode (areas + the knowledge-connected core;
 isolated data files are summarized on their area node).
+
+### Per-project tuning (`.secondbrain.json`)
+
+Drop a `.secondbrain.json` at the project root to extend the classification taxonomy or pin a
+specific file's node type when the heuristic guesses wrong (fail-safe: unknown type names are
+ignored, and with no file behaviour is byte-identical):
+
+```json
+{ "classify": { "type_overrides": { "data/seed.json": "data", "notes/SPEC.md": "design" } } }
+```
 
 ### Always fresh (auto-refresh)
 
@@ -236,7 +247,7 @@ exposes the same queries to MCP-aware assistants:
 
 ```bash
 pip install "second-brain-graph[mcp]"
-second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / focus / report / health
+second-brain-mcp .   # project_map / find / neighbors / subgraph / impact / impact_diff / why / communities / focus / report / health
 ```
 
 See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
@@ -304,7 +315,7 @@ Read-only on your sources, zero runtime dependencies, deterministic. Everything 
 | [`model.py`](second_brain/model.py) | Graph data model: typed nodes/edges, colours, the JSON-serializable container + adjacency index. |
 | [`indexer.py`](second_brain/indexer.py) | Builds the graph: file nodes, areas, import/reference edges, the opt-in symbol layer. |
 | [`classify.py`](second_brain/classify.py) | Classifies each file into a typed node (heuristic, configurable per project). |
-| [`config.py`](second_brain/config.py) | Per-project `.secondbrain.json` config (extend/replace the classification taxonomy). |
+| [`config.py`](second_brain/config.py) | Per-project `.secondbrain.json` config (extend/replace the classification taxonomy + per-file `type_overrides`). |
 | [`ignore.py`](second_brain/ignore.py) | `.secondbrainignore` patterns + sensible default ignores. |
 | [`references.py`](second_brain/references.py) | Extracts doc references: markdown links, `[[wikilinks]]`, and plain path-in-prose. |
 | [`pycode.py`](second_brain/pycode.py) | Import edges: Python via `ast`, JS/TS best-effort (comments stripped). |

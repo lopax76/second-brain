@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-06-16
+
+### Added
+
+- **`communities`** — the project's real modules as a first-class query: a new MCP tool and a
+  `second-brain communities` CLI command surface the community detection (clusters from
+  imports+references, with size, cohesion, key files and dominant types) plus the top
+  cross-module bridges. Previously this lived only inside the full `report`; now an assistant can
+  ask for the structural lens directly, at a fraction of the tokens. The MCP server is now
+  **11 tools**.
+- **Per-file node-type overrides** — `.secondbrain.json` accepts a `classify.type_overrides` map
+  (`{ "path/to/file": "data" }`) to pin a file's node type when the heuristic guesses wrong,
+  without touching the algorithm. Opt-in and fail-safe: unknown or `area` type names are ignored,
+  and with no file the classification is byte-identical.
+
+### Changed
+
+- **`impact --diff` clarity** — when every impacted node is itself among the changed files, the
+  result now carries an explicit `note` (and the CLI prints `(none - every impacted node is
+  already among your changed files)`) instead of a bare `(none)`, which read as "no impact".
+
+### Tests
+
+- New `tests/test_v06_features.py` (16 tests) covering the community query/tool, the `impact --diff`
+  note, the type overrides, and **end-to-end execution of all 11 MCP tools** (the server's tool
+  bodies were previously uncovered). Coverage 91% -> 93%; `mcp_server.py` 0% -> 85%. 257 tests total.
+
 ## [0.5.0] - 2026-06-15
 
 ### Added

@@ -378,8 +378,26 @@ def impact_diff(
                                            max_depth=max_depth, relations=relations, cap=cap)
         out["downstream"] = groups
         out["downstream_truncated"] = trunc
+    present = [out[k] for k in ("upstream", "downstream") if k in out]
+    if seeds and present and not any(present):
+        out["note"] = ("every impacted node is itself among the changed files "
+                       "(seeds are excluded from the results)")
     return out
 
+
+def community_summary(graph: Graph, *, key_files: int = 5, surprising: int = 10) -> dict[str, Any]:
+    """The project's real modules - clusters discovered from imports+references (not folders) -
+    each with size, cohesion, key files and dominant types, plus the most important cross-module
+    bridges. The structural lens, without loading the full report.
+    """
+    from second_brain import communities as _c
+    comm = _c.detect(graph)
+    rows = _c.summarize(graph, comm, key_files=key_files)
+    return {
+        "count": len(rows),
+        "communities": rows,
+        "surprising_edges": _c.surprising_edges(graph, comm, top=surprising),
+    }
 
 def why(
     graph: Graph,
