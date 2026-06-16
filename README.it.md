@@ -344,14 +344,14 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.5.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.6.1**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
 `subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —
-/ **`why`** (percorso minimo tra due nodi) / **`focus`**); il ranking per importanza **PageRank**; il
+/ **`why`** (percorso minimo tra due nodi) / **`focus`** / **`communities`** — i moduli reali del progetto + ponti cross-modulo); il ranking per importanza **PageRank**; il
 **rilevamento delle community**; il **`GRAPH_REPORT.md`** one-pager; i nodi operativi
 (decisioni/sessioni); il **call-graph dei simboli Python** opzionale (`build --symbols`); l'**export
-GraphML**; la tassonomia configurabile `.secondbrain.json`; l'**integrazione con gli agent**
+GraphML**; la tassonomia configurabile `.secondbrain.json` **con `type_overrides` per-file**; l'**integrazione con gli agent**
 (`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: un build
 davvero incrementale per grafi molto grandi, risoluzione dei riferimenti più ricca, layer di simboli
 per altri linguaggi e un layer semantico locale opzionale.

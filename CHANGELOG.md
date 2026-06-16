@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-06-16
+
+### Fixed
+
+- **README version** — the *Status & roadmap* section still read "Beta - v0.5.0" while the package
+  was already 0.6.0 (a stale line missed in the 0.6.0 bump). It now reads "Beta - v0.6.1", and the
+  "working today" list includes `communities` and per-file `type_overrides`.
+
+### Packaging
+
+- `CHANGELOG.md` is now shipped in the source distribution (via `MANIFEST.in`), so the change
+  history is discoverable from the PyPI source archive, not only on GitHub.
+
 ## [0.6.0] - 2026-06-16
 
 ### Added

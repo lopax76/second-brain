@@ -339,14 +339,14 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.5.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.6.1**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**
-(shortest path between two nodes) / **`focus`**); **PageRank** importance ranking; **community
+(shortest path between two nodes) / **`focus`** / **`communities`** — the project's real modules + cross-module bridges); **PageRank** importance ranking; **community
 detection**; the **`GRAPH_REPORT.md`** one-pager; operational nodes (decisions/sessions); the opt-in
 **Python symbol call-graph** (`build --symbols`); **GraphML export**; configurable
-`.secondbrain.json` taxonomy; **agent integration** (`agent install` + git `hook install`); and the
+`.secondbrain.json` taxonomy **with per-file `type_overrides`**; **agent integration** (`agent install` + git `hook install`); and the
 optional **MCP server**. Next: a truly incremental build for very large graphs, richer
 reference-resolution, symbol layers for more languages, and an optional local semantic layer.
 

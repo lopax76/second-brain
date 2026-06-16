@@ -3,5 +3,6 @@
 include LICENSE
 include README.md
 include README.it.md
+include CHANGELOG.md
 include second_brain/py.typed
 recursive-include second_brain/ui *.html *.js
