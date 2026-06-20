@@ -75,23 +75,27 @@ def build_server(project: str):
         return query.subgraph(_graph(project), node_id, hops=hops)
 
     @server.tool()
-    def impact(node_id: str, direction: str = "both", max_depth: int = 2) -> dict[str, Any]:
+    def impact(node_id: str, direction: str = "both", max_depth: int = 2,
+               budget: int = 0) -> dict[str, Any]:
         """Impact radius of a node, grouped by depth.
 
         ``direction`` in {up, down, both}: ``upstream`` = who depends on ``node_id`` (what breaks
-        if you change it), ``downstream`` = what ``node_id`` depends on. Use before editing a file
-        to see the blast radius without reading every dependent.
+        if you change it), ``downstream`` = what ``node_id`` depends on. ``budget`` > 0 ranks the
+        impacted nodes (nearest + most-connected first) and trims to ~that many tokens, so a hub
+        with hundreds of dependents returns only its most important ones; 0 = all, by depth.
         """
-        return query.impact(_graph(project), node_id, direction=direction, max_depth=max_depth)
+        return query.impact(_graph(project), node_id, direction=direction,
+                            max_depth=max_depth, budget_tokens=budget)
 
     @server.tool()
-    def impact_diff(direction: str = "both", max_depth: int = 2) -> dict[str, Any]:
+    def impact_diff(direction: str = "both", max_depth: int = 2, budget: int = 0) -> dict[str, Any]:
         """Blast radius of the project's UNCOMMITTED working-tree changes: what the current edits
         affect (``upstream`` = who depends on them) and what they depend on (``downstream``).
-        Reads ``git status`` (read-only) — the safety check to run before/after editing."""
+        Reads ``git status`` (read-only) — the safety check to run before/after editing. ``budget``
+        > 0 ranks the impacted nodes and trims to ~that many tokens (0 = all, grouped by depth)."""
         from second_brain import operational
         return query.impact_diff(_graph(project), operational.working_changes(project),
-                                 direction=direction, max_depth=max_depth)
+                                 direction=direction, max_depth=max_depth, budget_tokens=budget)
 
     @server.tool()
     def why(source: str, target: str) -> dict[str, Any]:
@@ -100,12 +104,18 @@ def build_server(project: str):
         return query.why(_graph(project), source, target)
 
     @server.tool()
-    def focus(task: str, budget: int = 2000) -> dict[str, Any]:
+    def focus(task: str, budget: int = 2000, signatures: bool = False) -> dict[str, Any]:
         """Task-aware retrieval: the minimal high-value subgraph for ``task``, within ~``budget``
-        tokens. Anchors the task to matching files, runs personalised PageRank from them, and
-        returns the top nodes + the knowledge edges among them — the context for a task, not the
-        whole digest. Falls back to globally important nodes when nothing matches the task."""
-        return query.focus(_graph(project), task, budget_tokens=budget)
+        tokens. Anchors the task (BM25 lexical ranking) to matching files, runs personalised
+        PageRank from them, and returns the top nodes + the knowledge edges among them — the
+        context for a task, not the whole digest. ``signatures=True`` also returns the key symbol
+        signatures of the top Python files (the API, without opening them). Falls back to globally
+        important nodes when nothing matches."""
+        g = _graph(project)
+        res = query.focus(g, task, budget_tokens=budget)
+        if signatures:
+            query.attach_signatures(g, project, res)
+        return res
 
     @server.tool()
     def report() -> str:

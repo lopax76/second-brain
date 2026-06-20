@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from second_brain import bm25, communities, rank
+from second_brain import bm25, budget, communities, rank
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -269,6 +269,38 @@ def _impact_walk(
     return groups, truncated
 
 
+def _rank_and_budget(
+    graph: Graph,
+    groups: dict[int, list[dict[str, Any]]],
+    *,
+    budget_tokens: int,
+    base_truncated: bool,
+) -> tuple[dict[int, list[dict[str, Any]]], bool]:
+    """Annotate each impacted entry with its incident ``degree`` and, when ``budget_tokens`` > 0,
+    keep only the most useful ones within the token budget — shallowest first, then most-connected
+    (a hub dependent matters more to review), then id. Deterministic. Default (0) leaves the
+    grouping untouched and only adds ``degree``."""
+    flat: list[dict[str, Any]] = []
+    for depth in groups:
+        for r in groups[depth]:
+            r["degree"] = graph.degree(r["id"])
+            flat.append(r)
+    if budget_tokens <= 0:
+        return groups, base_truncated
+    flat.sort(key=lambda r: (r["depth"], -r["degree"], r["id"]))
+    kept, _spent, trimmed = budget.fit(
+        flat,
+        lambda r: budget.node_cost(graph.nodes[r["id"]]) if r["id"] in graph.nodes else 1,
+        budget_tokens,
+    )
+    new_groups: dict[int, list[dict[str, Any]]] = {}
+    for r in kept:
+        new_groups.setdefault(r["depth"], []).append(r)
+    for d in new_groups:
+        new_groups[d].sort(key=lambda r: (-r["degree"], r["id"]))
+    return new_groups, (base_truncated or trimmed)
+
+
 def impact(
     graph: Graph,
     node_id: str,
@@ -277,6 +309,7 @@ def impact(
     max_depth: int = 2,
     relations: tuple[EdgeType, ...] = IMPACT_RELATIONS,
     cap: int = 200,
+    budget_tokens: int = 0,
 ) -> dict[str, Any]:
     """Impact radius of a node: what breaks if you touch it, and what it depends on.
 
@@ -297,11 +330,15 @@ def impact(
     if direction in ("up", "both"):
         groups, trunc = _impact_walk(graph, node_id, incoming=True,
                                      max_depth=max_depth, relations=relations, cap=cap)
+        groups, trunc = _rank_and_budget(graph, groups, budget_tokens=budget_tokens,
+                                         base_truncated=trunc)
         out["upstream"] = groups
         out["upstream_truncated"] = trunc
     if direction in ("down", "both"):
         groups, trunc = _impact_walk(graph, node_id, incoming=False,
                                      max_depth=max_depth, relations=relations, cap=cap)
+        groups, trunc = _rank_and_budget(graph, groups, budget_tokens=budget_tokens,
+                                         base_truncated=trunc)
         out["downstream"] = groups
         out["downstream_truncated"] = trunc
     return out
@@ -366,6 +403,7 @@ def impact_diff(
     max_depth: int = 2,
     relations: tuple[EdgeType, ...] = IMPACT_RELATIONS,
     cap: int = 200,
+    budget_tokens: int = 0,
 ) -> dict[str, Any]:
     """Combined blast radius of a set of changed files (e.g. the working-tree diff).
 
@@ -385,11 +423,15 @@ def impact_diff(
     if direction in ("up", "both"):
         groups, trunc = _impact_walk_multi(graph, seeds, incoming=True,
                                            max_depth=max_depth, relations=relations, cap=cap)
+        groups, trunc = _rank_and_budget(graph, groups, budget_tokens=budget_tokens,
+                                         base_truncated=trunc)
         out["upstream"] = groups
         out["upstream_truncated"] = trunc
     if direction in ("down", "both"):
         groups, trunc = _impact_walk_multi(graph, seeds, incoming=False,
                                            max_depth=max_depth, relations=relations, cap=cap)
+        groups, trunc = _rank_and_budget(graph, groups, budget_tokens=budget_tokens,
+                                         base_truncated=trunc)
         out["downstream"] = groups
         out["downstream_truncated"] = trunc
     present = [out[k] for k in ("upstream", "downstream") if k in out]
@@ -538,12 +580,6 @@ def _focus_seeds(graph: Graph, task: str) -> dict[str, float]:
     return bm25.BM25(docs).scores(toks)
 
 
-def _node_token_cost(node: Node) -> int:
-    """Rough token cost of a node's compact entry (id+type+path). chars/4 is an estimate."""
-    chars = len(node.id) + len(node.type.value) + len(node.path or "") + 12
-    return max(1, round(chars / 4))
-
-
 def focus(
     graph: Graph,
     task: str,
@@ -588,7 +624,7 @@ def focus(
     seen: set[str] = set()
     spent = 0
     for nid in order:
-        cost = _node_token_cost(graph.nodes[nid])
+        cost = budget.node_cost(graph.nodes[nid])
         if chosen and spent + cost > budget_tokens:
             break
         chosen.append(nid)
@@ -611,3 +647,43 @@ def focus(
         "nodes": nodes_out,
         "edges": edges_out,
     }
+
+
+def attach_signatures(graph: Graph, root: str, result: dict[str, Any], *,
+                      budget_tokens: int = 600, per_file: int = 8) -> dict[str, Any]:
+    """Enrich a ``focus`` result with the key symbol signatures of its top Python files.
+
+    Reads (on demand, read-only) the source of each chosen ``.py`` file in rank order and appends
+    its top function/class signatures — the API an assistant needs without opening the files —
+    until ``budget_tokens`` is spent. Adds ``signatures`` = ``{file_id: [{signature, line, kind,
+    depth}]}``. Python only (stdlib ``ast``); non-Python and unreadable files are skipped.
+    """
+    from pathlib import Path
+
+    from second_brain import symbols as _sym
+    root_p = Path(root)
+    sigs: dict[str, list[dict[str, Any]]] = {}
+    spent = 0
+    for n in result.get("nodes", []):
+        node = graph.nodes.get(n["id"])
+        if (node is None or node.path is None or not node.path.endswith(".py")
+                or node.type is not NodeType.PROGRAM):
+            continue
+        try:
+            src = (root_p / node.path).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        rows: list[dict[str, Any]] = []
+        for s in _sym.extract_symbols(src)[:per_file]:
+            cost = budget.text_cost(s.signature)
+            if budget_tokens > 0 and (sigs or rows) and spent + cost > budget_tokens:
+                break
+            rows.append({"signature": s.signature, "line": s.line,
+                         "kind": s.kind, "depth": s.depth})
+            spent += cost
+        if rows:
+            sigs[node.id] = rows
+        if budget_tokens > 0 and spent >= budget_tokens:
+            break
+    result["signatures"] = sigs
+    return result

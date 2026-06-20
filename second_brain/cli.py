@@ -70,6 +70,23 @@ _BACKBONE_AUTO = 8000  # graphs bigger than this auto-render as a backbone to st
 
 def cmd_view(args: argparse.Namespace) -> int:
     g, _ = _build(args.path)
+    if getattr(args, "focus", None):
+        from second_brain.model import Edge, Graph, Node
+        res = query.focus(g, args.focus, budget_tokens=args.budget)
+        ids = {n["id"] for n in res["nodes"]}
+        fg = Graph(project=g.project)
+        for nid in ids:
+            sn = g.nodes[nid]
+            fg.add_node(Node(id=sn.id, type=sn.type, label=sn.label,
+                             description=sn.description, path=sn.path, meta=dict(sn.meta)))
+        for e in g.edges:
+            if e.source in ids and e.target in ids:
+                fg.add_edge(Edge(e.source, e.target, e.type))
+        out = write_view(args.path, fg)
+        print(f"focus view ('{args.focus}'): {len(ids)} nodes (the slice an assistant gets) "
+              f"-> {out}")
+        print("open it in a browser (double-click).")
+        return 0
     full = len(g.nodes)
     if args.backbone or full > _BACKBONE_AUTO:
         g = query.backbone(g)
@@ -160,7 +177,8 @@ def cmd_impact(args: argparse.Namespace) -> int:
         from second_brain import operational
         root = args.node or "."  # with --diff the optional positional is the project path
         res = query.impact_diff(_load_or_build(root), operational.working_changes(root),
-                                direction=direction, max_depth=args.depth)
+                                direction=direction, max_depth=args.depth,
+                                budget_tokens=args.budget)
         print(f"working-tree changes: {len(res['changed'])} file(s) — "
               f"{len(res['seeds'])} in graph, {len(res['unindexed'])} unindexed")
         for c in res["seeds"]:
@@ -182,7 +200,7 @@ def cmd_impact(args: argparse.Namespace) -> int:
         print("impact: give a node id, or use --diff for the working-tree changes", file=sys.stderr)
         return 2
     res = query.impact(_load_or_build(args.path), args.node,
-                       direction=direction, max_depth=args.depth)
+                       direction=direction, max_depth=args.depth, budget_tokens=args.budget)
     if not res.get("exists"):
         print(f"node not found: {args.node}", file=sys.stderr)
         return 1
@@ -214,16 +232,22 @@ def cmd_why(args: argparse.Namespace) -> int:
 
 
 def cmd_focus(args: argparse.Namespace) -> int:
-    res = query.focus(_load_or_build(args.path), args.task, budget_tokens=args.budget)
+    g = _load_or_build(args.path)
+    res = query.focus(g, args.task, budget_tokens=args.budget)
+    if getattr(args, "signatures", False):
+        query.attach_signatures(g, args.path, res)
     if res["fallback"]:
         print(f"focus '{args.task}': no name/path match — showing globally important nodes "
               f"(~{res['token_estimate']} tokens / budget {args.budget})")
     else:
         print(f"focus '{args.task}': {len(res['seeds'])} seed(s), {len(res['nodes'])} nodes, "
               f"~{res['token_estimate']} tokens / budget {args.budget}")
+    sigs = res.get("signatures", {})
     for x in res["nodes"]:
         mark = "*" if x["seed"] else " "
         print(f" {mark}{x['score']:.3f}  {x['type']:9} {x['id']}")
+        for s in sigs.get(x["id"], []):
+            print(f"        {'  ' * s['depth']}{s['signature']}   [L{s['line']}]")
     if not res["nodes"]:
         print("  (no nodes)")
     return 0
@@ -376,6 +400,10 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.add_argument("--backbone", action="store_true",
                     help="render only areas + knowledge-connected files (auto for huge graphs)")
+    sp.add_argument("--focus", metavar="TASK",
+                    help="render only the focus slice for TASK (what an assistant would receive)")
+    sp.add_argument("--budget", type=int, default=2000,
+                    help="token budget for --focus (default: 2000)")
     sp.set_defaults(func=cmd_view)
 
     sp = sub.add_parser("communities",
@@ -410,6 +438,9 @@ def main(argv: list[str] | None = None) -> int:
     grp.add_argument("--up", action="store_true", help="only upstream (who depends on it)")
     grp.add_argument("--down", action="store_true", help="only downstream (what it depends on)")
     sp.add_argument("--depth", type=int, default=2, help="max BFS depth (default: 2)")
+    sp.add_argument("--budget", type=int, default=0,
+                    help="rank impacted nodes (nearest + most-connected first) and trim to ~N "
+                         "tokens (0 = all, grouped by depth)")
     sp.set_defaults(func=cmd_impact)
 
     sp = sub.add_parser("why", help="shortest path between two nodes (how are they connected?)")
@@ -424,6 +455,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.add_argument("--budget", type=int, default=2000,
                     help="approx token budget for the returned node set (default: 2000)")
+    sp.add_argument("--signatures", action="store_true",
+                    help="also show the key symbol signatures of the top Python files (read-only)")
     sp.set_defaults(func=cmd_focus)
 
     sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")

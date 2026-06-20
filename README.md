@@ -326,6 +326,7 @@ Read-only on your sources, zero runtime dependencies, deterministic. Everything 
 | [`store.py`](second_brain/store.py) | Persists the derived store under `.secondbrain/` (graph, manifest, signature, mode). |
 | [`query.py`](second_brain/query.py) | Low-token query layer: `map` / `find` / `neighbors` / `subgraph` / `impact` / `focus`. |
 | [`bm25.py`](second_brain/bm25.py) | Okapi BM25 lexical relevance (stdlib) — the task-to-file signal that seeds `focus`. |
+| [`budget.py`](second_brain/budget.py) | Token-cost estimate + budget-fit (stdlib) — the one place `focus` / `impact` count tokens. |
 | [`rank.py`](second_brain/rank.py) | PageRank importance (global + personalised) — engine behind god-nodes and `focus`. |
 | [`communities.py`](second_brain/communities.py) | Community detection (deterministic label propagation) + surprising cross-community edges. |
 | [`operational.py`](second_brain/operational.py) | Operational nodes: decisions found in docs, sessions from git commits. |
@@ -340,7 +341,7 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.7.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.8.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**
@@ -375,6 +376,7 @@ zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.m
 **Concepts & specifications**
 
 - **BM25 (lexical relevance)** — S. Robertson & H. Zaragoza, *The Probabilistic Relevance Framework: BM25 and Beyond* (2009); see [Okapi BM25](https://en.wikipedia.org/wiki/Okapi_BM25). Ranks the anchor files of a task for `focus`.
+- **Repo map design** — the PageRank-ranked, token-budgeted, signature-bearing map is inspired by [aider's repo map](https://aider.chat/docs/repomap.html) and the sibling project [veridge](https://github.com/galimar/veridge).
 - **PageRank** — S. Brin & L. Page, *The Anatomy of a Large-Scale Hypertextual Web Search Engine*
   (1998); see [PageRank](https://en.wikipedia.org/wiki/PageRank). Used for importance ranking and
   task-aware `focus` (personalised PageRank).
@@ -392,10 +394,4 @@ zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.m
 
 **Project docs**
 
-- [`docs/graph-format.md`](docs/graph-format.md) — on-disk store, node/edge taxonomy, `graph.json` schema, classification rules.
-- [`docs/mcp.md`](docs/mcp.md) — MCP tools and their shapes.
-- [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-
-## License
-
-[MIT](LICENSE).
+- [`docs/graph-format.md`](docs/graph-format.md) — on-di

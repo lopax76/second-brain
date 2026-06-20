@@ -4,6 +4,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-06-20
+
+### Added
+
+- **Symbol signatures in `focus`** — `focus --signatures` (and the MCP `focus` tool's
+  `signatures=True`) appends the key function/class signatures of the top-ranked Python files, read
+  on demand via the stdlib `ast` symbol layer. The assistant sees the API of the relevant files
+  without opening them — the idea behind aider's repo map, in a zero-dependency, Python-only form.
+  Off by default; plain `focus` output is unchanged.
+- **Ranked, budgeted `impact`** — `impact` / `impact_diff` (CLI `--budget`, MCP `budget`) annotate
+  each impacted node with its incident `degree` and, with a token budget, return the most useful
+  ones first (nearest, then most-connected) trimmed to the budget — a hub with hundreds of
+  dependents yields only the ones worth reviewing. Default (0) is unchanged: grouped by depth.
+- **`view --focus "<task>"`** — renders exactly the slice `focus` would return, in the offline
+  viewer, so a human can *see* the context an assistant receives. Reuses the existing viewer.
+- **`schema_version`** in `graph.json` — the on-disk graph now carries a format version (additive,
+  non-breaking; `from_dict` tolerates it) so exports, MCP and external tools can detect the format.
+
+### Changed
+
+- **Centralized budget accounting** — a new stdlib-only `budget.py` (`node_cost` / `text_cost` /
+  `fit`) is the single place the query layer estimates token cost and fits a ranked list to a
+  budget; `focus` and `impact` now share it. No behavioural change for existing callers.
+
+### Note
+
+On-brand, zero-dependency patterns absorbed from a study of **aider's repo map** (PageRank-ranked,
+token-budgeted, signature-bearing) and the sibling project
+**[galimar/veridge](https://github.com/galimar/veridge)** (centralized budget, ranked impact,
+`view --focus`, versioned graph). The heavier ideas from that ecosystem — tree-sitter multi-language
+parsing, embeddings/vector stores, a watcher process — were deliberately left out: they would break
+Second Brain's zero-dependency, read-only, deterministic core. +8 tests (coverage 94%).
+
 ## [0.7.0] - 2026-06-20
 
 ### Added

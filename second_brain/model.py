@@ -12,7 +12,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-__all__ = ["NodeType", "EdgeType", "NODE_COLORS", "EDGE_COLORS", "Node", "Edge", "Graph"]
+__all__ = ["SCHEMA_VERSION", "NodeType", "EdgeType", "NODE_COLORS", "EDGE_COLORS",
+           "Node", "Edge", "Graph"]
+
+# Version of the graph.json on-disk format. Additive/non-breaking changes keep the number; a
+# breaking change bumps it so consumers (exports, MCP, external tools) can detect the format.
+SCHEMA_VERSION = 1
 
 
 class NodeType(str, Enum):
@@ -234,6 +239,7 @@ class Graph:
         nodes = sorted(self.nodes.values(), key=lambda n: n.id)
         edges = sorted(self.edges, key=lambda e: (e.source, e.target, e.type.value))
         return {
+            "schema_version": SCHEMA_VERSION,
             "project": self.project,
             "nodes": [n.to_dict() for n in nodes],
             "edges": [e.to_dict() for e in edges],

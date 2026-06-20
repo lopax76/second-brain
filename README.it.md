@@ -331,6 +331,7 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode). |
 | [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` / `focus`. |
 | [`bm25.py`](second_brain/bm25.py) | Rilevanza lessicale Okapi BM25 (stdlib) — il segnale task-file che innesca `focus`. |
+| [`budget.py`](second_brain/budget.py) | Stima costo-token + fit a budget (stdlib) — l'unico posto dove `focus` / `impact` contano i token. |
 | [`rank.py`](second_brain/rank.py) | PageRank per importanza (globale + personalizzato) — motore dietro god-node e `focus`. |
 | [`communities.py`](second_brain/communities.py) | Community detection (label propagation deterministica) + archi cross-community sorprendenti. |
 | [`operational.py`](second_brain/operational.py) | Nodi operativi: decisioni dai documenti, sessioni dai commit git. |
@@ -345,7 +346,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.7.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.8.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
 `subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —
@@ -381,6 +382,7 @@ zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SE
 **Concetti & specifiche**
 
 - **BM25 (rilevanza lessicale)** — S. Robertson & H. Zaragoza, *The Probabilistic Relevance Framework: BM25 and Beyond* (2009); vedi [Okapi BM25](https://en.wikipedia.org/wiki/Okapi_BM25). Ordina i file-ancora del task per `focus`.
+- **Design della repo map** — la mappa ranked-PageRank, budgeted e con firme è ispirata dalla [repo map di aider](https://aider.chat/docs/repomap.html) e dal progetto gemello [veridge](https://github.com/galimar/veridge).
 - **PageRank** — S. Brin & L. Page, *The Anatomy of a Large-Scale Hypertextual Web Search Engine*
   (1998); vedi [PageRank](https://it.wikipedia.org/wiki/PageRank). Usato per il ranking d'importanza
   e per `focus` mirato al compito (PageRank personalizzato).
@@ -398,10 +400,4 @@ zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SE
 
 **Documentazione del progetto**
 
-- [`docs/graph-format.md`](docs/graph-format.md) — store su disco, tassonomia nodi/archi, schema `graph.json`, regole di classificazione.
-- [`docs/mcp.md`](docs/mcp.md) — tool MCP e forme dei dati.
-- [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-
-## Licenza
-
-[MIT](LICENSE).
+- [`docs/graph-format.md`](docs/graph-format.md) — store su disc
