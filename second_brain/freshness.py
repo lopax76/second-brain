@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from second_brain.ignore import load_ignore_patterns
-from second_brain.indexer import build_graph, iter_files
+from second_brain.indexer import build_graph, gitignore_rules_for, iter_files
 from second_brain.model import Graph, NodeType
 
 _CHUNK = 65536
@@ -85,7 +85,7 @@ def _hash_rel(root: Path, rel: str) -> str | None:
 def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:
     """Return ``{relative_path: hash}`` for every indexable file under ``root``."""
     root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p))
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
     out: dict[str, str] = {}
     for rel in rels:
         hv = _hash_rel(root_p, rel)
@@ -104,7 +104,7 @@ def index(
     shared by graph build and manifest. ``symbols=True`` adds the opt-in symbol/call layer.
     """
     root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p))
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
     graph = build_graph(root_p, symbols=symbols, _rels=rels)
     if operational:
         from second_brain.operational import enrich
@@ -150,7 +150,7 @@ def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     catches it exactly).
     """
     root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p))
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
     out: dict[str, str] = {}
     for rel in rels:
         try:

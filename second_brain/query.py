@@ -13,6 +13,7 @@ from collections import OrderedDict
 from typing import Any
 
 from second_brain import bm25, budget, communities, rank
+from second_brain import recency as recency_mod
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -586,6 +587,8 @@ def focus(
     *,
     budget_tokens: int = 2000,
     damping: float = 0.85,
+    recency: float = 0.0,
+    half_life_days: float = 30.0,
     use_cache: bool = True,
 ) -> dict[str, Any]:
     """Return the minimal high-value subgraph for a task, within a token budget.
@@ -594,6 +597,13 @@ def focus(
     and fills a token budget with the highest-scoring nodes (seeds first), plus the knowledge
     edges among the chosen nodes. With no seed match it falls back to global importance, so the
     assistant always gets *something* relevant rather than the whole digest.
+
+    ``recency`` (0..1, default 0 = off) blends in a deterministic git-derived recency/frequency
+    signal (the ACT-R *base-level* of memory): the final ranking becomes
+    ``(1-recency)*importance + recency*recency_score``, so a recently/often-touched file can
+    outrank a structurally important but dormant one — recall closer to human memory. ``recency``
+    is applied *after* the cached PageRank (it never invalidates the cache); with no git history it
+    is a no-op. ``half_life_days`` sets how fast the recency weight decays (default 30 days).
     """
     seeds = _focus_seeds(graph, task)
     fallback = not seeds
@@ -611,8 +621,16 @@ def focus(
     elif use_cache:
         _FOCUS_CACHE.move_to_end(key)  # mark as recently used
 
+    # Recency blend (opt-in). Applied post-cache so it never affects the stored PageRank; with
+    # recency=0 or no git sessions, rank_scores is exactly scores -> byte-identical ordering.
+    rank_scores = scores
+    if recency > 0:
+        rec = recency_mod.recency_scores(graph, half_life_days=half_life_days)
+        if rec:
+            rank_scores = recency_mod.blend(scores, rec, recency)
+
     ranked = sorted(
-        ((nid, s) for nid, s in scores.items()
+        ((nid, s) for nid, s in rank_scores.items()
          if nid in graph.nodes and graph.nodes[nid].type is not NodeType.AREA),
         key=lambda kv: (-kv[1], kv[0]),
     )
@@ -632,7 +650,7 @@ def focus(
         spent += cost
 
     nodes_out = [{"id": nid, "type": graph.nodes[nid].type.value,
-                  "path": graph.nodes[nid].path, "score": round(scores[nid], 6),
+                  "path": graph.nodes[nid].path, "score": round(rank_scores[nid], 6),
                   "seed": nid in seed_ids}
                  for nid in chosen]
     edges_out = [{"source": e.source, "target": e.target, "type": e.type.value}
@@ -642,6 +660,7 @@ def focus(
         "task": task,
         "seeds": sorted(seeds),
         "fallback": fallback,
+        "recency": recency if recency > 0 else 0.0,
         "budget_tokens": budget_tokens,
         "token_estimate": spent,
         "nodes": nodes_out,

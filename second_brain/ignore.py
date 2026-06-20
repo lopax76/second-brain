@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import fnmatch
 import os
+import re
+from dataclasses import dataclass
 from pathlib import Path
 
 # Directory names never walked into.
@@ -53,6 +55,97 @@ def load_ignore_patterns(root: Path) -> list[str]:
         if s and not s.startswith("#"):
             out.append(s)
     return out
+
+
+# -- optional .gitignore support (opt-in via .secondbrain.json "respect_gitignore": true) -------
+# A pragmatic, deterministic subset of .gitignore semantics, applied to the ROOT .gitignore only:
+# blank lines and "#" comments, glob (`*` `?` `[...]`-free), `**`, a leading "/" anchors to root,
+# a trailing "/" matches directories only, and a leading "!" re-includes (negation). Last matching
+# rule wins. NOT supported (documented): nested .gitignore files and rare escapes. Zero-dependency.
+
+@dataclass(frozen=True)
+class GitRule:
+    """One compiled .gitignore line: a regex over the POSIX relative path + its flags."""
+
+    regex: re.Pattern[str]
+    negated: bool
+    dir_only: bool
+
+
+def _glob_to_regex(pat: str) -> str:
+    """Translate a gitignore path glob (segment-aware) to a regex body (no anchors)."""
+    out: list[str] = []
+    i, n = 0, len(pat)
+    while i < n:
+        if pat[i:i + 3] == "**/":
+            out.append("(?:.*/)?")  # any number of leading directories
+            i += 3
+        elif pat[i:i + 2] == "**":
+            out.append(".*")
+            i += 2
+        elif pat[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pat[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pat[i]))
+            i += 1
+    return "".join(out)
+
+
+def _compile_gitignore_line(line: str) -> GitRule | None:
+    """Compile one .gitignore line to a :class:`GitRule`, or ``None`` for blanks/comments."""
+    s = line.rstrip("\n").rstrip()
+    if not s or s.startswith("#"):
+        return None
+    negated = s.startswith("!")
+    if negated:
+        s = s[1:]
+    if not s:
+        return None
+    dir_only = s.endswith("/")
+    s = s.rstrip("/")
+    if not s:
+        return None
+    anchored = s.startswith("/") or ("/" in s)  # a leading or embedded "/" anchors to root
+    s = s.lstrip("/")
+    body = _glob_to_regex(s)
+    # Anchored: match the path from the root. Otherwise: match the basename at any depth. In both
+    # cases also match everything *under* a matched directory (``(?:/.*)?``) so a dir rule like
+    # ``build/`` excludes its contents even when tested file-by-file.
+    prefix = "" if anchored else "(?:.*/)?"
+    regex = re.compile("^" + prefix + body + "(?:/.*)?$")
+    return GitRule(regex=regex, negated=negated, dir_only=dir_only)
+
+
+def load_gitignore_rules(root: Path) -> list[GitRule]:
+    """Read and compile the root ``.gitignore`` (in file order); empty if absent/unreadable."""
+    f = root / ".gitignore"
+    if not f.is_file():
+        return []
+    try:
+        text = f.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    rules: list[GitRule] = []
+    for line in text.splitlines():
+        rule = _compile_gitignore_line(line)
+        if rule is not None:
+            rules.append(rule)
+    return rules
+
+
+def gitignored(rel_posix: str, is_dir: bool, rules: list[GitRule]) -> bool:
+    """True if ``rel_posix`` is ignored by ``rules`` (last match wins; ``!`` re-includes)."""
+    ignored = False
+    for r in rules:
+        if r.dir_only and not is_dir:
+            continue
+        if r.regex.match(rel_posix):
+            ignored = not r.negated
+    return ignored
 
 
 def is_ignored_dir(name: str) -> bool:

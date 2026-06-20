@@ -15,7 +15,8 @@ Shape (every field optional)::
           "report": ["collaudo"]                  // extra keywords -> REPORT
         },
         "decision_id_prefixes": ["DEC"]           // extra ADR/RFC-like ids -> decision nodes
-      }
+      },
+      "respect_gitignore": true                   // also skip files matched by the root .gitignore
     }
 """
 
@@ -38,6 +39,7 @@ class ClassifyConfig:
     report_keywords: tuple[str, ...] = ()
     decision_id_prefixes: tuple[str, ...] = ()
     type_overrides: tuple[tuple[str, str], ...] = ()
+    respect_gitignore: bool = False  # opt-in: also skip files matched by the root .gitignore
 
 
 def _str_tuple(value: object) -> tuple[str, ...]:
@@ -75,9 +77,12 @@ def load_config(root: str | Path) -> ClassifyConfig:
         return ClassifyConfig()
     if not isinstance(data, dict):
         return ClassifyConfig()
+    # ``respect_gitignore`` is a top-level flag (not under "classify"); read it even when there is
+    # no "classify" block, so a config with only {"respect_gitignore": true} still works.
+    respect_gitignore = data.get("respect_gitignore") is True
     cls = data.get("classify")
     if not isinstance(cls, dict):
-        return ClassifyConfig()
+        return ClassifyConfig(respect_gitignore=respect_gitignore)
     kw = cls.get("keywords") if isinstance(cls.get("keywords"), dict) else {}
     mode = cls.get("mode")
     return ClassifyConfig(
@@ -87,6 +92,7 @@ def load_config(root: str | Path) -> ClassifyConfig:
         report_keywords=_str_tuple(kw.get("report")),
         decision_id_prefixes=_str_tuple(cls.get("decision_id_prefixes")),
         type_overrides=_type_overrides(cls.get("type_overrides")),
+        respect_gitignore=respect_gitignore,
     )
 
 

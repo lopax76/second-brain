@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-06-20
+
+### Added
+
+- **Recency-weighted recall — the base-level of memory** (`focus --recency W`, MCP
+  `focus(recency=…)`, off by default). On top of the *associative* recall that personalised
+  PageRank already provides (the spreading-activation half of human declarative memory), `focus`
+  can now blend in the **base-level** half — recency and frequency — derived from git history that
+  is **already in the graph** (`session` nodes carry the commit date, `touches` edges the files
+  they changed). A recently or frequently changed file can outrank a structurally important but
+  dormant one. The signal is anchored to the **most recent commit in the graph, never the wall
+  clock**, so output stays deterministic; it adds **no new dependency and no extra indexing**, and
+  is a no-op without git history. `--half-life DAYS` (default 30) tunes the decay. New
+  zero-dependency `recency.py`; plain `focus` (`--recency 0`) is byte-identical.
+- **Opt-in `.gitignore` support** — set `"respect_gitignore": true` (top level of
+  `.secondbrain.json`) and the indexer also skips files matched by the project's **root**
+  `.gitignore`, keeping build artefacts and generated data out of the map on large repos. Honours a
+  pragmatic, deterministic subset (comments/blanks, globs and `**`, leading `/` anchoring, trailing
+  `/` directory-only, `!` negation; nested `.gitignore` files are not read). Applied consistently to
+  the graph build, the manifest, and the freshness signature so staleness detection stays correct.
+  Default off = byte-identical; zero new dependency (stdlib `re`/`fnmatch`).
+
+### Note
+
+Both are the on-brand, zero-weight pickups from a scan of the code-graph / repo-map / agent-memory
+ecosystem (aider, RepoGraph, repomix/gitingest, mem0/A-MEM, ACT-R). The heavier ideas — tree-sitter
+multi-language parsing, embeddings/vector memory, LLM-driven extract/update memory, a watcher
+process, access-frequency reinforcement (mutable, non-deterministic state) — were deliberately left
+out: they would break Second Brain's zero-dependency, read-only, deterministic, low-token core.
++21 tests.
+
 ## [0.8.1] - 2026-06-20
 
 ### Changed

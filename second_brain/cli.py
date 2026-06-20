@@ -233,7 +233,9 @@ def cmd_why(args: argparse.Namespace) -> int:
 
 def cmd_focus(args: argparse.Namespace) -> int:
     g = _load_or_build(args.path)
-    res = query.focus(g, args.task, budget_tokens=args.budget)
+    res = query.focus(g, args.task, budget_tokens=args.budget,
+                      recency=getattr(args, "recency", 0.0),
+                      half_life_days=getattr(args, "half_life", 30.0))
     if getattr(args, "signatures", False):
         query.attach_signatures(g, args.path, res)
     if res["fallback"]:
@@ -457,6 +459,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="approx token budget for the returned node set (default: 2000)")
     sp.add_argument("--signatures", action="store_true",
                     help="also show the key symbol signatures of the top Python files (read-only)")
+    sp.add_argument("--recency", type=float, default=0.0, metavar="W",
+                    help="blend git recency/frequency into ranking, W in 0..1 (default 0=off)")
+    sp.add_argument("--half-life", type=float, default=30.0, dest="half_life", metavar="DAYS",
+                    help="recency half-life in days (default: 30); only used with --recency")
     sp.set_defaults(func=cmd_focus)
 
     sp = sub.add_parser("symbols", help="list function/class signatures in a Python file")

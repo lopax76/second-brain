@@ -125,15 +125,19 @@ def build_server(project: str):
         return query.why(_graph(project), source, target)
 
     @server.tool()
-    def focus(task: str, budget: int = 2000, signatures: bool = False) -> dict[str, Any]:
+    def focus(task: str, budget: int = 2000, signatures: bool = False,
+              recency: float = 0.0, half_life_days: float = 30.0) -> dict[str, Any]:
         """Task-aware retrieval: the minimal high-value subgraph for ``task``, within ~``budget``
         tokens. Anchors the task (BM25 lexical ranking) to matching files, runs personalised
         PageRank from them, and returns the top nodes + the knowledge edges among them — the
         context for a task, not the whole digest. ``signatures=True`` also returns the key symbol
-        signatures of the top Python files (the API, without opening them). Falls back to globally
-        important nodes when nothing matches."""
+        signatures of the top Python files (the API, without opening them). ``recency`` (0..1,
+        default 0) blends a deterministic git recency/frequency signal into the ranking so
+        recently/often-touched files surface first (the ACT-R base-level of memory);
+        ``half_life_days`` sets the decay (default 30); falls back to global importance."""
         g = _graph(project)
-        res = query.focus(g, task, budget_tokens=budget)
+        res = query.focus(g, task, budget_tokens=budget,
+                          recency=recency, half_life_days=half_life_days)
         if signatures:
             query.attach_signatures(g, project, res)
         return res

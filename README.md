@@ -210,6 +210,16 @@ ignored, and with no file behaviour is byte-identical):
 { "classify": { "type_overrides": { "data/seed.json": "data", "notes/SPEC.md": "design" } } }
 ```
 
+Set `"respect_gitignore": true` (top-level) to also skip files matched by the project's root
+`.gitignore` — handy on big repos to keep build artefacts and generated data out of the map.
+Opt-in; default off = byte-identical. It honours a pragmatic subset of `.gitignore` (root file
+only): comments/blanks, globs and `**`, a leading `/` (anchored) and trailing `/` (directories
+only), and `!` negation; nested `.gitignore` files are not read.
+
+```json
+{ "respect_gitignore": true }
+```
+
 ### `focus --signatures` and `view --focus`
 
 `focus --signatures` (and the MCP `focus` tool with `signatures=true`) additionally lists the key
@@ -221,6 +231,17 @@ assistant sees the API of the relevant files without opening them; non-Python fi
 `view --focus "<task>"` writes the usual `.secondbrain/view.html`, but renders **only the slice
 `focus` would return** for that task — a temporary in-memory subgraph that never changes
 `graph.json`. It lets a human *see* exactly the context an assistant receives.
+
+### Recency-weighted recall
+
+`focus … --recency W` (W in 0..1; MCP `focus(recency=…)`) blends a **deterministic, git-derived
+recency/frequency** signal into the ranking, so a recently or often-changed file can outrank a
+structurally important but dormant one — the *base-level activation* of human memory, on top of the
+associative recall personalised PageRank already provides. The signal is anchored to the **most
+recent commit in the graph** (never the wall clock), so results stay reproducible; it adds **no
+weight** (it reuses the `session`/`touches` data already indexed from git) and is a no-op without
+git history. `--half-life DAYS` (default 30) tunes how fast older changes fade. Off by default
+(`--recency 0`) — plain `focus` is byte-identical.
 
 ### Always fresh (auto-refresh)
 
@@ -239,6 +260,7 @@ same-size edit within the same filesystem tick as the last build — which `seco
 | `SECOND_BRAIN_REFRESH_TTL=<sec>` | throttle the freshness check to once per window (default 150s; the long-running MCP server also keeps the graph in an in-process cache within the window) |
 | `build --symbols` | include the function/class + call layer (off by default to keep the map light) |
 | `focus … --budget N` | size the task-context returned by `focus` (default 2000 tokens) |
+| `focus … --recency W` | blend git recency/frequency into recall, W in 0..1 (default 0; `--half-life DAYS` tunes decay) |
 | `impact … --up` / `--down` / `--depth N` | restrict/limit the blast-radius walk |
 | `view --backbone` | force backbone rendering on any size (auto above ~8000 nodes) |
 
@@ -343,6 +365,7 @@ Read-only on your sources, zero runtime dependencies, deterministic. Everything 
 | [`bm25.py`](second_brain/bm25.py) | Okapi BM25 lexical relevance (stdlib) — the task-to-file signal that seeds `focus`. |
 | [`budget.py`](second_brain/budget.py) | Token-cost estimate + budget-fit (stdlib) — the one place `focus` / `impact` count tokens. |
 | [`rank.py`](second_brain/rank.py) | PageRank importance (global + personalised) — engine behind god-nodes and `focus`. |
+| [`recency.py`](second_brain/recency.py) | Deterministic git recency/frequency weighting (ACT-R base-level) — the opt-in `focus --recency` blend. |
 | [`communities.py`](second_brain/communities.py) | Community detection (deterministic label propagation) + surprising cross-community edges. |
 | [`operational.py`](second_brain/operational.py) | Operational nodes: decisions found in docs, sessions from git commits. |
 | [`report.py`](second_brain/report.py) | Generates `GRAPH_REPORT.md` (god nodes, communities, churn, decisions, problems). |
@@ -356,14 +379,15 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.8.1**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.9.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**
-(shortest path between two nodes) / **`focus`** / **`communities`** — the project's real modules + cross-module bridges); **PageRank** importance ranking; **community
+(shortest path between two nodes) / **`focus`** / **`communities`** — the project's real modules + cross-module bridges); **PageRank** importance ranking; **recency-weighted recall** (`focus
+--recency` — a deterministic git base-level signal, off by default); **community
 detection**; the **`GRAPH_REPORT.md`** one-pager; operational nodes (decisions/sessions); the opt-in
 **Python symbol call-graph** (`build --symbols`); **GraphML export**; configurable
-`.secondbrain.json` taxonomy **with per-file `type_overrides`**; **agent integration** (`agent install` + git `hook install`); and the
+`.secondbrain.json` taxonomy **with per-file `type_overrides`** and opt-in **`respect_gitignore`**; **agent integration** (`agent install` + git `hook install`); and the
 optional **MCP server**. Next: a truly incremental build for very large graphs, richer
 reference-resolution, symbol layers for more languages, and an optional local semantic layer.
 

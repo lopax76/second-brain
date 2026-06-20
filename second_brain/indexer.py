@@ -21,8 +21,11 @@ from second_brain.classify import classify, rules_from_config
 from second_brain.config import load_config
 from second_brain.ignore import (
     DEFAULT_IGNORE_DIRS,
+    GitRule,
+    gitignored,
     is_ignored_dir,
     is_ignored_file,
+    load_gitignore_rules,
     load_ignore_patterns,
 )
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
@@ -68,23 +71,48 @@ def _is_reparse(path: str) -> bool:
         return True  # unreadable -> safest to skip
 
 
-def iter_files(root: Path, patterns: list[str]) -> list[str]:
+def gitignore_rules_for(root: Path) -> list[GitRule] | None:
+    """Compiled root-``.gitignore`` rules when the project opts in (config ``respect_gitignore``),
+    else ``None`` (the walk then ignores .gitignore entirely — byte-identical default)."""
+    return load_gitignore_rules(root) if load_config(root).respect_gitignore else None
+
+
+def iter_files(
+    root: Path, patterns: list[str], git_rules: list[GitRule] | None = None
+) -> list[str]:
     """Return sorted POSIX relative paths of indexable files under ``root``.
 
     ``os.walk`` does not follow directory symlinks, and junctions/reparse points are pruned
     explicitly (loop-safe on Windows too). An entry that cannot be expressed relative to
-    ``root`` (exotic symlink/junction) is skipped, never aborting.
+    ``root`` (exotic symlink/junction) is skipped, never aborting. When ``git_rules`` is given
+    (project opted in to ``respect_gitignore``), files and directories matched by the root
+    ``.gitignore`` are also skipped — pruning an ignored directory is correct (git cannot
+    re-include a path under an excluded directory).
     """
     rels: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames
-                       if not is_ignored_dir(d) and not _is_reparse(os.path.join(dirpath, d))]
+        kept: list[str] = []
+        for d in dirnames:
+            full = os.path.join(dirpath, d)
+            if is_ignored_dir(d) or _is_reparse(full):
+                continue
+            if git_rules:
+                try:
+                    rel_d = Path(full).relative_to(root).as_posix()
+                except ValueError:
+                    rel_d = ""
+                if rel_d and gitignored(rel_d, True, git_rules):
+                    continue
+            kept.append(d)
+        dirnames[:] = kept
         for fn in filenames:
             try:
                 rel = (Path(dirpath) / fn).relative_to(root).as_posix()
             except ValueError:
                 continue
             if is_ignored_file(rel, fn, patterns):
+                continue
+            if git_rules and gitignored(rel, False, git_rules):
                 continue
             rels.append(rel)
     return sorted(rels)
@@ -277,11 +305,15 @@ def build_graph(
     if not root_p.is_dir():
         raise NotADirectoryError(f"not a directory: {root_p}")
 
-    rels = _rels if _rels is not None else iter_files(root_p, load_ignore_patterns(root_p))
     g = Graph(project=project or root_p.name)
     cfg = load_config(root_p)
     rules = rules_from_config(cfg)
     overrides = _override_types(cfg)
+    if _rels is not None:
+        rels = _rels
+    else:
+        git_rules = load_gitignore_rules(root_p) if cfg.respect_gitignore else None
+        rels = iter_files(root_p, load_ignore_patterns(root_p), git_rules)
 
     # 1. File nodes + areas.
     areas: set[str] = set()
