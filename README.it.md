@@ -330,6 +330,7 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`gate.py`](second_brain/gate.py) | Il gate anti-deriva: ref rotte / file stantii / orfani. |
 | [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode). |
 | [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` / `focus`. |
+| [`bm25.py`](second_brain/bm25.py) | Rilevanza lessicale Okapi BM25 (stdlib) — il segnale task-file che innesca `focus`. |
 | [`rank.py`](second_brain/rank.py) | PageRank per importanza (globale + personalizzato) — motore dietro god-node e `focus`. |
 | [`communities.py`](second_brain/communities.py) | Community detection (label propagation deterministica) + archi cross-community sorprendenti. |
 | [`operational.py`](second_brain/operational.py) | Nodi operativi: decisioni dai documenti, sessioni dai commit git. |
@@ -379,6 +380,7 @@ zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SE
 
 **Concetti & specifiche**
 
+- **BM25 (rilevanza lessicale)** — S. Robertson & H. Zaragoza, *The Probabilistic Relevance Framework: BM25 and Beyond* (2009); vedi [Okapi BM25](https://en.wikipedia.org/wiki/Okapi_BM25). Ordina i file-ancora del task per `focus`.
 - **PageRank** — S. Brin & L. Page, *The Anatomy of a Large-Scale Hypertextual Web Search Engine*
   (1998); vedi [PageRank](https://it.wikipedia.org/wiki/PageRank). Usato per il ranking d'importanza
   e per `focus` mirato al compito (PageRank personalizzato).
