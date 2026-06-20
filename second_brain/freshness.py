@@ -177,7 +177,7 @@ def auto_refresh_enabled() -> bool:
 
 def _refresh_ttl() -> float:
     try:
-        ttl = float(os.environ.get("SECOND_BRAIN_REFRESH_TTL", "0"))
+        ttl = float(os.environ.get("SECOND_BRAIN_REFRESH_TTL", "150"))
     except ValueError:
         return 0.0
     return max(0.0, ttl) if math.isfinite(ttl) else 0.0  # inf/nan -> always check (never freeze)

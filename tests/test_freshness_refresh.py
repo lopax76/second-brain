@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from second_brain import store
 from second_brain.freshness import (
     auto_refresh_enabled,
@@ -11,6 +13,17 @@ from second_brain.freshness import (
     load_or_refresh,
 )
 from second_brain.model import NodeType
+
+
+@pytest.fixture(autouse=True)
+def _always_check(monkeypatch):
+    # These tests verify the staleness MECHANISM = the no-throttle (TTL=0) behaviour. Pin it so the
+    # new default TTL (150s) cannot throttle a second check within the same test process.
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "0")
+    import second_brain.freshness as fr
+    fr._LAST_CHECK.clear()
+    yield
+    fr._LAST_CHECK.clear()
 
 
 def test_first_touch_builds_and_writes_signature(tmp_path):

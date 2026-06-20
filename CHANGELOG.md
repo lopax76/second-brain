@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-06-20
+
+### Changed
+
+- **In-process graph cache for the MCP server** — a long-running `second-brain-mcp` now reuses the
+  loaded graph across tool calls within the freshness window instead of re-parsing `graph.json` and
+  re-stat'ing every file on each call. On a ~130k-file repo this turns ~16s per query into an
+  instant cache hit; outside the window it re-checks the content signature and reloads/rebuilds if
+  the project changed. `clear_graph_cache()` resets it.
+- **`SECOND_BRAIN_REFRESH_TTL` now defaults to 150s** (was 0 = check on every query). A one-shot
+  CLI command still checks once; the throttle (and the cache above) matter for the long-running MCP
+  server on large graphs. Set it to `0` to restore check-every-query.
+
 ## [0.8.0] - 2026-06-20
 
 ### Added

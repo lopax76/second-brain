@@ -236,7 +236,7 @@ same-size edit within the same filesystem tick as the last build — which `seco
 | Switch | Effect |
 |--------|--------|
 | `SECOND_BRAIN_AUTO_REFRESH=0` | turn auto-refresh off (serve the stored graph, faster, may be stale) |
-| `SECOND_BRAIN_REFRESH_TTL=<sec>` | throttle the freshness check to once per window (huge monorepo graphs) |
+| `SECOND_BRAIN_REFRESH_TTL=<sec>` | throttle the freshness check to once per window (default 150s; the long-running MCP server also keeps the graph in an in-process cache within the window) |
 | `build --symbols` | include the function/class + call layer (off by default to keep the map light) |
 | `focus … --budget N` | size the task-context returned by `focus` (default 2000 tokens) |
 | `impact … --up` / `--down` / `--depth N` | restrict/limit the blast-radius walk |
@@ -356,7 +356,7 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.8.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.8.1**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**

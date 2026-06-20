@@ -241,7 +241,7 @@ tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash)
 | Interruttore | Effetto |
 |--------------|---------|
 | `SECOND_BRAIN_AUTO_REFRESH=0` | disattiva l'auto-refresh (serve il grafo salvato, più veloce, può essere stantio) |
-| `SECOND_BRAIN_REFRESH_TTL=<sec>` | limita il controllo di freschezza a una volta per finestra (grafi monorepo enormi) |
+| `SECOND_BRAIN_REFRESH_TTL=<sec>` | limita il controllo di freschezza a una volta per finestra (default 150s; il server MCP long-running tiene anche il grafo in cache in-processo nella finestra) |
 | `build --symbols` | include il layer di funzioni/classi + chiamate (off di default per tenere la mappa leggera) |
 | `focus … --budget N` | dimensiona il contesto-compito restituito da `focus` (default 2000 token) |
 | `impact … --up` / `--down` / `--depth N` | restringe/limita la camminata del raggio d'impatto |
@@ -361,7 +361,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.8.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.8.1**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
 `subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —

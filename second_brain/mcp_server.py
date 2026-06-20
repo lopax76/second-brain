@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Any
 
 from second_brain import gate, query, store
 from second_brain import report as _report
-from second_brain.freshness import build_manifest, load_or_refresh
+from second_brain.freshness import _refresh_ttl, build_manifest, load_or_refresh
 from second_brain.model import Graph
 
 try:  # pragma: no cover - import-guard
@@ -31,9 +32,29 @@ except ImportError:
 _NO_MCP = 'The MCP server needs the optional "mcp" extra: pip install "second-brain-graph[mcp]"'
 
 
+# In-process graph cache for the long-running MCP server. A tool call reuses the loaded graph
+# within the freshness TTL window (SECOND_BRAIN_REFRESH_TTL, default 150s) instead of re-parsing
+# graph.json and re-stat'ing every file on each call — the difference between ~16s and instant on
+# a 100k-file repo. Outside the window, load_or_refresh re-checks the content signature and
+# reloads/rebuilds if the project changed. One project per server, so a tiny dict suffices.
+_GRAPH_CACHE: dict[str, tuple[float, Graph]] = {}
+
+
+def clear_graph_cache() -> None:
+    """Drop the in-process graph cache (e.g. after an out-of-band rebuild)."""
+    _GRAPH_CACHE.clear()
+
+
 def _graph(project: str) -> Graph:
-    # Self-refreshing read: auto-build on first touch, rebuild only if the project changed.
-    return load_or_refresh(project)
+    """Self-refreshing read, cached in-process within the TTL window (zero I/O on a cache hit)."""
+    ttl = _refresh_ttl()
+    now = time.monotonic()
+    cached = _GRAPH_CACHE.get(project)
+    if cached is not None and ttl > 0 and (now - cached[0]) < ttl:
+        return cached[1]
+    g = load_or_refresh(project)
+    _GRAPH_CACHE[project] = (now, g)
+    return g
 
 
 def build_server(project: str):

@@ -101,3 +101,34 @@ def test_schema_version_present_and_tolerated():
     d = g.to_dict()
     assert d["schema_version"] == SCHEMA_VERSION == 1
     assert "a.py" in Graph.from_dict(d).nodes            # round-trips, field tolerated
+
+
+# --------------------------- MCP in-process graph cache (v0.8.1) -------------
+def test_mcp_graph_cache_reuses_within_ttl(tmp_path, monkeypatch):
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "150")
+    from second_brain import mcp_server
+    mcp_server.clear_graph_cache()
+    proj = tmp_path / "p"
+    proj.mkdir()
+    (proj / "a.py").write_text("x = 1\n", encoding="utf-8")
+    g1 = mcp_server._graph(str(proj))
+    g2 = mcp_server._graph(str(proj))
+    assert g1 is g2                                   # within TTL window: same object, zero I/O
+    mcp_server.clear_graph_cache()
+    assert mcp_server._graph(str(proj)) is not g1     # after clear: fresh load
+
+
+def test_mcp_graph_cache_off_when_ttl_zero(tmp_path, monkeypatch):
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "0")
+    from second_brain import mcp_server
+    mcp_server.clear_graph_cache()
+    proj = tmp_path / "p"
+    proj.mkdir()
+    (proj / "a.py").write_text("x = 1\n", encoding="utf-8")
+    assert mcp_server._graph(str(proj)) is not mcp_server._graph(str(proj))  # caching disabled
+
+
+def test_refresh_ttl_default_is_150(monkeypatch):
+    import second_brain.freshness as fr
+    monkeypatch.delenv("SECOND_BRAIN_REFRESH_TTL", raising=False)
+    assert fr._refresh_ttl() == 150.0
