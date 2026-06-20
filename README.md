@@ -229,7 +229,7 @@ cheap size+mtime signature before answering and **rebuild only if the project ch
 *uncommitted* edits. So the map is current whenever the assistant uses it, with **no scheduler and no
 dependencies**. First use of a project auto-builds. To serve the stored graph as-is (skip the
 check), set `SECOND_BRAIN_AUTO_REFRESH=0`. On a huge single-graph project you can throttle the
-check with `SECOND_BRAIN_REFRESH_TTL=<seconds>`. The stat-only check has one narrow blind spot — a
+check with `SECOND_BRAIN_REFRESH_TTL=<seconds>` (default 150); the long-running MCP server also keeps the graph in an in-process cache within that window, so repeated tool calls are served from memory instead of re-scanning the whole tree. The stat-only check has one narrow blind spot — a
 same-size edit within the same filesystem tick as the last build — which `second-brain gate`
 (content-hash) catches exactly.
 

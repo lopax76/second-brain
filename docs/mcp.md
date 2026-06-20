@@ -20,6 +20,15 @@ second-brain-mcp /path/to/project        # defaults to the current directory
 
 The server lazily loads the stored graph (or builds it on first use), so it starts instantly.
 
+## Performance on large repos
+
+The server is long-running, so it keeps the loaded graph in an **in-process cache** and reuses it
+across tool calls within a freshness window — `SECOND_BRAIN_REFRESH_TTL` seconds (**default 150**).
+Within the window a tool call is served from memory (zero I/O); after it, the server re-checks the
+content signature and reloads/rebuilds only if the project changed. On a ~130k-file project this is
+the difference between several seconds and an instant per call. Set `SECOND_BRAIN_REFRESH_TTL=0` to
+re-check on every call.
+
 ## Tools
 
 | Tool | Arguments | Returns |

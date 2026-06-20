@@ -234,7 +234,7 @@ una **firma leggera size+mtime** prima di rispondere e **ricostruiscono solo se 
 cambiato** — modifiche **non ancora committate** incluse. Così la mappa è aggiornata ogni volta che
 l'assistente la usa, **senza scheduler e senza dipendenze**. Il primo uso di un progetto fa il build
 da solo. Per servire il grafo salvato così com'è (saltando il controllo): `SECOND_BRAIN_AUTO_REFRESH=0`.
-Su un progetto a grafo unico enorme puoi limitare il controllo con `SECOND_BRAIN_REFRESH_TTL=<secondi>`.
+Su un progetto a grafo unico enorme puoi limitare il controllo con `SECOND_BRAIN_REFRESH_TTL=<secondi>` (default 150); il server MCP long-running tiene anche il grafo in cache in-processo nella finestra, così le tool call ripetute sono servite dalla memoria invece di riscansionare tutto l'albero.
 Il controllo solo-`stat` ha un unico punto cieco — una modifica a parità di dimensione entro lo stesso
 tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash) cattura con precisione.
 
