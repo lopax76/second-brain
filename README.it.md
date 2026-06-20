@@ -395,7 +395,7 @@ pytest -q
 
 I contributi sono benvenuti — vedi [CONTRIBUTING.md](CONTRIBUTING.md) e i
 [principi di design](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
-zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SECURITY.md](SECURITY.md).
+zero-deps, basso costo di token, deterministico). Segnalazioni di sicurezza: [SECURITY.md](SECURITY.md). Cronologia completa delle versioni: [CHANGELOG.md](CHANGELOG.md).
 
 ## Riferimenti & fonti
 

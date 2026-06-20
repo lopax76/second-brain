@@ -41,6 +41,7 @@ Homepage = "https://github.com/lopax76/second-brain"
 Repository = "https://github.com/lopax76/second-brain"
 Issues = "https://github.com/lopax76/second-brain/issues"
 Documentation = "https://github.com/lopax76/second-brain#readme"
+Changelog = "https://github.com/lopax76/second-brain/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 packages = ["second_brain"]

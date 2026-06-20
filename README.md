@@ -389,7 +389,7 @@ pytest -q
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [design principles](CONTRIBUTING.md#design-principles-please-keep-these-intact) (read-only,
-zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.md).
+zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.md). Full version history: [CHANGELOG.md](CHANGELOG.md).
 
 ## References & sources
 
