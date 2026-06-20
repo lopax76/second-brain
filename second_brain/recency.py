@@ -14,7 +14,7 @@ which is the practical analogue of ACT-R's base-level equation.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from second_brain.model import EdgeType, Graph, NodeType
 
@@ -22,13 +22,18 @@ __all__ = ["recency_scores", "blend"]
 
 
 def _parse_iso(value: object) -> datetime | None:
-    """Parse a git ``%aI`` ISO-8601 timestamp; anything unparseable -> ``None`` (skipped)."""
+    """Parse a git ``%aI`` ISO-8601 timestamp; anything unparseable -> ``None`` (skipped).
+
+    A parsed value with no timezone (a non-``%aI`` date such as a bare ``YYYY-MM-DD``) is coerced
+    to UTC so it can never be mixed with offset-aware dates and crash ``max()`` / subtraction.
+    """
     if not isinstance(value, str) or not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(value)
     except ValueError:
         return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def recency_scores(graph: Graph, *, half_life_days: float = 30.0) -> dict[str, float]:

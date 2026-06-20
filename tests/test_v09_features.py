@@ -41,7 +41,11 @@ def test_recency_recent_outranks_old():
     g = _g_with_sessions()
     s = recency.recency_scores(g, half_life_days=30.0)
     assert s["b.py"] == 1.0           # most recent -> normalised top
-    assert 0.0 < s["a.py"] < 0.1      # ~0.5 ** (170/30) ~ 0.02 after normalisation
+    assert s["b.py"] > s["a.py"]      # recency genuinely orders them (not a normalisation artifact)
+    # OLD is exactly 170 days before RECENT; with b.py as the anchor (raw 1.0), a.py's normalised
+    # score equals its decay. This PINS the anchor to the newest commit (a wall-clock anchor would
+    # change a.py's age and break this exact equality).
+    assert abs(s["a.py"] - 0.5 ** (170 / 30.0)) < 1e-9
 
 
 def test_recency_frequency_accumulates():
@@ -59,11 +63,35 @@ def test_recency_frequency_accumulates():
 
 
 def test_recency_anchor_is_newest_commit_not_wall_clock():
-    # All commits are in the (relative) past; recency is anchored to the NEWEST commit in the
-    # graph, so the result is deterministic regardless of the current wall-clock time.
+    # Recency is anchored to the NEWEST commit IN THE GRAPH, not the wall clock. Adding a session
+    # newer than RECENT moves the anchor forward, so b.py (was the newest -> 1.0) must now decay
+    # below the new top. A wall-clock anchor could not produce this graph-relative shift.
     g = _g_with_sessions()
-    assert recency.recency_scores(g) == recency.recency_scores(g)  # stable
-    assert recency.recency_scores(g)["b.py"] == 1.0                # newest -> 1.0
+    s1 = recency.recency_scores(g)
+    assert s1 == recency.recency_scores(g)  # stable across calls
+    assert s1["b.py"] == 1.0                # b.py is the newest here
+    future = "2026-09-01T12:00:00+00:00"
+    g.add_node(Node(id="c.py", type=NodeType.PROGRAM, label="c.py", path="c.py"))
+    g.add_node(Node(id="session:fut", type=NodeType.SESSION, label="fut", meta={"date": future}))
+    g.add_edge(Edge("session:fut", "c.py", EdgeType.TOUCHES))
+    s2 = recency.recency_scores(g)
+    assert s2["c.py"] == 1.0     # the new newest commit becomes the anchor
+    assert s2["b.py"] < 1.0      # b.py is now older than the anchor -> decays
+
+
+def test_recency_mixed_naive_and_aware_dates_do_not_crash():
+    # A non-%aI (timezone-naive) date must be coerced, not crash max()/subtraction when mixed
+    # with offset-aware git dates.
+    g = Graph(project="t")
+    for f in ("a.py", "b.py"):
+        g.add_node(Node(id=f, type=NodeType.PROGRAM, label=f, path=f))
+    g.add_node(Node(id="session:aware", type=NodeType.SESSION, label="a", meta={"date": RECENT}))
+    g.add_node(Node(id="session:naive", type=NodeType.SESSION, label="n",
+                    meta={"date": "2026-01-01"}))  # naive, no offset
+    g.add_edge(Edge("session:aware", "a.py", EdgeType.TOUCHES))
+    g.add_edge(Edge("session:naive", "b.py", EdgeType.TOUCHES))
+    s = recency.recency_scores(g)  # must not raise
+    assert s["a.py"] == 1.0 and 0.0 < s["b.py"] < 1.0
 
 
 # -- recency.blend ----------------------------------------------------------------------------

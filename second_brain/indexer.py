@@ -312,8 +312,7 @@ def build_graph(
     if _rels is not None:
         rels = _rels
     else:
-        git_rules = load_gitignore_rules(root_p) if cfg.respect_gitignore else None
-        rels = iter_files(root_p, load_ignore_patterns(root_p), git_rules)
+        rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
 
     # 1. File nodes + areas.
     areas: set[str] = set()
