@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-06-16
+
+### Added
+
+- **BM25 lexical ranking for `focus`** (new zero-dependency `bm25.py`, stdlib only) — the task is
+  now anchored to seed files by Okapi BM25 (IDF x saturated term-frequency over each node's
+  id/path/label/type, symbol qualified name and description) instead of a flat token count. A task's
+  *rare, specific* terms (`pagerank`, a decision id, a symbol name) now dominate over ubiquitous
+  ones (`test`, `py`), so the personalised-PageRank restart vector anchors on the right files.
+  snake_case identifiers are split into components, so `focus "auth login"` matches `auth_login.py`.
+  No new dependency, deterministic, and `focus` falls back to global rank when nothing matches.
+- **Transparent budgeting on the flood-prone tools** — `neighbors` and `communities` (CLI + MCP)
+  take an optional `limit`: `neighbors --limit N` caps each direction and reports `outgoing_total` /
+  `incoming_total` + `truncated`; `communities --limit N` returns only the N largest clusters with
+  the true `count` + `shown` + `truncated`. Default (0) is unchanged — every row, fully backward
+  compatible — so a god-node or a huge community list can no longer silently flood an agent's context.
+
+### Note
+
+These are the two on-brand, zero-dependency patterns absorbed from a study of Headroom (a context-
+compression layer): better lexical relevance for retrieval, and explicit, reversible output budgeting.
+Headroom itself (proxy, ML compression model, embeddings/HNSW, mutable memory) was deliberately not
+adopted — it would break Second Brain's zero-dependency, read-only, deterministic core.
+
 ## [0.6.1] - 2026-06-16
 
 ### Fixed

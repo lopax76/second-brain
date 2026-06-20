@@ -9,11 +9,10 @@ tens of thousands. Pure functions over a :class:`~second_brain.model.Graph`; no 
 
 from __future__ import annotations
 
-import re
 from collections import OrderedDict
 from typing import Any
 
-from second_brain import communities, rank
+from second_brain import bm25, communities, rank
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -119,8 +118,13 @@ def find(graph: Graph, query: str, *, limit: int | None = None) -> list[dict[str
     return rows if limit is None else rows[: max(0, limit)]
 
 
-def neighbors(graph: Graph, node_id: str) -> dict[str, Any] | None:
-    """Return a node and its incoming/outgoing connections (compact). None if unknown."""
+def neighbors(graph: Graph, node_id: str, *, limit: int = 0) -> dict[str, Any] | None:
+    """Return a node and its incoming/outgoing connections (compact). None if unknown.
+
+    ``limit`` > 0 caps each direction to that many rows (deterministic insertion order) and reports
+    the true ``outgoing_total`` / ``incoming_total`` + a ``truncated`` flag — so a god-node with
+    thousands of edges can't flood the context. ``limit`` <= 0 (default) returns every edge.
+    """
     n = graph.nodes.get(node_id)
     if n is None:
         return None
@@ -131,6 +135,13 @@ def neighbors(graph: Graph, node_id: str) -> dict[str, Any] | None:
 
     out = [_row(e.target, e.type.value) for e in graph.edges if e.source == node_id]
     inc = [_row(e.source, e.type.value) for e in graph.edges if e.target == node_id]
+    out_total, inc_total = len(out), len(inc)
+    truncated = False
+    if limit and limit > 0:
+        if out_total > limit:
+            out, truncated = out[:limit], True
+        if inc_total > limit:
+            inc, truncated = inc[:limit], True
     return {
         "id": n.id, "type": n.type.value, "path": n.path,
         "size": int(n.meta.get("size", 0)),
@@ -138,6 +149,9 @@ def neighbors(graph: Graph, node_id: str) -> dict[str, Any] | None:
         "broken_refs": n.meta.get("broken_refs", []),
         "outgoing": out,
         "incoming": inc,
+        "outgoing_total": out_total,
+        "incoming_total": inc_total,
+        "truncated": truncated,
     }
 
 
@@ -385,16 +399,23 @@ def impact_diff(
     return out
 
 
-def community_summary(graph: Graph, *, key_files: int = 5, surprising: int = 10) -> dict[str, Any]:
+def community_summary(graph: Graph, *, key_files: int = 5, surprising: int = 10,
+                      limit: int = 0) -> dict[str, Any]:
     """The project's real modules - clusters discovered from imports+references (not folders) -
     each with size, cohesion, key files and dominant types, plus the most important cross-module
     bridges. The structural lens, without loading the full report.
     """
     from second_brain import communities as _c
     comm = _c.detect(graph)
-    rows = _c.summarize(graph, comm, key_files=key_files)
+    rows = _c.summarize(graph, comm, key_files=key_files)  # largest community first
+    total = len(rows)
+    truncated = False
+    if limit and limit > 0 and total > limit:
+        rows, truncated = rows[:limit], True
     return {
-        "count": len(rows),
+        "count": total,
+        "shown": len(rows),
+        "truncated": truncated,
         "communities": rows,
         "surprising_edges": _c.surprising_edges(graph, comm, top=surprising),
     }
@@ -488,28 +509,33 @@ def _graph_fingerprint(graph: Graph) -> int:
     ))
 
 
-def _task_tokens(task: str) -> list[str]:
-    return [t for t in re.split(r"[^a-z0-9_]+", task.lower()) if len(t) >= 3]
+def _node_text(node: Node) -> str:
+    """The searchable text of a node for lexical ranking: id/path/label/type, a symbol's qualified
+    name, and the human description when present."""
+    parts = [node.id, node.label, node.type.value]
+    if node.path:
+        parts.append(node.path)
+    qual = node.meta.get("qualname")
+    if isinstance(qual, str):
+        parts.append(qual)
+    if node.description:
+        parts.append(node.description)
+    return " ".join(parts)
 
 
 def _focus_seeds(graph: Graph, task: str) -> dict[str, float]:
-    """Anchor nodes for a task: file/entity nodes whose label or path contains a task token.
+    """Anchor nodes for a task, weighted by **BM25** lexical relevance over each node's text.
 
-    Weight = number of distinct task tokens matched (a file hit by more of the query is a
-    stronger anchor). Areas are excluded — they are containers, not answers.
+    BM25 (IDF x saturated term-frequency) makes a node carrying the task's *rare, specific* terms a
+    far stronger anchor than one matching only ubiquitous tokens — a better restart vector for the
+    personalised PageRank than the old token-count. Areas are excluded (containers, not answers); a
+    task with no token match yields no seed (focus then falls back to global rank).
     """
-    toks = _task_tokens(task)
+    toks = bm25.tokenize(task)
     if not toks:
         return {}
-    seeds: dict[str, float] = {}
-    for n in graph.nodes.values():
-        if n.type is NodeType.AREA:
-            continue
-        hay = n.label.lower() + " " + (n.path or "").lower()
-        hits = sum(1 for t in set(toks) if t in hay)
-        if hits:
-            seeds[n.id] = float(hits)
-    return seeds
+    docs = {nid: _node_text(n) for nid, n in graph.nodes.items() if n.type is not NodeType.AREA}
+    return bm25.BM25(docs).scores(toks)
 
 
 def _node_token_cost(node: Node) -> int:

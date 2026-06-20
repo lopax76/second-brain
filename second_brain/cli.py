@@ -120,7 +120,7 @@ def cmd_find(args: argparse.Namespace) -> int:
 
 
 def cmd_neighbors(args: argparse.Namespace) -> int:
-    n = query.neighbors(_load_or_build(args.path), args.node)
+    n = query.neighbors(_load_or_build(args.path), args.node, limit=args.limit)
     if n is None:
         print(f"node not found: {args.node}", file=sys.stderr)
         return 1
@@ -129,12 +129,14 @@ def cmd_neighbors(args: argparse.Namespace) -> int:
         print(f"  {n['description']}")
     if n["broken_refs"]:
         print(f"  broken refs: {n['broken_refs']}")
-    print(f"  outgoing ({len(n['outgoing'])}):")
+    print(f"  outgoing ({len(n['outgoing'])}/{n['outgoing_total']}):")
     for o in n["outgoing"]:
         print(f"    -{o['edge']}-> {o['id']} ({o['type']})")
-    print(f"  incoming ({len(n['incoming'])}):")
+    print(f"  incoming ({len(n['incoming'])}/{n['incoming_total']}):")
     for o in n["incoming"]:
         print(f"    <-{o['edge']}- {o['id']} ({o['type']})")
+    if n["truncated"]:
+        print("  (truncated \u2014 raise --limit, or 0 for all)")
     return 0
 
 
@@ -255,8 +257,11 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def cmd_communities(args: argparse.Namespace) -> int:
-    res = query.community_summary(_load_or_build(args.path))
-    print(f"{res['count']} communities")
+    res = query.community_summary(_load_or_build(args.path), limit=args.limit)
+    head = f"{res['count']} communities"
+    if res.get("truncated"):
+        head += f" (showing {res['shown']})"
+    print(head)
     for c in res["communities"]:
         kf = ", ".join(c["key_files"][:3])
         print(f"  {c['name']:10} {c['size']:4} files  cohesion {c['cohesion']:.2f}  [{kf}]")
@@ -361,8 +366,6 @@ def main(argv: list[str] | None = None) -> int:
         ("map", cmd_map, "compact project digest (areas, sizes, most connected)"),
         ("assess", cmd_assess, "one-shot before/after report: problems + token savings"),
         ("report", cmd_report, "write GRAPH_REPORT.md: god nodes, communities, decisions"),
-        ("communities", cmd_communities,
-         "the project's real modules (clusters) + cross-module bridges"),
     ]:
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
@@ -375,6 +378,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="render only areas + knowledge-connected files (auto for huge graphs)")
     sp.set_defaults(func=cmd_view)
 
+    sp = sub.add_parser("communities",
+                        help="the project's real modules (clusters) + cross-module bridges")
+    sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--limit", type=int, default=0,
+                    help="show only the N largest communities (0 = all); the true total is printed")
+    sp.set_defaults(func=cmd_communities)
+
     sp = sub.add_parser("find", help="find nodes by name or path substring")
     sp.add_argument("query", help="substring to search for")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
@@ -386,6 +396,8 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("neighbors", help="show a node and its connections")
     sp.add_argument("node", help="node id (relative path)")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
+    sp.add_argument("--limit", type=int, default=0,
+                    help="cap each direction to N rows (0 = all); reports the true totals")
     sp.set_defaults(func=cmd_neighbors)
 
     sp = sub.add_parser("impact", help="impact radius: who depends on a node / what it depends on")

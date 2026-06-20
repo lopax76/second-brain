@@ -60,10 +60,13 @@ def build_server(project: str):
         return {"total": len(rows), "shown": min(cap, len(rows)), "matches": rows[:cap]}
 
     @server.tool()
-    def neighbors(node_id: str) -> dict[str, Any]:
-        """A node and its incoming/outgoing connections (imports, references, area membership)."""
+    def neighbors(node_id: str, limit: int = 0) -> dict[str, Any]:
+        """A node and its incoming/outgoing connections (imports, references, area membership).
+
+        ``limit`` > 0 caps each direction and reports the true totals + a ``truncated`` flag, so a
+        god-node with thousands of edges can't flood the context; 0 (default) returns every edge."""
         # Distinct error for an unknown node, so an assistant can tell "no edges" from "no node".
-        res = query.neighbors(_graph(project), node_id)
+        res = query.neighbors(_graph(project), node_id, limit=limit)
         return res if res is not None else {"error": "node not found", "id": node_id}
 
     @server.tool()
@@ -111,11 +114,13 @@ def build_server(project: str):
         return _report.render_report(_graph(project), root=project)
 
     @server.tool()
-    def communities(key_files: int = 5, surprising: int = 10) -> dict[str, Any]:
+    def communities(key_files: int = 5, surprising: int = 10, limit: int = 0) -> dict[str, Any]:
         """The project's real modules: clusters from imports+references (not folders), each with
         size, cohesion, key files and dominant types, plus the top cross-module bridges. The
-        structural lens, far cheaper than loading the full report."""
-        return query.community_summary(_graph(project), key_files=key_files, surprising=surprising)
+        structural lens, far cheaper than loading the full report. ``limit`` > 0 returns only the
+        N largest communities (with the true total + ``truncated``); 0 (default) returns all."""
+        return query.community_summary(_graph(project), key_files=key_files,
+                                       surprising=surprising, limit=limit)
 
     @server.tool()
     def health() -> dict[str, Any]:

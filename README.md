@@ -339,7 +339,7 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.6.1**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.7.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**

@@ -344,7 +344,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.6.1**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.7.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
 `subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —
