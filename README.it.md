@@ -178,10 +178,12 @@ second-brain find util .                            # nodi il cui nome/path cont
 second-brain neighbors second_brain/model.py .      # un nodo e le sue connessioni
 second-brain impact second_brain/model.py .         # raggio d'impatto: cosa si rompe / da cosa dipende
 second-brain impact second_brain/model.py . --up    # solo chi dipende da esso (eseguilo prima di modificare!)
+second-brain impact second_brain/model.py . --budget 300   # ordina gli impattati + taglia a ~300 token
 second-brain impact --diff . --up                    # raggio d'impatto delle tue modifiche NON committate (git diff)
 second-brain why second_brain/cli.py second_brain/model.py .   # percorso minimo: come sono collegati due nodi?
 second-brain focus "budget token nel report" .      # mirato al compito: il sottografo minimo che conta
 second-brain focus "flusso di auth" . --budget 4000 #   ...entro ~4000 token (default 2000)
+second-brain focus "flusso di auth" . --signatures   #   ...mostra anche le firme dei file Python top
 second-brain symbols second_brain/model.py .        # firme funzioni/classi di un file Python
 ```
 
@@ -189,6 +191,7 @@ second-brain symbols second_brain/model.py .        # firme funzioni/classi di u
 ```bash
 second-brain view .             # viewer mappa 2D a community offline -> .secondbrain/view.html
 second-brain view ./src/api     # drill-down su un'area in pieno dettaglio (la vista d'insieme resta leggera)
+second-brain view . --focus "flusso di auth"   # renderizza solo la fetta di focus (cio' che riceve l'agente)
 second-brain export . --format graphml --out graph.graphml   # GraphML per Gephi/yEd/Cytoscape/networkx
 ```
 

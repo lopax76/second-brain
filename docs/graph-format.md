@@ -21,10 +21,13 @@ half-written graph.
 ## `graph.json`
 
 Deterministically ordered (nodes by `id`, edges by `(source, target, type)`) so diffs and
-content hashes are reproducible.
+content hashes are reproducible. A top-level `schema_version` (integer) records the on-disk
+format: additive/non-breaking changes keep the number, a breaking change bumps it, and the
+loader tolerates an unknown field — so exports, the MCP layer and external tools can detect it.
 
 ```json
 {
+  "schema_version": 1,
   "project": "my-project",
   "nodes": [
     {

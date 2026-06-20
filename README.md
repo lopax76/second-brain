@@ -174,9 +174,11 @@ second-brain neighbors second_brain/model.py .      # a node and its connections
 second-brain impact second_brain/model.py .         # blast radius: what breaks / what it depends on
 second-brain impact second_brain/model.py . --up    # only what depends on it (run before editing!)
 second-brain impact --diff . --up                    # blast radius of your UNCOMMITTED changes (git diff)
+second-brain impact second_brain/model.py . --budget 300   # rank impacted nodes + trim to ~300 tokens
 second-brain why second_brain/cli.py second_brain/model.py .   # shortest path: how are two nodes linked?
 second-brain focus "token budget in the report" .   # task-aware: the minimal high-value subgraph
 second-brain focus "auth flow" . --budget 4000      #   ...within ~4000 tokens (default 2000)
+second-brain focus "auth flow" . --signatures        #   ...also list the top Python files' signatures
 second-brain symbols second_brain/model.py .        # function/class signatures of one Python file
 ```
 
@@ -184,6 +186,7 @@ second-brain symbols second_brain/model.py .        # function/class signatures 
 ```bash
 second-brain view .             # offline 2D community-map viewer -> .secondbrain/view.html
 second-brain view ./src/api     # drill into one area in full detail (top-level view stays light)
+second-brain view . --focus "auth flow"   # render only the focus slice (what an assistant receives)
 second-brain export . --format graphml --out graph.graphml   # GraphML for Gephi/yEd/Cytoscape/networkx
 ```
 
