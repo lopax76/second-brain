@@ -49,3 +49,18 @@ python -m twine upload dist/*
 
 > Note: an automated GitHub Actions *publish-on-tag* workflow (PyPI Trusted Publishing) can be
 > added later so tagging a release uploads it without a local token.
+
+## Documentation checks (before tagging a release)
+
+Run through these so the published version is internally consistent:
+
+- `README.md` / `README.it.md`: **Status line** version matches `__version__`; the *Commands*
+  section and *Architecture & modules* table reflect any new flags/modules.
+- `CHANGELOG.md`: a dated entry for the new version (correct date).
+- `docs/mcp.md`: every MCP tool + parameter is listed.
+- `docs/graph-format.md`: the on-disk format (incl. `schema_version`) is current.
+- `pyproject.toml`: `Development Status` classifier agrees with the README maturity claim
+  (Alpha vs Beta).
+- **GitHub "About" description**: no stale wording (e.g. "3D"); matches the README.
+- GitHub Release for the tag is marked **Latest**; PyPI badge resolves.
+- `PROGETTO.md` and historical design docs are either updated or clearly marked archive.

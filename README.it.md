@@ -215,6 +215,18 @@ ignorati, e senza il file il comportamento è byte-identico):
 { "classify": { "type_overrides": { "data/seed.json": "data", "notes/SPEC.md": "design" } } }
 ```
 
+### `focus --signatures` e `view --focus`
+
+`focus --signatures` (e il tool MCP `focus` con `signatures=true`) elenca in più le firme di
+funzioni/classi dei file top. È **solo Python** (stdlib `ast`), legge i sorgenti **on-demand e in
+sola lettura**, **non** richiede un grafo `build --symbols`, rispetta un budget di token interno per
+le firme, e **lascia invariato l'output normale di `focus`** — così l'assistente vede l'API dei file
+rilevanti senza aprirli; i file non-Python sono saltati.
+
+`view --focus "<task>"` scrive il solito `.secondbrain/view.html`, ma renderizza **solo la fetta che
+`focus` restituirebbe** per quel task — un sottografo temporaneo in memoria che non tocca mai
+`graph.json`. Permette a una persona di *vedere* esattamente il contesto che riceve l'assistente.
+
 ### Sempre fresco (auto-refresh)
 
 Le query (`map` / `find` / `neighbors` / `impact` / `focus` / `report`, e i tool MCP) controllano
@@ -332,7 +344,7 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`freshness.py`](second_brain/freshness.py) | Manifest content-hash, firma leggera e query auto-aggiornanti. |
 | [`gate.py`](second_brain/gate.py) | Il gate anti-deriva: ref rotte / file stantii / orfani. |
 | [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode). |
-| [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` / `focus`. |
+| [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` (+ `impact --diff`) / `why` / `communities` / `focus` (BM25, firme opzionali). |
 | [`bm25.py`](second_brain/bm25.py) | Rilevanza lessicale Okapi BM25 (stdlib) — il segnale task-file che innesca `focus`. |
 | [`budget.py`](second_brain/budget.py) | Stima costo-token + fit a budget (stdlib) — l'unico posto dove `focus` / `impact` contano i token. |
 | [`rank.py`](second_brain/rank.py) | PageRank per importanza (globale + personalizzato) — motore dietro god-node e `focus`. |
@@ -360,6 +372,18 @@ GraphML**; la tassonomia configurabile `.secondbrain.json` **con `type_overrides
 (`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: un build
 davvero incrementale per grafi molto grandi, risoluzione dei riferimenti più ricca, layer di simboli
 per altri linguaggi e un layer semantico locale opzionale.
+
+## Cosa NON è (per scelta)
+
+Second Brain resta leggero di proposito. Il core **non** crescerà con:
+
+- **niente embeddings / vector store** — mappa *struttura e importanza*, non semantica (complementare al RAG);
+- **niente tree-sitter / parsing simboli multi-linguaggio** nel core — i simboli Python usano la stdlib `ast`;
+- **niente watcher obbligatorio** — la freschezza è un check di firma economico più un git hook opzionale;
+- **niente contenuti dei file** nei risultati delle query — solo id, tipi, dimensioni e connessioni;
+- **nessun LLM richiesto** per costruire o interrogare il grafo.
+
+Questo lo tiene **zero-dipendenze, read-only, deterministico e low-token** — il suo intero scopo.
 
 ## Sviluppo
 

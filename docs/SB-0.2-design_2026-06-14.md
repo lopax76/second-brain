@@ -1,3 +1,6 @@
+> **Archivio storico.** Questo documento descrive una fase progettuale precedente (v0.2).
+> Lo stato canonico è `README.md` + `docs/graph-format.md` + `docs/mcp.md` + `CHANGELOG.md`.
+
 # Second Brain v0.2 — disegno (tassonomia configurabile + symbol-layer)
 
 > Stato: DISEGNO, da ratificare con Roberto prima di costruire. Interno (gitignored).
