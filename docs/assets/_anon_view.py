@@ -66,7 +66,10 @@ def anonymize(graph: dict, project: str) -> dict:
         t = idmap.get(e["target"])
         if s is None or t is None:
             continue
-        out_edges.append({"source": s, "target": t, "type": e.get("type", "references"), "meta": {}})
+        out_edges.append({
+            "source": s, "target": t,
+            "type": e.get("type", "references"), "meta": {},
+        })
     return {"project": project, "nodes": out_nodes, "edges": out_edges}
 
 
