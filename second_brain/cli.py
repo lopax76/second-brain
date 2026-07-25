@@ -11,7 +11,7 @@ import shutil
 import sys
 
 from second_brain import __version__, agent_integration, assess, gate, query, report, store
-from second_brain.freshness import build_manifest, fast_signature, index, load_or_refresh
+from second_brain.freshness import build_manifest, index, index_cached, load_or_refresh
 from second_brain.model import Graph
 from second_brain.viewer import write_view
 
@@ -39,14 +39,21 @@ def _load_or_build(path: str) -> Graph:
 
 def cmd_build(args: argparse.Namespace) -> int:
     sym = getattr(args, "symbols", False)
-    g, m = _build(args.path, symbols=sym)
-    store.save(args.path, g, m, signature=fast_signature(args.path), symbols=sym)
+    full = getattr(args, "full", False)
+    stats: dict[str, int] = {}
+    res = index_cached(args.path, symbols=sym, incremental=not full, stats=stats)
+    g = res.graph
+    store.save(args.path, g, res.manifest, signature=res.signature, symbols=sym,
+               extract=res.extract)
     # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
     rp = report.write_report(args.path, g, scan=False)
     c = g.counts()
     print(f"built '{g.project}': {len(g.nodes)} nodes, {len(g.edges)} edges")
     print("  nodes:", c["nodes"])
     print("  edges:", c["edges"])
+    if stats.get("reused"):
+        print(f"  reused: {stats['reused']} files unchanged, "
+              f"{stats['extracted']} re-read, {stats['hashed']} re-hashed")
     print(f"  store: {store.store_dir(args.path)}")
     print(f"  report: {rp}")
     return 0
@@ -384,6 +391,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.add_argument("--symbols", action="store_true",
                     help="also index the Python symbol layer (function/class nodes + calls)")
+    sp.add_argument("--full", action="store_true",
+                    help="ignore the cached per-file extraction and re-read every file")
     sp.set_defaults(func=cmd_build)
 
     for name, fn, help_text in [

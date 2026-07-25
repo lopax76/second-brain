@@ -4,6 +4,68 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.2] - 2026-07-25
+
+Scaling release: make a rebuild proportional to what *changed*, not to how big the project is.
+Measured on a real 22.233-file tree (a multi-product workspace with a vendored monorepo) and on
+a 5.243-file / 120-agent projection of it.
+
+### Added
+
+- **Incremental indexing** — a rebuild now re-reads only the files whose content actually moved.
+  Indexing is split in two: **extraction** (open one file, pull out its imports / reference
+  targets / symbols) is per-file and cached in `.secondbrain/extract.json`, keyed by the same
+  content hash the manifest already computes; **resolution** (turning those raw targets into
+  edges against the whole file set) is cheap and is redone **globally on every build**.
+  That split is what makes the result *byte-identical* to a full rebuild rather than merely
+  close to it — no edge is ever carried over, only raw per-file findings — so the usual failure
+  mode of incremental graph updates (a stale cross-file edge quietly surviving) cannot occur.
+  Adding, deleting or renaming a file still updates the edges of documents that did not change.
+  Verified by tests that assert equality against a from-scratch build, including on the real
+  22k-file tree. New `extract.py`; `build --full` forces a complete re-read. Zero new dependency.
+  - 22.233 files: cold **18,1s**, rebuild after one edit **4,6s** (**3,9×**).
+  - 5.243 files / 120 agents: cold **2,57s**, rebuild after one edit **1,82s**.
+
+  The cache is keyed on a **content digest**, never on the manifest's `size + whole-second mtime`
+  fallback for files above the content-hash cap: two different contents can share that stamp
+  (same length, same second), and keying on it served a stale parse that `gate` could not see —
+  it recomputes the very same stamp. Large extractable files therefore get a real digest.
+- **`second-brain build --full`** — ignore the cached extraction and re-read everything.
+- `index_cached()` / `BuildResult` — the build entry point that returns the extraction cache and
+  the freshness signature alongside the graph and manifest. `index()` is unchanged for callers
+  that do not need them.
+
+### Changed
+
+- **Import scanning no longer walks the whole AST.** An import is a *statement*, so it can only
+  appear inside a statement list — never inside an expression. Visiting only statement fields
+  (in each node's own `_fields` order, so the breadth-first order is preserved) skips the bulk
+  of a Python AST. On a 5.024-file corpus the old `ast.walk` accounted for 26,9s of a 34,4s
+  index. Verified to return identical results to `ast.walk` on **13.800 real Python files** plus
+  hand-written `try/except*/match/async` edge cases. A source without the substring `import` is
+  now skipped without parsing at all (exact, not heuristic).
+- **The project tree is walked once per build, not twice.** The freshness signature used to come
+  from a separate `fast_signature()` pass before indexing; it is now produced by the build's own
+  walk. About a second of duplicated `stat` on a 5.000-file tree. The ordering guarantee is
+  unchanged: the signature is still captured before any file's contents are read, so a file that
+  appears mid-build reads as stale next time (safe) rather than as fresh.
+- **The manifest is recomputed from the files on every build, never carried over.** An earlier
+  cut of this release reused the stored hash when a file's size+mtime had not moved. It was
+  faster and it was wrong: the store could then hold a hash that did not match the file, and the
+  state was **self-perpetuating** — the stale hash validated the stale cache entry, which
+  regenerated the stale hash, so `gate` reported drift while every rebuild faithfully reproduced
+  it and only `--full` broke the loop. The manifest is what `gate` compares against, so it has to
+  be evidence rather than memory, and a rebuild has to be able to *heal* a drifted store. Paying
+  the re-hash is what buys that: it is the difference between 2,8s and 4,6s on the 22k tree.
+
+### Fixed
+
+- **A UTF-8 BOM no longer silently disables SB's own config files.** Notepad and PowerShell 5.1's
+  `Set-Content -Encoding utf8` both write a BOM. `.secondbrain.json` then failed to parse and
+  fell back to defaults (so `respect_gitignore` stayed off), and the BOM glued itself to the
+  first rule of `.gitignore`/`.secondbrainignore`, silently killing that rule. All three readers
+  now use `utf-8-sig` — identical to `utf-8` when no BOM is present. (Backlogged as 0.9.1.)
+
 ## [0.9.0] - 2026-06-20
 
 ### Added

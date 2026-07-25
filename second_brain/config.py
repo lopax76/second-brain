@@ -72,7 +72,10 @@ def load_config(root: str | Path) -> ClassifyConfig:
     """
     path = Path(root) / CONFIG_NAME
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: strips a leading BOM if present, identical to utf-8 otherwise. Notepad and
+        # PowerShell 5.1's Set-Content -Encoding utf8 both write a BOM, which made json.loads
+        # raise and silently fall back to the defaults (so respect_gitignore stayed off).
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return ClassifyConfig()
     if not isinstance(data, dict):

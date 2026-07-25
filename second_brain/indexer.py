@@ -19,6 +19,7 @@ from pathlib import Path
 
 from second_brain.classify import classify, rules_from_config
 from second_brain.config import load_config
+from second_brain.extract import FileExtract, extract_file
 from second_brain.ignore import (
     DEFAULT_IGNORE_DIRS,
     GitRule,
@@ -29,23 +30,14 @@ from second_brain.ignore import (
     load_ignore_patterns,
 )
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
-from second_brain.pycode import PyImport, js_imports, python_imports
-from second_brain.pysymbols import extract as extract_symbol_calls
-from second_brain.references import extract_references_tagged
+from second_brain.pycode import PyImport
 
-_TEXT_EXTS = {
-    ".md", ".markdown", ".rst", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",
-    ".toml", ".ini", ".cfg", ".conf", ".yaml", ".yml", ".json", ".jsonl", ".xml",
-    ".html", ".htm", ".css", ".sql", ".ps1", ".psm1", ".sh", ".bash", ".go", ".rs",
-    ".java", ".c", ".cc", ".cpp", ".h", ".hpp", ".rb", ".php", ".cs",
-}
 _JS_EXTS = {".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs"}
 # Documentation references (links, wikilinks, path-in-prose) are extracted ONLY from
 # documents. In source code, filename-looking strings are data, not references — scanning
 # them produces noise, so we rely on import edges (ast) for code instead.
 _DOC_REF_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
 _JS_RESOLVE_ORDER = ("", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", "/index.ts", "/index.js")
-_MAX_READ_BYTES = 5_000_000
 
 AREA_ROOT = "(root)"
 
@@ -116,18 +108,6 @@ def iter_files(
                 continue
             rels.append(rel)
     return sorted(rels)
-
-
-def _read_text(path: Path) -> str | None:
-    ext = _ext(path.name)
-    if ext and ext not in _TEXT_EXTS:
-        return None
-    try:
-        if path.stat().st_size > _MAX_READ_BYTES:
-            return None
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return None
 
 
 def _top_area(rel: str) -> str:
@@ -294,12 +274,18 @@ def build_graph(
     project: str | None = None,
     symbols: bool = False,
     _rels: list[str] | None = None,
+    _extract: dict[str, FileExtract] | None = None,
 ) -> Graph:
     """Index the project at ``root`` and return its graph. Never modifies the project.
 
     ``symbols=True`` adds the opt-in symbol layer (function/class nodes + intra-file ``calls``
     edges) for Python files. ``_rels`` lets a caller pass a precomputed file list to avoid
     walking the tree twice (see :func:`second_brain.freshness.index`).
+
+    ``_extract`` lets a caller supply the per-file raw findings instead of having them read from
+    disk here — that is how incremental builds skip re-reading unchanged files. Resolution below
+    always runs over the *whole* file set regardless, so a supplied cache can never leave a stale
+    cross-file edge behind: the result is identical to reading every file again.
     """
     root_p = Path(root).resolve()
     if not root_p.is_dir():
@@ -342,33 +328,38 @@ def build_graph(
         stem_index.setdefault(stem, []).append(rel)
     py_files = [r for r in rels if _ext(r) == ".py"]
     module_map = _python_module_map(py_files)
-    py_text: dict[str, str] = {}  # .py contents cached during edge build, reused by the symbol pass
 
     # 3. Edges from file contents. Only code (imports) and docs (references) are ever READ;
     #    data/config/binaries are never opened - the graph needs only their type/size/area.
     #    This is what keeps indexing light on data-heavy projects (no reading huge JSON/CSV/logs).
+    #    Reading itself lives in `extract`, so a caller that already has the findings (incremental
+    #    build) can hand them over; everything below this line is resolution, and always runs.
+    if _extract is not None:
+        extracts = _extract
+    else:
+        extracts = {}
+        for rel in rels:
+            fe = extract_file(root_p, rel, symbols=symbols)
+            if fe is not None:
+                extracts[rel] = fe
+
     for rel in rels:
+        fe = extracts.get(rel)
+        if fe is None:
+            continue
         ext = _ext(rel)
-        is_code = ext == ".py" or ext in _JS_EXTS
-        is_doc = ext in _DOC_REF_EXTS
-        if not (is_code or is_doc):
-            continue
-        text = _read_text(root_p / rel)
-        if text is None:
-            continue
         if ext == ".py":
-            py_text[rel] = text  # reuse in the symbol pass (3b) instead of reading twice
-            for imp in python_imports(text):
+            for imp in fe.py_imports:
                 for tgt in _resolve_py(imp, rel, module_map):
                     g.add_edge(Edge(rel, tgt, EdgeType.IMPORTS))
         elif ext in _JS_EXTS:
-            for spec in js_imports(text):
+            for spec in fe.js_specs:
                 tgt = _resolve_js(spec, rel, node_ids)
                 if tgt:
                     g.add_edge(Edge(rel, tgt, EdgeType.IMPORTS))
         if ext in _DOC_REF_EXTS:
             broken: list[str] = []
-            for target, kind in extract_references_tagged(text):
+            for target, kind in fe.refs:
                 resolved, is_broken = _resolve_ref(
                     target, kind, rel, node_ids, basename_index, stem_index, root_p
                 )
@@ -385,10 +376,10 @@ def build_graph(
     #     calls are intentionally not linked (no type inference) — `imports` already carries that.
     if symbols:
         for rel in py_files:
-            text = py_text.get(rel)  # already read during the edge pass (no second disk read)
-            if text is None:
+            fe = extracts.get(rel)  # already extracted in the pass above (no second disk read)
+            if fe is None:
                 continue
-            sym_defs, sym_calls = extract_symbol_calls(text)
+            sym_defs, sym_calls = fe.sym_defs, fe.sym_calls
             for d in sym_defs:
                 sid = f"{rel}::{d.qualname}"
                 g.add_node(Node(id=sid, type=NodeType.SYMBOL,

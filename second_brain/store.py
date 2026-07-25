@@ -11,10 +11,11 @@ import os
 import tempfile
 from pathlib import Path
 
+from second_brain.extract import CachedExtract, cache_from_json, cache_to_json
 from second_brain.model import Graph
 
 __all__ = ["STORE_DIRNAME", "store_dir", "save", "load_graph", "load_manifest",
-           "load_signature", "load_symbols_mode"]
+           "load_signature", "load_symbols_mode", "load_extract"]
 
 STORE_DIRNAME = ".secondbrain"
 
@@ -42,6 +43,7 @@ def save(
     *,
     signature: dict[str, str] | None = None,
     symbols: bool | None = None,
+    extract: dict[str, CachedExtract] | None = None,
 ) -> Path:
     d = store_dir(root)
     d.mkdir(parents=True, exist_ok=True)
@@ -63,7 +65,27 @@ def save(
         _atomic_write(
             d / "mode.json", json.dumps({"symbols": bool(symbols)}, indent=2)
         )
+    # Per-file raw extraction, keyed by the same content hash as the manifest: the next build
+    # re-reads only the files whose hash moved. Purely derived — deleting it costs one full
+    # rebuild and nothing else. Written compactly (no indent): on a 20k-file tree the pretty
+    # form is several MB of pure whitespace.
+    if extract is not None:
+        _atomic_write(
+            d / "extract.json",
+            json.dumps(cache_to_json(extract), ensure_ascii=False, separators=(",", ":")),
+        )
     return d
+
+
+def load_extract(root: str | os.PathLike[str]) -> dict[str, CachedExtract]:
+    """Load the per-file extraction cache; empty dict if missing, corrupt or from an old format."""
+    p = store_dir(root) / "extract.json"
+    if not p.is_file():
+        return {}
+    try:
+        return cache_from_json(json.loads(p.read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return {}
 
 
 def load_signature(root: str | os.PathLike[str]) -> dict[str, str] | None:

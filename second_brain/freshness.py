@@ -13,8 +13,10 @@ import hashlib
 import math
 import os
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
+from second_brain.extract import CachedExtract, FileExtract, extract_file, is_extractable
 from second_brain.ignore import load_ignore_patterns
 from second_brain.indexer import build_graph, gitignore_rules_for, iter_files
 from second_brain.model import Graph, NodeType
@@ -37,8 +39,9 @@ _TEXT_HASH_EXTS = {
 _CONTENT_HASH_CAP = 1_000_000
 
 
-__all__ = ["file_hash", "build_manifest", "index", "diff_manifest", "fast_signature",
-           "is_stale", "auto_refresh_enabled", "load_or_refresh"]
+__all__ = ["file_hash", "build_manifest", "index", "index_cached", "BuildResult",
+           "diff_manifest", "fast_signature", "is_stale", "auto_refresh_enabled",
+           "load_or_refresh"]
 
 
 def _ext(name: str) -> str:
@@ -94,27 +97,157 @@ def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:
     return out
 
 
+def _stat_sig(root: Path, rel: str) -> str | None:
+    """The same cheap size+mtime signature :func:`fast_signature` stores, for one file."""
+    try:
+        st = (root / rel).stat()
+    except OSError:
+        return None
+    return f"{st.st_size}:{st.st_mtime_ns}"
+
+
+def _is_content_hash(value: str) -> bool:
+    """True if a manifest value is a real content digest rather than a size+mtime stamp.
+
+    :func:`_hash_rel` returns a BLAKE2b hex digest for text up to ``_CONTENT_HASH_CAP`` and the
+    fallback ``s<size>:m<seconds>`` stamp otherwise; only the stamp contains ``:``.
+    """
+    return ":" not in value
+
+
+def _content_key(root: Path, rel: str, manifest_value: str | None) -> str | None:
+    """A key that changes whenever this file's CONTENT changes — what the cache must key on.
+
+    The manifest value qualifies for text files up to the content-hash cap. Above it the manifest
+    holds ``size + whole-second mtime``, and **two different contents can share that stamp**: edit
+    a large file to the same length within the same second and the stamp does not move. Keying the
+    extraction cache on it made a rebuild reuse a stale extraction — a graph that no longer matched
+    a from-scratch build, with ``gate`` unable to see it (the same stamp is what gate recomputes).
+    So large files get a real digest here. They are few, and only extractable ones reach this.
+    """
+    if manifest_value is not None and _is_content_hash(manifest_value):
+        return manifest_value  # already a content digest: free
+    try:
+        return file_hash(root / rel, normalize_newlines=True)
+    except OSError:
+        return None
+
+
+@dataclass
+class BuildResult:
+    """Everything one build produces — pass it straight to :func:`second_brain.store.save`."""
+
+    graph: Graph
+    manifest: dict[str, str]
+    extract: dict[str, CachedExtract]
+    signature: dict[str, str]
+
+
+def index_cached(
+    root: str | os.PathLike[str],
+    *,
+    operational: bool = True,
+    symbols: bool = False,
+    incremental: bool = True,
+    stats: dict[str, int] | None = None,
+) -> BuildResult:
+    """Build the graph and the manifest, reusing what the last build already learned.
+
+    Returns a :class:`BuildResult`; hand its ``extract`` and ``signature`` to
+    :func:`second_brain.store.save` so the next build can reuse them in turn.
+
+    The freshness signature is produced by *this* walk rather than by a separate
+    :func:`fast_signature` pass. Two walks over a 5.000-file tree cost about a second of pure
+    duplicated ``stat`` — and the ordering guarantee is unchanged, because the signature is still
+    captured before any file's contents are read: a file that appears afterwards is missing from
+    the stored signature, so the next query sees a mismatch and rebuilds (false-stale, safe).
+
+    Exactly one thing is reused, and only against fresh evidence: the **extraction** (imports,
+    reference targets, symbols) of a file whose *content digest* still matches the one it was
+    taken from. The manifest is recomputed from the files every time — it is what ``gate``
+    compares against, so it has to be evidence rather than memory, and a rebuild has to be able
+    to heal a store that drifted rather than re-confirm it.
+
+    Resolution is never reused: :func:`build_graph` re-resolves every reference in the project on
+    every call, so adding or deleting a file still updates every other file's edges. That is what
+    makes an incremental result identical to a full rebuild rather than merely close to one.
+
+    ``incremental=False`` ignores the stored state entirely and rebuilds from scratch. Pass a
+    dict as ``stats`` to receive ``{files, hashed, extracted, reused}`` for reporting.
+    """
+    root_p = Path(root).resolve()
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
+
+    from second_brain import store
+    cached = store.load_extract(root_p) if incremental else {}
+
+    # 1. One stat per file: it produces the freshness signature AND decides what to re-hash.
+    signature: dict[str, str] = {}
+    for rel in rels:
+        sig = _stat_sig(root_p, rel)
+        if sig is not None:
+            signature[rel] = sig
+
+    # 2. Manifest: always recomputed from the files themselves, never carried over.
+    #    An earlier version of this reused the stored hash when size+mtime had not moved. It made
+    #    the store able to hold a hash that did not match the file, and — worse — the state was
+    #    SELF-PERPETUATING: the stale hash validated the stale cache entry, which produced the same
+    #    stale hash again, so `gate` reported drift while every rebuild kept reproducing it. Only
+    #    `--full` broke the loop. The manifest is what `gate` compares against, so it must be
+    #    evidence, not memory; a rebuild has to be able to heal the store, not re-confirm it.
+    manifest: dict[str, str] = {}
+    hashed = 0
+    for rel in rels:
+        hashed += 1
+        hv = _hash_rel(root_p, rel)
+        if hv is not None:
+            manifest[rel] = hv
+
+    # 3. Extraction: re-read only files whose content hash moved. A cache entry taken WITHOUT the
+    #    symbol layer cannot serve a --symbols build, so it is re-extracted; the reverse is fine.
+    extracts: dict[str, FileExtract] = {}
+    fresh_cache: dict[str, CachedExtract] = {}
+    extracted = reused = 0
+    for rel in rels:
+        if not is_extractable(rel):
+            continue  # never opened by the indexer: nothing to extract, nothing to cache
+        hv = _content_key(root_p, rel, manifest.get(rel))
+        entry = cached.get(rel)
+        fe: FileExtract | None = None
+        if entry is not None and hv is not None and entry.hash == hv:
+            if entry.data.has_symbols or not symbols:
+                fe = entry.data
+                reused += 1
+        if fe is None:
+            extracted += 1
+            fe = extract_file(root_p, rel, symbols=symbols)
+        if fe is None:
+            continue
+        extracts[rel] = fe
+        if hv is not None:
+            fresh_cache[rel] = CachedExtract(hash=hv, data=fe)
+
+    if stats is not None:
+        stats.update({"files": len(rels), "hashed": hashed,
+                      "extracted": extracted, "reused": reused})
+
+    graph = build_graph(root_p, symbols=symbols, _rels=rels, _extract=extracts)
+    if operational:
+        from second_brain.operational import enrich
+        enrich(graph, root_p)
+    return BuildResult(graph=graph, manifest=manifest, extract=fresh_cache, signature=signature)
+
+
 def index(
     root: str | os.PathLike[str], *, operational: bool = True, symbols: bool = False
 ) -> tuple[Graph, dict[str, str]]:
     """Build the graph and the manifest from one directory walk.
 
-    The filesystem is enumerated once (``iter_files``); file *contents* are still read again to
-    hash them for the manifest, so this is not zero double-I/O - just a single directory listing
-    shared by graph build and manifest. ``symbols=True`` adds the opt-in symbol/call layer.
+    Thin wrapper over :func:`index_cached` for callers that do not persist the extraction cache;
+    the build is still incremental if a cache is present on disk.
     """
-    root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
-    graph = build_graph(root_p, symbols=symbols, _rels=rels)
-    if operational:
-        from second_brain.operational import enrich
-        enrich(graph, root_p)
-    manifest: dict[str, str] = {}
-    for rel in rels:
-        hv = _hash_rel(root_p, rel)
-        if hv is not None:
-            manifest[rel] = hv
-    return graph, manifest
+    res = index_cached(root, operational=operational, symbols=symbols)
+    return res.graph, res.manifest
 
 
 def diff_manifest(old: dict[str, str], new: dict[str, str]) -> dict[str, list[str]]:
@@ -204,11 +337,12 @@ def _has_symbols(graph: Graph) -> bool:
 def _save_quiet(
     root: str | os.PathLike[str], g: Graph, m: dict[str, str], *,
     symbols: bool, signature: dict[str, str],
+    extract: dict[str, CachedExtract] | None = None,
 ) -> None:
     """Persist the store, ignoring write errors (read-only checkout / locked store)."""
     from second_brain import store
     try:
-        store.save(root, g, m, signature=signature, symbols=symbols)
+        store.save(root, g, m, signature=signature, symbols=symbols, extract=extract)
     except OSError:
         pass  # degrade gracefully: the in-memory graph is still served
 
@@ -235,20 +369,20 @@ def load_or_refresh(
         # Capture the signature BEFORE reading file contents: if a file changes during the walk,
         # the stored signature is then "older" than the change, so the next query sees a mismatch
         # and rebuilds (false-stale = safe) — instead of a permanent false-fresh.
-        sig = fast_signature(root)
-        built, m = index(root)
-        _save_quiet(root, built, m, symbols=False, signature=sig)
-        return built
+        res = index_cached(root)  # its own walk also yields the signature (no second pass)
+        _save_quiet(root, res.graph, res.manifest, symbols=False,
+                    signature=res.signature, extract=res.extract)
+        return res.graph
     if refresh and _should_check(root) and is_stale(root):
         # Prefer the persisted build mode; fall back to "are there symbol nodes?" only if the
         # store predates mode.json (so a --symbols build of a then-symbol-less tree is preserved).
         mode = store.load_symbols_mode(root)
         use_symbols = mode if mode is not None else _has_symbols(g)
-        sig = fast_signature(root)  # before the walk (see first-touch note)
         try:
-            rebuilt, m = index(root, symbols=use_symbols)
+            res = index_cached(root, symbols=use_symbols)
         except Exception:
             return g  # any rebuild failure -> serve the loaded graph (stale but alive), never crash
-        _save_quiet(root, rebuilt, m, symbols=use_symbols, signature=sig)
-        return rebuilt
+        _save_quiet(root, res.graph, res.manifest, symbols=use_symbols,
+                    signature=res.signature, extract=res.extract)
+        return res.graph
     return g

@@ -140,9 +140,10 @@ def test_rebuild_failure_degrades_not_crashes(tmp_path, monkeypatch):
     def _boom(*a, **k):
         raise ValueError("parser exploded")
 
-    monkeypatch.setattr(fr, "index", _boom)
+    monkeypatch.setattr(fr, "index_cached", _boom)
     g = load_or_refresh(tmp_path)  # must NOT raise
     assert "a.py" in g.nodes  # served the already-loaded (stale) graph
+    assert "b.py" not in g.nodes  # and it is the STALE one: the rebuild really did fail
 
 
 def test_no_false_fresh_when_file_appears_during_build(tmp_path, monkeypatch):
@@ -152,14 +153,14 @@ def test_no_false_fresh_when_file_appears_during_build(tmp_path, monkeypatch):
     import second_brain.freshness as fr
 
     (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
-    real_index = fr.index
+    real_index = fr.index_cached  # the seam load_or_refresh actually goes through
 
     def index_then_change(root, **kw):
-        g, m = real_index(root, **kw)
+        res = real_index(root, **kw)
         (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # appears after the walk
-        return g, m
+        return res
 
-    monkeypatch.setattr(fr, "index", index_then_change)
+    monkeypatch.setattr(fr, "index_cached", index_then_change)
     fr.load_or_refresh(tmp_path)  # builds {a.py}; b.py created during build
     monkeypatch.undo()
     g2 = fr.load_or_refresh(tmp_path)

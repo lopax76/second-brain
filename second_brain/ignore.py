@@ -50,7 +50,8 @@ def load_ignore_patterns(root: Path) -> list[str]:
     if not f.is_file():
         return []
     out: list[str] = []
-    for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
+    # utf-8-sig so a BOM (Notepad / PowerShell 5.1) does not glue itself to the first pattern.
+    for line in f.read_text(encoding="utf-8-sig", errors="ignore").splitlines():
         s = line.strip()
         if s and not s.startswith("#"):
             out.append(s)
@@ -126,7 +127,9 @@ def load_gitignore_rules(root: Path) -> list[GitRule]:
     if not f.is_file():
         return []
     try:
-        text = f.read_text(encoding="utf-8", errors="ignore")
+        # utf-8-sig: a BOM would otherwise become part of the FIRST rule, so that rule silently
+        # stops matching (the classic Windows symptom: "vendor/ is in .gitignore but is indexed").
+        text = f.read_text(encoding="utf-8-sig", errors="ignore")
     except OSError:
         return []
     rules: list[GitRule] = []
