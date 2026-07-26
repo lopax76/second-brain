@@ -1,4 +1,4 @@
-﻿# Second Brain (SB)
+# Second Brain (SB)
 
 [![CI](https://github.com/lopax76/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/lopax76/second-brain/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/second-brain-graph.svg)](https://pypi.org/project/second-brain-graph/)
@@ -391,7 +391,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.9.4**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
+Beta — **v0.9.5**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
 l'**indicizzazione incrementale** (un rebuild rilegge solo i file il cui contenuto è cambiato;
 `build --full` forza la rilettura completa); le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
