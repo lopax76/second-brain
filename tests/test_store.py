@@ -53,6 +53,27 @@ def test_a_store_written_before_stamps_is_still_accepted(tmp_path):
     assert store.load_graph(tmp_path) is not None
 
 
+def test_an_unreadable_stamp_is_not_trusted(tmp_path):
+    """A stamp we cannot parse must count as incoherent, not as absent.
+
+    ``is_coherent`` guards against ``RecursionError`` as well as ``OSError``/``ValueError``, because
+    deeply nested JSON raises the former and it is a ``RuntimeError``, not a ``ValueError``. Without
+    that guard the exception escapes every read path and crashes the command.
+    """
+    store.save(tmp_path, _one_node_graph("a.py"), {}, signature={}, symbols=False)
+    stamp = tmp_path / ".secondbrain" / store.STAMP_NAME
+
+    stamp.write_text("[" * 20000 + "]" * 20000, encoding="utf-8")  # RecursionError on parse
+    assert store.is_coherent(tmp_path) is False
+    assert store.load_graph(tmp_path) is None
+
+    stamp.write_text("{not json", encoding="utf-8")  # ValueError
+    assert store.is_coherent(tmp_path) is False
+
+    stamp.write_text('["not", "a", "mapping"]', encoding="utf-8")  # valid JSON, wrong shape
+    assert store.is_coherent(tmp_path) is False
+
+
 def test_a_failed_write_leaves_the_previous_store_intact(tmp_path, monkeypatch):
     """The atomicity the module docstring promises, made observable without a real crash.
 

@@ -470,6 +470,56 @@ def test_an_unreadable_file_is_retried_once_it_can_be_read(tmp_path):
     assert any(e.source == "doc.md" and e.target == "target.md" for e in recovered.graph.edges)
 
 
+def test_fast_signature_also_marks_an_unreadable_file(tmp_path):
+    """Both sides of the comparison must use the sentinel, or the retry never happens.
+
+    ``is_stale`` compares a stored signature with a fresh one. If ``index_cached`` records the
+    sentinel but ``fast_signature`` omits the file, the two differ for ever and the project is
+    permanently stale; if both omit it, they agree and the lost edges never come back. Only the two
+    agreeing on the sentinel gives the wanted behaviour — stable while locked, retried when freed.
+    """
+    import pathlib
+
+    import second_brain.freshness as fr
+
+    (tmp_path / "doc.md").write_text("# d\n", encoding="utf-8")
+    real_stat = pathlib.Path.stat
+
+    def refuse_doc(self, *a, **k):
+        if self.name == "doc.md":
+            raise OSError("locked")
+        return real_stat(self, *a, **k)
+
+    pathlib.Path.stat = refuse_doc
+    try:
+        sig = fr.fast_signature(tmp_path)
+    finally:
+        pathlib.Path.stat = real_stat
+
+    assert sig["doc.md"] == fr.UNREADABLE
+
+
+def test_the_coarse_stamp_distinguishes_writes_within_one_second(tmp_path):
+    """Above the cap the manifest value must carry nanoseconds, not whole seconds.
+
+    With ``m{int(st.st_mtime)}`` two different contents of the same length written inside one
+    second produced the SAME manifest value — and `gate` recomputes exactly that value, so it
+    reported clean over a changed file.
+    """
+    from second_brain.freshness import _hash_rel
+
+    big = tmp_path / "big.md"
+    filler = "z" * 1_200_000  # above the content-hash cap: stamp, not digest
+    big.write_text(f"aaaa{filler}", encoding="utf-8")
+    first = _hash_rel(tmp_path, "big.md")
+    big.write_text(f"bbbb{filler}", encoding="utf-8")  # same length, same second
+    second = _hash_rel(tmp_path, "big.md")
+
+    assert first is not None and second is not None
+    assert first.startswith("s") and ":m" in first  # it really is the stamp branch
+    assert first != second
+
+
 def test_gate_declares_which_files_it_could_only_check_by_stamp(tmp_path):
     """Above the content-hash cap `gate` compares a stat stamp, not content. It must say so."""
     from second_brain import gate

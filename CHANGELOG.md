@@ -44,6 +44,26 @@ and, where an irreducible residue remains, now **declared** instead of implied.
 - `tests/test_cli.py` no longer copies a `.secondbrain` left in the fixture by an earlier run, which
   had been handing the "first" build a warm cache and making those tests order-dependent.
 
+### Verified
+
+**Twenty independent sabotages, each caught by a named test.** The sabotage harness was extended to
+every change in this release and re-run; three gaps it exposed are now closed:
+
+- `fast_signature` omitting an unreadable file instead of marking it. Both sides of the comparison
+  must use the sentinel: if only one does, the project is stale for ever; if neither does, they
+  agree and the lost edges never return. Only the two agreeing gives the wanted behaviour.
+- The coarse stamp reverting to whole seconds — nothing asserted the nanosecond precision that
+  makes it able to tell two same-length writes within one second apart.
+- `is_coherent` losing its `RecursionError` guard. Worth recording *how* this was missed: the guard
+  in `is_coherent` and the one in `load_extract` are textually identical, and a single-substitution
+  sabotage only ever hit the first, so the run that appeared to cover both covered one. Two separate
+  sabotages now.
+
+Two other "uncaught" results were not gaps and are documented as such in the harness: keying the
+cache on `hv` above the cap is an **equivalent mutant** now that the stamp carries nanoseconds
+(`hv` and the signature hold the same information), and one sabotage was written as
+`stamp_only = [] or sorted(...)`, which is a **no-op** because an empty list is falsy.
+
 ## [0.9.4] - 2026-07-26
 
 A cross-check aimed squarely at test quality — sabotage the code, see whether anything fails —
