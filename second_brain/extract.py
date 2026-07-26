@@ -14,6 +14,15 @@ time**. That is what makes an incremental result byte-identical to a full rebuil
 the usual objection to incremental graph updates — a stale cross-file edge quietly surviving a
 partial update — does not apply here: no edge is ever carried over, only raw per-file findings.
 
+**The one exception, stated rather than implied.** For files above the content-hash cap the key is
+the ``size:mtime_ns`` signature, not a digest, because re-reading a 50 MB file on every build to key
+its cache would defeat the point. A replacement of such a file that preserves *both* size and exact
+mtime (``cp -p``, ``tar -x``, a restore) is therefore invisible: the cache is reused while a full
+rebuild — which never consults the cache — would re-extract and could produce different edges. So
+the equivalence above holds for every file the cap covers, and for larger ones it holds up to the
+limit of what a ``stat`` can witness. ``gate`` names the files in that category (``stamp_only``)
+instead of leaving the reader to work it out.
+
 The cache lives in ``.secondbrain/extract.json``. Its key is the same content digest the manifest
 computes for files up to the content-hash cap, and the precise ``size:mtime_ns`` signature above
 it — where the manifest itself holds only a coarse stamp and re-reading a 50 MB file on every build

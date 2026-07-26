@@ -161,6 +161,14 @@ scales. 325 tests, ruff clean.
   the same evidence `is_stale` already trusts to decide whether to rebuild at all, and no weaker
   than the known-and-open item about `gate` above the cap.
 
+  **And it qualifies the headline promise, which earlier entries stated without qualification.** A
+  full rebuild never consults the cache, so it always re-extracts; an incremental one reuses. For a
+  file above the cap replaced while preserving *both* size and exact mtime, the two therefore
+  disagree — the byte-identity claim holds for every file the cap covers, and for larger ones only
+  up to what a `stat` can witness. This was documented as a `gate` limitation before; framing it
+  only that way understated it, and an external review (DeepSeek, via the project's own gateway)
+  is what made the connection to the equivalence claim explicit. `gate` names the affected files.
+
 ### Known and NOT fixed (pre-existing, found by the same cross-check) — **all addressed in 0.9.5**
 
 - **Two overlapping builds can leave `graph.json` from one and `manifest.json`/`signature.json`

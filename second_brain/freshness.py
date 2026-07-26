@@ -190,7 +190,10 @@ def index_cached(
 
     Resolution is never reused: :func:`build_graph` re-resolves every reference in the project on
     every call, so adding or deleting a file still updates every other file's edges. That is what
-    makes an incremental result identical to a full rebuild rather than merely close to one.
+    makes an incremental result identical to a full rebuild rather than merely close to one — with
+    one stated exception: above the content-hash cap the key is stat evidence, so a replacement
+    preserving both size and exact mtime is invisible here while a full rebuild would re-extract.
+    See the note in :mod:`second_brain.extract`.
 
     ``incremental=False`` ignores the stored state entirely and rebuilds from scratch. Pass a
     dict as ``stats`` to receive ``{files, hashed, extracted, reused}`` for reporting.
