@@ -103,15 +103,6 @@ def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:
     return out
 
 
-def _stat_sig(root: Path, rel: str) -> str | None:
-    """The same cheap size+mtime signature :func:`fast_signature` stores, for one file."""
-    try:
-        st = (root / rel).stat()
-    except OSError:
-        return None
-    return f"{st.st_size}:{st.st_mtime_ns}"
-
-
 def _digest_bytes(data: bytes) -> str:
     """Digest raw bytes exactly as :func:`file_hash` would with ``normalize_newlines=True``.
 
@@ -159,7 +150,8 @@ def index_cached(
 
     Exactly one thing is reused, and only against fresh evidence: the **extraction** (imports,
     reference targets, symbols) of a file whose key still matches the one it was stored under —
-    a content digest taken from the very bytes the findings came from. The manifest is recomputed
+    a content digest taken from the very bytes the findings came from — or, above the content-hash
+    cap, the precise ``size:mtime_ns`` signature. The manifest is recomputed
     from the files every time: it is what ``gate`` compares against, so it has to be evidence
     rather than memory, and a rebuild has to be able to heal a drifted store, not re-confirm it.
 

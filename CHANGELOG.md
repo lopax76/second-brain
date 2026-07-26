@@ -4,7 +4,52 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.9.3] - 2026-07-25
+## [0.9.4] - 2026-07-26
+
+A cross-check aimed squarely at test quality — sabotage the code, see whether anything fails —
+found that several of the properties 0.9.2 and 0.9.3 claim to protect were guarded by nothing.
+No behaviour changes here beyond one dead function: this release is the tests, plus the docs that
+had drifted away from the code.
+
+### Added
+
+- **Eleven independent sabotages, each now caught by a named test.** Verified by re-applying every
+  one of them to a copy of the repo and confirming the suite fails: the mid-build double read, the
+  freshness signature captured too late, a forgotten statement field in the import scanner, the
+  coarse stamp used as a cache key, `_atomic_write` without its temp file, GraphML losing its sort,
+  `build` exiting 0 without persisting, `--full` silently ignored, cache type-validation removed,
+  `RecursionError` uncaught, and dangling symlinks dropped from the graph.
+- **A differential test for the import scanner** (`tests/test_pycode.py`): `python_imports` is
+  compared against a reference `ast.walk` implementation on every construct that nests statements
+  — `match`/`case` (nested, and with guards), `except*`, `async with`/`async for`, loop `else`,
+  class-in-function. Removing a field from `_STMT_FIELDS` now fails the suite; before, dropping
+  `cases` lost every import inside a `match` and 325 tests stayed green.
+- Tests for the CLI surface added in 0.9.2/0.9.3: the `reused:` line, `--full`, and the non-zero
+  exit plus stderr warning when the store cannot be written.
+- A test that the store survives a failed write with the previous version intact and no `.tmp-*`
+  left behind — the atomicity the module docstring has always promised.
+
+### Fixed
+
+- **Two tests were vacuous.** The pair covering the cache above the content-hash cap wrote
+  `[link](alpha.py)` then `[link](zeta.py)` while claiming "same byte length": those differ by one
+  byte, so the size in the coarse stamp invalidated the cache on its own and the collision the
+  tests existed to provoke never happened. Targets are now isometric *and* the test asserts it.
+- `test_graphml_deterministic` was `to_graphml(g) == to_graphml(g)` — true of any pure function,
+  blind to the insertion-order dependency it was meant to catch. It now compares two equivalent
+  graphs built in opposite order.
+- `test_cache_from_a_future_version_is_ignored` injected the integer `CACHE_VERSION + 1` while
+  `cache_id()` returns a string, so it tested type rejection rather than a future identity.
+- **Documentation that had stopped being true**: both READMEs still said `v0.9.0` and listed
+  incremental indexing under "next steps" — the headline feature of the two releases before this
+  one; `build --full` was documented nowhere outside argparse's help; `docs/graph-format.md` and
+  the module tables never mentioned `extract.json`; three places described the cache key as a
+  content digest without the above-the-cap exception; `store.py` described two of the five files
+  it writes; and the `[0.9.3]` entry was dated a day before the commit containing it.
+- Removed `freshness._stat_sig`, orphaned when 0.9.3 merged the two passes, and a comment pointing
+  at `indexer._TEXT_EXTS`, a name deleted in 0.9.2.
+
+## [0.9.3] - 2026-07-26
 
 Everything here comes from an adversarial cross-check of 0.9.2. Its central promise — an
 incremental result identical to a full rebuild — did not hold, and the reason is worth recording:
@@ -46,6 +91,15 @@ the digest and the findings were taken from **two separate reads at two differen
 22.233 files: cold **16,1s**, rebuild after one edit **5,1s**. 5.243 files / 120 agents: cold
 **1,90s**, rebuild **1,71s**. Incremental verified byte-identical to a from-scratch build at both
 scales. 325 tests, ruff clean.
+
+### Changed
+
+- Above the content-hash cap the cache key is the precise `size:mtime_ns` signature rather than a
+  re-read digest. That removes a full re-read of every large extractable file on every build (48 MB
+  read on a no-op build, in one measurement) and the same-second collision the coarse stamp allows.
+  The trade-off, stated plainly: for those files the key is *stat* evidence, not content evidence —
+  the same evidence `is_stale` already trusts to decide whether to rebuild at all, and no weaker
+  than the known-and-open item about `gate` above the cap.
 
 ### Known and NOT fixed (pre-existing, found by the same cross-check)
 
@@ -98,10 +152,13 @@ a 5.243-file / 120-agent projection of it.
 - **Import scanning no longer walks the whole AST.** An import is a *statement*, so it can only
   appear inside a statement list — never inside an expression. Visiting only statement fields
   (in each node's own `_fields` order, so the breadth-first order is preserved) skips the bulk
-  of a Python AST. On a 5.024-file corpus the old `ast.walk` accounted for 26,9s of a 34,4s
-  index. Verified to return identical results to `ast.walk` on **13.800 real Python files** plus
-  hand-written `try/except*/match/async` edge cases. A source without the substring `import` is
-  now skipped without parsing at all (exact, not heuristic).
+  of a Python AST. Measured on ~2.000 real Python files, import collection costs **3,3s** with
+  `ast.walk` against **2,1s** here — of which 2,0s is `ast.parse` itself, unavoidable either way;
+  a full index of a 5.200-file Python-only tree drops from **11,1s to 6,9s**. (An earlier draft of
+  this entry claimed 26,9s of a 34,4s index; that figure was not reproducible and is withdrawn.)
+  Verified to return results identical to `ast.walk` on ~2.000 real Python files, and — since
+  0.9.3 — by a differential test in the suite covering every statement-nesting construct. A source
+  without the substring `import` is now skipped without parsing at all (exact, not heuristic).
 - **The project tree is walked once per build, not twice.** The freshness signature used to come
   from a separate `fast_signature()` pass before indexing; it is now produced by the build's own
   walk. About a second of duplicated `stat` on a 5.000-file tree. The ordering guarantee is

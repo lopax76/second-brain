@@ -1,7 +1,9 @@
-"""Persist the derived graph and manifest under ``<project>/.secondbrain/``.
+"""Persist the derived store under ``<project>/.secondbrain/``.
 
-The files are derived and regenerable; they never replace the project's own sources.
-Writes are atomic (temp file + ``os.replace``) so a crash can't leave a half-written graph.
+Five files: the graph, the content manifest, the cheap freshness signature, the build mode, and
+the per-file extraction cache. All of them are derived and regenerable; they never replace the
+project's own sources. Writes are atomic (temp file + ``os.replace``) so a crash can't leave a
+half-written graph.
 """
 
 from __future__ import annotations
@@ -65,7 +67,8 @@ def save(
         _atomic_write(
             d / "mode.json", json.dumps({"symbols": bool(symbols)}, indent=2)
         )
-    # Per-file raw extraction, keyed by the same content hash as the manifest: the next build
+    # Per-file raw extraction, keyed by a content digest up to the content-hash cap and by the
+    # precise size+mtime_ns signature above it (see extract.py): the next build
     # re-reads only the files whose hash moved. Purely derived — deleting it costs one full
     # rebuild and nothing else. Written compactly (no indent): on a 20k-file tree the pretty
     # form is several MB of pure whitespace.

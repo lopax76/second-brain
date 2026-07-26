@@ -23,6 +23,50 @@ def test_build_writes_store(tmp_path):
     assert (proj / ".secondbrain" / "manifest.json").is_file()
 
 
+def test_second_build_reports_reuse_and_full_forces_a_re_read(tmp_path, capsys):
+    """The incremental path and ``--full`` must be observable, not just implemented."""
+    proj = _project(tmp_path)
+
+    assert main(["build", str(proj)]) == 0
+    assert "reused:" not in capsys.readouterr().out  # nothing to reuse on a first build
+
+    assert main(["build", str(proj)]) == 0
+    assert "reused:" in capsys.readouterr().out
+
+    assert main(["build", str(proj), "--full"]) == 0
+    assert "reused:" not in capsys.readouterr().out  # --full really ignores the cache
+
+
+def test_build_that_cannot_persist_says_so_and_exits_nonzero(tmp_path, capsys, monkeypatch):
+    """A hook or CI must be able to tell that nothing was written without parsing prose."""
+    from second_brain import store
+
+    proj = _project(tmp_path)
+
+    def refuse(*_a, **_k):
+        raise OSError("read-only store")
+
+    monkeypatch.setattr(store, "save", refuse)
+    assert main(["build", str(proj)]) == 1
+    captured = capsys.readouterr()
+    assert "warning: could not write the store" in captured.err
+    assert "built '" in captured.out  # the graph is still reported
+
+
+def test_build_survives_a_report_that_cannot_be_written(tmp_path, capsys, monkeypatch):
+    from second_brain import report, store
+
+    proj = _project(tmp_path)
+
+    def refuse(*_a, **_k):
+        raise OSError("read-only store")
+
+    monkeypatch.setattr(store, "save", refuse)
+    monkeypatch.setattr(report, "write_report", refuse)
+    assert main(["build", str(proj)]) == 1  # no traceback escapes
+    assert "built '" in capsys.readouterr().out
+
+
 def test_gate_fails_on_broken_ref(tmp_path):
     proj = _project(tmp_path)
     main(["build", str(proj)])

@@ -27,8 +27,36 @@ def test_graphml_is_well_formed_xml():
 
 
 def test_graphml_deterministic():
-    g = _g()
-    assert to_graphml(g) == to_graphml(g)
+    """Two equivalent graphs built in OPPOSITE insertion order must export identically.
+
+    ``assert to_graphml(g) == to_graphml(g)`` was true of any pure function of its argument, so it
+    could not notice a dependency on insertion order — which is exactly what the module promises
+    to be free of ("nodes/edges sorted like graph.json, for clean diffs").
+    """
+    nodes = [
+        Node(id="a.py", type=NodeType.PROGRAM, label="a.py", path="a.py"),
+        Node(id="b.py", type=NodeType.PROGRAM, label="b & b", path="b.py"),
+        Node(id="c.py", type=NodeType.PROGRAM, label="c.py", path="c.py"),
+    ]
+    edges = [
+        Edge("a.py", "b.py", EdgeType.IMPORTS),
+        Edge("b.py", "c.py", EdgeType.IMPORTS),
+        Edge("a.py", "c.py", EdgeType.IMPORTS),
+    ]
+
+    ascending = Graph(project="proj & <x>")
+    for n in nodes:
+        ascending.add_node(n)
+    for e in edges:
+        ascending.add_edge(e)
+
+    descending = Graph(project="proj & <x>")
+    for n in reversed(nodes):
+        descending.add_node(n)
+    for e in reversed(edges):
+        descending.add_edge(e)
+
+    assert to_graphml(ascending) == to_graphml(descending)
 
 
 def test_export_cli_writes_file(tmp_path):

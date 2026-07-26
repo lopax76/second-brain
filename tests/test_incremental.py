@@ -100,11 +100,15 @@ def test_corrupt_cache_falls_back_to_a_correct_full_build(tmp_path):
 
 
 def test_cache_from_a_future_version_is_ignored(tmp_path):
+    import second_brain
+
     _seed(tmp_path)
     _incremental(tmp_path)
     p = tmp_path / ".secondbrain" / "extract.json"
     data = json.loads(p.read_text(encoding="utf-8"))
-    data["version"] = CACHE_VERSION + 1
+    # A well-formed identity from a FUTURE shape. Writing the bare integer `CACHE_VERSION + 1`
+    # only proved "a value of the wrong type is refused", since cache_id() is now a string.
+    data["version"] = f"{CACHE_VERSION + 1}-{second_brain.__version__}"
     p.write_text(json.dumps(data), encoding="utf-8")
     got, stats = _incremental(tmp_path)
     assert got == _full(tmp_path)
@@ -164,18 +168,25 @@ def test_large_file_same_size_same_second_is_not_served_from_cache(tmp_path):
     with, invisibly to ``gate`` (which recomputes the very same stamp).
     """
     filler = "x" * 1_100_000
-    (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
-    (tmp_path / "zeta.py").write_text("Z = 1\n", encoding="utf-8")
+    (tmp_path / "aaaa.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "zzzz.py").write_text("Z = 1\n", encoding="utf-8")
+    # Isometric targets, ASSERTED: with "alpha.py" vs "zeta.py" the two versions differed by one
+    # byte, so the size in the coarse stamp invalidated the cache on its own and this test proved
+    # nothing. Keep the assertion so the premise cannot go quietly false again.
+    v1 = f"[link](aaaa.py)\n{filler}"
+    v2 = f"[link](zzzz.py)\n{filler}"
+    assert len(v1) == len(v2)
+
     big = tmp_path / "big.md"
-    big.write_text(f"[link](alpha.py)\n{filler}", encoding="utf-8")
+    big.write_text(v1, encoding="utf-8")
     _incremental(tmp_path)
 
     # Same byte length, different target, written immediately (same whole second).
-    big.write_text(f"[link](zeta.py)\n{filler}", encoding="utf-8")
+    big.write_text(v2, encoding="utf-8")
     got, _ = _incremental(tmp_path)
     assert got == _full(tmp_path)
     assert any(
-        e["source"] == "big.md" and e["target"] == "zeta.py" for e in json.loads(got)["edges"]
+        e["source"] == "big.md" and e["target"] == "zzzz.py" for e in json.loads(got)["edges"]
     )
 
 
@@ -204,6 +215,47 @@ def test_a_drifted_store_heals_on_the_next_build(tmp_path):
     assert any(
         e["source"] == "doc.md" and e["target"] == "bravo.py" for e in json.loads(got)["edges"]
     )
+
+
+def test_a_change_between_reads_cannot_mislabel_the_cache(tmp_path, monkeypatch):
+    """The window a revert-between-builds can never reach.
+
+    0.9.2 took the digest and the findings from two separate reads, so a file rewritten in between
+    was stored as "digest of one version, findings of another". Because it then settled on the
+    version that had been digested, every later build matched the cache and served the wrong
+    findings — permanently, with ``gate`` green. Only exercising that window catches it: this test
+    passes on a single read and fails the moment a second one is reintroduced.
+    """
+    import second_brain.freshness as fr
+
+    for name in ("alpha", "bbbbb"):
+        (tmp_path / f"{name}.py").write_text("X = 1\n", encoding="utf-8")
+    doc = tmp_path / "doc.md"
+    v1, v2 = "[x](alpha.py)\n", "[x](bbbbb.py)\n"
+    assert len(v1) == len(v2)  # isometric on purpose: the manifest stamp must not rescue us
+
+    doc.write_text(v1, encoding="utf-8")
+    real_read = fr.read_bytes_capped
+    swapped: list[bool] = []
+
+    def read_then_swap(path):
+        data = real_read(path)
+        if path.name == "doc.md" and not swapped:
+            swapped.append(True)
+            doc.write_text(v2, encoding="utf-8")  # the file moves AFTER this read
+        return data
+
+    monkeypatch.setattr(fr, "read_bytes_capped", read_then_swap)
+    _incremental(tmp_path)
+    monkeypatch.undo()
+
+    assert swapped, "the window was never exercised — the test would prove nothing"
+    assert doc.read_text(encoding="utf-8") == v2
+
+    got, _ = _incremental(tmp_path)
+    assert got == _full(tmp_path)
+    got_again, _ = _incremental(tmp_path)
+    assert got_again == _full(tmp_path)  # and the disagreement is not permanent
 
 
 def test_reverting_a_file_serves_its_own_findings_not_the_other_version(tmp_path):
@@ -339,18 +391,21 @@ def test_deeply_nested_store_does_not_crash_the_build(tmp_path):
 def test_large_text_file_keeps_incremental_equal_to_full(tmp_path):
     """Files above the content-hash cap are keyed on the precise signature, not the coarse stamp."""
     filler = "y" * 2_000_000  # over the 1 MB hash cap, under the 5 MB read cap
-    (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
-    (tmp_path / "zeta.py").write_text("Z = 1\n", encoding="utf-8")
-    big = tmp_path / "big.md"
+    (tmp_path / "aaaa.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "zzzz.py").write_text("Z = 1\n", encoding="utf-8")
+    v1 = f"[l](aaaa.py)\n{filler}"
+    v2 = f"[l](zzzz.py)\n{filler}"
+    assert len(v1) == len(v2)  # see the note in the test above
 
-    big.write_text(f"[l](alpha.py)\n{filler}", encoding="utf-8")
+    big = tmp_path / "big.md"
+    big.write_text(v1, encoding="utf-8")
     _incremental(tmp_path)
-    big.write_text(f"[l](zeta.py)\n{filler}", encoding="utf-8")
+    big.write_text(v2, encoding="utf-8")
     got, _ = _incremental(tmp_path)
 
     assert got == _full(tmp_path)
     assert any(
-        e["source"] == "big.md" and e["target"] == "zeta.py" for e in json.loads(got)["edges"]
+        e["source"] == "big.md" and e["target"] == "zzzz.py" for e in json.loads(got)["edges"]
     )
 
 

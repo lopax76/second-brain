@@ -15,6 +15,9 @@ half-written graph.
 | `graph.json` | `build` | The graph itself (nodes + edges). The thing you consume. |
 | `manifest.json` | `build` | `{ "<relative/path>": "<content-hash>" }`, sorted. Powers the anti-drift gate's *stale* check — which files changed since the last build. |
 | `signature.json` | `build` | `{ "<relative/path>": "<size>:<mtime>" }`, sorted. A cheap stat-only signature that lets queries detect "did anything change?" without hashing, powering self-refreshing reads. |
+| `mode.json` | `build` | `{ "symbols": <bool> }`. The build mode, so a self-refresh rebuilds the same way even if the current graph happens to contain no symbol nodes. |
+| `extract.json` | `build` | The per-file extraction cache behind incremental indexing: raw imports, reference targets and symbol names, keyed per file and stamped with an identity of `<shape>-<SB version>`. Purely derived — deleting it costs one full rebuild, never correctness. Never contains file *contents*. |
+| `assessment.md` | `assess` | The before/after evaluation report: problems found and token savings. |
 | `view.html` | `view` | A self-contained **2D community-map** viewer with the graph data *and* the rendering library both inlined — a single file that works fully offline (see note below). |
 | `GRAPH_REPORT.md` | `build`, `report` | A read-only Markdown one-pager: scale + token cost, god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The artifact an assistant reads first. |
 

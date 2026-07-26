@@ -14,9 +14,11 @@ time**. That is what makes an incremental result byte-identical to a full rebuil
 the usual objection to incremental graph updates — a stale cross-file edge quietly surviving a
 partial update — does not apply here: no edge is ever carried over, only raw per-file findings.
 
-The cache lives in ``.secondbrain/extract.json``, is keyed by the same content hash the manifest
-already computes, and is derived data like everything else in the store: deleting it costs one
-full rebuild, never correctness.
+The cache lives in ``.secondbrain/extract.json``. Its key is the same content digest the manifest
+computes for files up to the content-hash cap, and the precise ``size:mtime_ns`` signature above
+it — where the manifest itself holds only a coarse stamp and re-reading a 50 MB file on every build
+just to key the cache would defeat the point. Like everything else in the store it is derived data:
+deleting it costs one full rebuild, never correctness.
 """
 
 from __future__ import annotations
@@ -52,10 +54,11 @@ def cache_id() -> str:
     from second_brain import __version__
     return f"{CACHE_VERSION}-{__version__}"
 
+# The file types extraction actually opens: code (imports) and docs (references). Kept here so
+# extraction is self-contained and the indexer no longer needs to know how to read a file.
 _JS_EXTS = {".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs"}
 _DOC_REF_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
-# Mirrors indexer._TEXT_EXTS for the file types we actually open; kept here so extraction is
-# self-contained and the indexer no longer needs to know how to read a file.
+# Hard read cap: above this a file is never opened, so it contributes no edges.
 _MAX_READ_BYTES = 5_000_000
 
 

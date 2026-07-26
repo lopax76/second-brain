@@ -32,8 +32,9 @@ re-searching files. That is slow, incomplete, and **burns tokens repeatedly** �
 gets worse as the project grows.
 
 Second Brain builds the project's graph and keeps it honest as the project changes — a
-content-hash **gate** flags exactly what drifted, and a rebuild is a fast full re-walk (outside
-the model, at near-zero token cost). The assistant **queries** it and gets compact answers; a
+content-hash **gate** flags exactly what drifted, and a rebuild re-reads only what changed
+(outside the model, at near-zero token cost; `--full` forces a complete re-read). The assistant
+**queries** it and gets compact answers; a
 human opens the **2D community map** and sees the whole project at a glance.
 
 It is **not a RAG system**: no embeddings, no vector store, no LLM needed to build the graph.
@@ -155,7 +156,12 @@ answers from a stale map (see *Always fresh* below).
 ```bash
 second-brain build .              # index the project -> .secondbrain/ (graph + GRAPH_REPORT.md)
 second-brain build . --symbols    # also index the Python symbol layer (functions/classes + calls)
+second-brain build . --full       # ignore the cached extraction and re-read every file
 second-brain gate .               # anti-drift check: broken refs, stale files, orphans (exit≠0 if drifted)
+```
+A rebuild re-reads only the files whose content changed. Use `--full` to reproduce a build from
+scratch, or if you have any reason to distrust the cache in `.secondbrain/extract.json`.
+```bash
 ```
 
 **Orient — read these first**
@@ -297,7 +303,7 @@ See [`docs/mcp.md`](docs/mcp.md) for the tools and their shapes.
    area membership. Operational nodes (decisions found in the docs, sessions from git commits)
    are added too.
 2. **Stay fresh** — content-hash diffing tells the **gate** exactly what changed since the last
-   build; a rebuild is a fast full re-walk (outside the model). Queries also **self-refresh**:
+   build, and a rebuild re-reads only those files (outside the model). Queries also **self-refresh**:
    they rebuild automatically when the project changed (uncommitted edits included), so an
    assistant never works from a stale map.
 3. **Query / view** — a human gets the 2D community map; an assistant queries the low-token layer,
@@ -360,7 +366,8 @@ Read-only on your sources, zero runtime dependencies, deterministic. Everything 
 | [`symbols.py`](second_brain/symbols.py) | Function/class signatures of a single Python file (the `symbols` command). |
 | [`freshness.py`](second_brain/freshness.py) | Content-hash manifest, cheap signature, and self-refreshing reads. |
 | [`gate.py`](second_brain/gate.py) | The anti-drift gate: broken refs / stale files / orphans. |
-| [`store.py`](second_brain/store.py) | Persists the derived store under `.secondbrain/` (graph, manifest, signature, mode). |
+| [`extract.py`](second_brain/extract.py) | Per-file raw extraction, cacheable between builds — the basis of incremental indexing. |
+| [`store.py`](second_brain/store.py) | Persists the derived store under `.secondbrain/` (graph, manifest, signature, mode, extraction cache). |
 | [`query.py`](second_brain/query.py) | Low-token query layer: `map` / `find` / `neighbors` / `subgraph` / `impact` (+ `impact --diff`) / `why` / `communities` / `focus` (BM25-seeded, optional symbol signatures). |
 | [`bm25.py`](second_brain/bm25.py) | Okapi BM25 lexical relevance (stdlib) — the task-to-file signal that seeds `focus`. |
 | [`budget.py`](second_brain/budget.py) | Token-cost estimate + budget-fit (stdlib) — the one place `focus` / `impact` count tokens. |
@@ -379,7 +386,9 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.9.0**. Working today: the typed graph; the anti-drift **gate**; **self-refreshing
+Beta — **v0.9.4**. Working today: the typed graph; the anti-drift **gate**; **incremental
+indexing** (a rebuild re-reads only the files whose content moved; `build --full` forces a
+complete re-read); **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
 community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` / `subgraph` /
 `impact` — **plus `--diff` for the blast radius of your uncommitted changes** — / **`why`**
@@ -388,8 +397,8 @@ community-map** viewer; the low-token query layer (`map` / `find` / `neighbors` 
 detection**; the **`GRAPH_REPORT.md`** one-pager; operational nodes (decisions/sessions); the opt-in
 **Python symbol call-graph** (`build --symbols`); **GraphML export**; configurable
 `.secondbrain.json` taxonomy **with per-file `type_overrides`** and opt-in **`respect_gitignore`**; **agent integration** (`agent install` + git `hook install`); and the
-optional **MCP server**. Next: a truly incremental build for very large graphs, richer
-reference-resolution, symbol layers for more languages, and an optional local semantic layer.
+optional **MCP server**. Next: richer reference-resolution, symbol layers for more languages, and
+an optional local semantic layer.
 
 ## What it deliberately is not
 

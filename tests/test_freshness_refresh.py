@@ -167,6 +167,39 @@ def test_no_false_fresh_when_file_appears_during_build(tmp_path, monkeypatch):
     assert "b.py" in g2.nodes  # not masked as fresh
 
 
+def test_signature_is_captured_before_any_content_is_read(tmp_path, monkeypatch):
+    """The ordering guarantee, hooked where it is actually observable.
+
+    ``index_cached`` and ``load_or_refresh`` both document it: the freshness signature is taken
+    before any file's contents are read, so a file appearing mid-build is missing from the stored
+    signature and the next query rebuilds (false-stale, safe) instead of staying false-fresh for
+    ever. The older test wrapped ``index_cached`` itself and created the file after it had fully
+    returned — after BOTH possible capture points — so it passed either way and proved nothing.
+    Hooking ``iter_files`` puts the new file between the walk and the reads, where the two orders
+    give opposite answers.
+    """
+    import second_brain.freshness as fr
+
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "0")  # never throttle the staleness check
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+
+    real_iter = fr.iter_files
+
+    def iter_then_create(root, patterns, git_rules=None):
+        rels = real_iter(root, patterns, git_rules)
+        (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # after the walk, before reads
+        return rels
+
+    fr.iter_files = iter_then_create
+    try:
+        fr.load_or_refresh(tmp_path)
+    finally:
+        fr.iter_files = real_iter
+
+    assert fr.is_stale(tmp_path) is True  # b.py is absent from the stored signature
+    assert "b.py" in fr.load_or_refresh(tmp_path).nodes
+
+
 def test_refresh_ttl_non_finite_does_not_freeze(monkeypatch):
     import second_brain.freshness as fr
     monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "inf")

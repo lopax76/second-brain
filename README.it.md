@@ -32,8 +32,9 @@ ri-cercando i file. È lento, incompleto e **brucia token ripetutamente** — e 
 il progetto cresce.
 
 Second Brain costruisce il grafo del progetto e lo mantiene onesto man mano che il progetto
-cambia — un **gate** per content-hash segnala esattamente cosa è andato fuori sync, e il rebuild è
-un re-walk completo veloce (fuori dal modello, a costo di token quasi nullo). L'assistente lo
+cambia — un **gate** per content-hash segnala esattamente cosa è andato fuori sync, e il rebuild
+rilegge solo ciò che è cambiato (fuori dal modello, a costo di token quasi nullo; `--full` forza la
+rilettura completa). L'assistente lo
 **interroga** e ottiene risposte compatte; una persona apre la **mappa 2D a community** e vede
 l'intero progetto a colpo d'occhio.
 
@@ -160,7 +161,12 @@ assistente non risponde mai da una mappa stantia (vedi *Sempre fresco* sotto).
 ```bash
 second-brain build .              # indicizza il progetto -> .secondbrain/ (grafo + GRAPH_REPORT.md)
 second-brain build . --symbols    # indicizza anche il layer simboli Python (funzioni/classi + calls)
+second-brain build . --full       # ignora l'estrazione in cache e rilegge tutti i file
 second-brain gate .               # check anti-deriva: ref rotte, file stantii, orfani (exit≠0 se derivato)
+```
+Un rebuild rilegge solo i file il cui contenuto è cambiato. Usa `--full` per riprodurre un build da
+zero, o se hai qualunque motivo per non fidarti della cache in `.secondbrain/extract.json`.
+```bash
 ```
 
 **Orientarsi — leggi questi per primi**
@@ -302,7 +308,7 @@ Vedi [`docs/mcp.md`](docs/mcp.md) per i tool e le forme dei dati.
    appartenenza ad area. Vengono aggiunti anche i nodi operativi (decisioni trovate nei documenti,
    sessioni dai commit git).
 2. **Stay fresh** — il diffing per content-hash dice al **gate** esattamente cosa è cambiato
-   dall'ultimo build; il rebuild è un re-walk completo veloce (fuori dal modello). Le query inoltre
+   dall'ultimo build, e il rebuild rilegge solo quei file (fuori dal modello). Le query inoltre
    si **auto-aggiornano**: ricostruiscono da sole quando il progetto è cambiato (modifiche non
    committate incluse), così un assistente non lavora mai su una mappa stantia.
 3. **Query / view** — una persona ottiene la mappa 2D a community; un assistente interroga il layer a
@@ -365,7 +371,8 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`symbols.py`](second_brain/symbols.py) | Firme funzioni/classi di un singolo file Python (comando `symbols`). |
 | [`freshness.py`](second_brain/freshness.py) | Manifest content-hash, firma leggera e query auto-aggiornanti. |
 | [`gate.py`](second_brain/gate.py) | Il gate anti-deriva: ref rotte / file stantii / orfani. |
-| [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode). |
+| [`extract.py`](second_brain/extract.py) | Estrazione grezza per-file, memorizzabile fra un build e l'altro — è la base dell'indicizzazione incrementale. |
+| [`store.py`](second_brain/store.py) | Persiste lo store derivato in `.secondbrain/` (graph, manifest, signature, mode, cache di estrazione). |
 | [`query.py`](second_brain/query.py) | Layer di query a basso costo: `map` / `find` / `neighbors` / `subgraph` / `impact` (+ `impact --diff`) / `why` / `communities` / `focus` (BM25, firme opzionali). |
 | [`bm25.py`](second_brain/bm25.py) | Rilevanza lessicale Okapi BM25 (stdlib) — il segnale task-file che innesca `focus`. |
 | [`budget.py`](second_brain/budget.py) | Stima costo-token + fit a budget (stdlib) — l'unico posto dove `focus` / `impact` contano i token. |
@@ -384,7 +391,9 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.9.0**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva; le **query
+Beta — **v0.9.4**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
+l'**indicizzazione incrementale** (un rebuild rilegge solo i file il cui contenuto è cambiato;
+`build --full` forza la rilettura completa); le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer
 **mappa 2D a community** offline; il layer di query a basso costo (`map` / `find` / `neighbors` /
 `subgraph` / `impact` — **più `--diff` per il raggio d'impatto delle tue modifiche non committate** —
@@ -393,9 +402,9 @@ recency** (`focus --recency` — segnale deterministico base-level da git, spent
 **rilevamento delle community**; il **`GRAPH_REPORT.md`** one-pager; i nodi operativi
 (decisioni/sessioni); il **call-graph dei simboli Python** opzionale (`build --symbols`); l'**export
 GraphML**; la tassonomia configurabile `.secondbrain.json` **con `type_overrides` per-file** e opt-in **`respect_gitignore`**; l'**integrazione con gli agent**
-(`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: un build
-davvero incrementale per grafi molto grandi, risoluzione dei riferimenti più ricca, layer di simboli
-per altri linguaggi e un layer semantico locale opzionale.
+(`agent install` + git `hook install`); e il **server MCP** opzionale. Prossimi passi: risoluzione
+dei riferimenti più ricca, layer di simboli per altri linguaggi e un layer semantico locale
+opzionale.
 
 ## Cosa NON è (per scelta)
 
