@@ -92,6 +92,14 @@ _NESTED_SOURCES = [
 
 @pytest.mark.parametrize("source", _NESTED_SOURCES)
 def test_python_imports_matches_a_full_ast_walk(source: str) -> None:
+    # Some constructs postdate the oldest supported interpreter (`except*` is 3.11+). On an older
+    # one the source simply does not parse, so there is nothing to compare: `python_imports` returns
+    # [] by contract and the reference walk cannot run at all. Skip rather than assert a tautology —
+    # and keep the source in the list, so it IS exercised on the versions that have the syntax.
+    try:
+        ast.parse(source)
+    except SyntaxError:
+        pytest.skip("construct not supported by this interpreter")
     assert python_imports(source) == _walk_imports(source)
 
 
