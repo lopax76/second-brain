@@ -1,4 +1,4 @@
-"""Render a single-file, offline graph viewer (vis-network) with data + library inlined.
+﻿"""Render a single-file, offline graph viewer (vis-network) with data + library inlined.
 
 The viewer is a self-contained HTML file: the graph data and the rendering library are both
 embedded, so it opens straight from disk with no local server, no CORS, and no sibling files to
@@ -6,7 +6,7 @@ lose — just double-click ``.secondbrain/view.html``. Fully offline: no CDN, no
 
 The interactive viewer (force-directed layout, community colouring, search, click-to-inspect
 panel with neighbour navigation, and per-community show/hide filters) is adapted from **Graphify**
-(https://github.com/safishamsi/graphify, MIT License, Copyright (c) 2026 Safi Shamsi). It renders
+(https://github.com/Graphify-Labs/graphify, MIT License, Copyright (c) 2026 Safi Shamsi). It renders
 with **vis-network** (Apache-2.0 OR MIT). Both are bundled offline; see THIRD_PARTY_NOTICES.md.
 With thanks to the Graphify project.
 """

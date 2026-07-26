@@ -1,4 +1,4 @@
-# Second Brain (SB)
+﻿# Second Brain (SB)
 
 [![CI](https://github.com/lopax76/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/lopax76/second-brain/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/second-brain-graph.svg)](https://pypi.org/project/second-brain-graph/)
@@ -60,7 +60,7 @@ purpose-built for one thing: **situational awareness at a very low token cost.**
 - **Offline graph viewer** — an interactive force-directed map (vis-network), coloured by
   community, with search, a click-to-inspect node panel with neighbour navigation, and a
   per-community show/hide legend. Data and library are inlined in one HTML file, so it works fully
-  offline. The viewer is **adapted from [Graphify](https://github.com/safishamsi/graphify)** (MIT)
+  offline. The viewer is **adapted from [Graphify](https://github.com/Graphify-Labs/graphify)** (MIT)
   — see [References & sources](#references--sources).
 - **Importance ranking (PageRank)** — "god nodes" are ranked by *structural importance* (the files
   the important files depend on), not raw link count — a pure-Python, deterministic implementation.
@@ -428,7 +428,7 @@ zero-deps, low-token, deterministic). Security reports: [SECURITY.md](SECURITY.m
 
 **Built on / adapted from**
 
-- **[Graphify](https://github.com/safishamsi/graphify)** by Safi Shamsi (MIT) — the interactive
+- **[Graphify](https://github.com/Graphify-Labs/graphify)** by Safi Shamsi (MIT) — the interactive
   graph viewer is modelled on Graphify's viewer; with thanks.
 - **[vis-network](https://github.com/visjs/vis-network)** (Apache-2.0 OR MIT) — the rendering
   library, bundled offline. Full license texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
