@@ -16,6 +16,43 @@ def _one_node_graph(node_id: str) -> Graph:
     return g
 
 
+def test_an_incoherent_store_is_refused_not_served(tmp_path):
+    """Two overlapping builds can leave one build's graph beside another's manifest+signature.
+
+    Every file is written atomically, but nothing bound the *set* together, so the surviving
+    combination could describe the project correctly in the manifest and signature — the two things
+    `gate` and `is_stale` consult — while the graph itself was stale. Nothing looked wrong and no
+    rebuild fixed it. The stamp makes such a set detectable, and a detected one is refused.
+    """
+    store.save(tmp_path, _one_node_graph("old.py"), {"a": "1"},
+               signature={"a": "1:1"}, symbols=False)
+    graph_text = (tmp_path / ".secondbrain" / "graph.json").read_text(encoding="utf-8")
+
+    # Build B lands its manifest and signature; build A's graph is what survives.
+    store.save(tmp_path, _one_node_graph("new.py"), {"a": "2"},
+               signature={"a": "2:2"}, symbols=False)
+    (tmp_path / ".secondbrain" / "graph.json").write_text(graph_text, encoding="utf-8")
+
+    assert store.is_coherent(tmp_path) is False
+    assert store.load_graph(tmp_path) is None  # refused -> the caller rebuilds
+
+
+def test_a_coherent_store_is_served(tmp_path):
+    store.save(tmp_path, _one_node_graph("a.py"), {"a": "1"},
+               signature={"a": "1:1"}, symbols=False)
+    assert store.is_coherent(tmp_path) is True
+    g = store.load_graph(tmp_path)
+    assert g is not None and "a.py" in g.nodes
+
+
+def test_a_store_written_before_stamps_is_still_accepted(tmp_path):
+    """Absence of a stamp is not evidence of incoherence — it is an older store."""
+    store.save(tmp_path, _one_node_graph("a.py"), {}, signature={}, symbols=False)
+    (tmp_path / ".secondbrain" / store.STAMP_NAME).unlink()
+    assert store.is_coherent(tmp_path) is True
+    assert store.load_graph(tmp_path) is not None
+
+
 def test_a_failed_write_leaves_the_previous_store_intact(tmp_path, monkeypatch):
     """The atomicity the module docstring promises, made observable without a real crash.
 

@@ -11,8 +11,11 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample_project"
 
 
 def _project(tmp_path) -> Path:
+    # Skip any .secondbrain left in the fixture by an earlier run: copying it in would hand the
+    # "first" build a warm cache and an existing graph, making these tests depend on what ran
+    # before them. (The directory is gitignored, so it never reaches the repository.)
     proj = tmp_path / "proj"
-    shutil.copytree(FIXTURE, proj)
+    shutil.copytree(FIXTURE, proj, ignore=shutil.ignore_patterns(".secondbrain"))
     return proj
 
 

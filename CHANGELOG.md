@@ -4,6 +4,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.5] - 2026-07-26
+
+The four defects 0.9.4 listed as *known and not fixed*. Three are closed; the fourth is reduced
+and, where an irreducible residue remains, now **declared** instead of implied.
+
+### Fixed
+
+- **Two overlapping builds can no longer leave an incoherent store.** Each file was written
+  atomically, but nothing bound the *set*: the survivors could be one build's `graph.json` beside
+  another's `manifest.json` and `signature.json` — correct in everything `gate` and `is_stale`
+  consult, stale in the thing actually served. Nothing looked wrong, so no rebuild ever fixed it.
+  `save` now ends by writing `stamp.json`, the digests of those three files together; `load_graph`
+  verifies it and refuses a set that never came from a single build, which costs a rebuild instead
+  of going quietly wrong. A store written before stamps existed has none and is still accepted —
+  absence of a stamp is not evidence of incoherence.
+- **Editing `.secondbrain.json` now counts as the project changing.** SB's own config files are
+  excluded from the walk, so they were absent from the signature — yet the graph depends on them:
+  `classify` decides node types and `respect_gitignore` decides which files exist at all. Changing
+  the `classify` block left a stale graph reporting itself fresh, with `gate` green, for every
+  subsequent query. Both config files are now digested into the signature under `:config:` keys.
+- **A momentarily unreadable file no longer loses its edges for good.** A file held open
+  exclusively (an editor, Excel, an antivirus, a log writer) was *omitted* from the signature — and
+  so was omitted from a fresh one too, so the two agreed and nothing ever retried it. It is now
+  recorded as `!unreadable`, which matches no real value: the file is re-read as soon as it can be,
+  and while it stays locked there is no rebuild thrashing either.
+
+### Changed
+
+- **Above the content-hash cap the stamp uses `st_mtime_ns`, not whole seconds.** Two different
+  contents of the same length written inside one second used to produce the *same* manifest value,
+  so `gate` — which recomputes exactly that value — reported clean over a changed file. Free to fix,
+  and it removes that collision entirely.
+- **`gate` now names the files it could only check by size+mtime.** Above the cap no bytes are read,
+  by design, so "clean" is a weaker statement for those files than for every other one. A
+  replacement that preserves size *and* exact mtime (`cp -p`, `tar -x`, a restore, a coarse-grained
+  filesystem) remains invisible to any stat-based check — that residue is real and is the reason
+  this is reported rather than claimed fixed.
+- `tests/test_cli.py` no longer copies a `.secondbrain` left in the fixture by an earlier run, which
+  had been handing the "first" build a warm cache and making those tests order-dependent.
+
 ## [0.9.4] - 2026-07-26
 
 A cross-check aimed squarely at test quality — sabotage the code, see whether anything fails —
@@ -101,7 +141,7 @@ scales. 325 tests, ruff clean.
   the same evidence `is_stale` already trusts to decide whether to rebuild at all, and no weaker
   than the known-and-open item about `gate` above the cap.
 
-### Known and NOT fixed (pre-existing, found by the same cross-check)
+### Known and NOT fixed (pre-existing, found by the same cross-check) — **all addressed in 0.9.5**
 
 - **Two overlapping builds can leave `graph.json` from one and `manifest.json`/`signature.json`
   from the other.** `store.save` writes each file atomically but takes no lock across them, so the

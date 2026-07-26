@@ -88,7 +88,12 @@ def _hash_rel(root: Path, rel: str) -> str | None:
             return file_hash(p, normalize_newlines=True)
         except OSError:
             return None
-    return f"s{st.st_size}:m{int(st.st_mtime)}"
+    # Nanoseconds, not whole seconds. With `m{int(st.st_mtime)}` two different contents of the same
+    # length written inside one second produced the SAME stamp, so `gate` — which recomputes this
+    # very value — reported clean over a changed file. st_mtime_ns costs nothing extra and removes
+    # that collision; what remains is a replacement that preserves size AND exact mtime (cp -p,
+    # tar -x, a restore), which no stat-based check can see. Callers are told: see gate's report.
+    return f"s{st.st_size}:m{st.st_mtime_ns}"
 
 
 def build_manifest(root: str | os.PathLike[str]) -> dict[str, str]:
@@ -117,6 +122,34 @@ def _digest_bytes(data: bytes) -> str:
 def _hashes_content(rel: str, size: int) -> bool:
     """Whether :func:`_hash_rel` would produce a real content digest for this file."""
     return _ext(rel) in _TEXT_HASH_EXTS and size <= _CONTENT_HASH_CAP
+
+
+# SB's own configuration files. They are excluded from the walk (DEFAULT_IGNORE_FILES), so they
+# never appeared in the signature — yet the graph depends on them: the `classify` block decides
+# node types, and `respect_gitignore` decides which files exist at all. Editing `.secondbrain.json`
+# therefore left a stale graph that reported itself fresh, with `gate` green, for ever. The keys are
+# prefixed with ':' so they cannot collide with a relative path.
+_CONFIG_INPUTS = (".secondbrain.json", ".secondbrainignore")
+
+# Recorded in the signature for a file that exists but could not be read this time round — a file
+# held open exclusively by an editor, by Excel, by an antivirus, by a log writer. Both the stored
+# signature and a fresh one use it, so a file that STAYS unreadable does not cause endless
+# rebuilding; but the moment it becomes readable the two differ and the build is retried. Omitting
+# it, as before, made both sides agree on nothing and the lost edges stuck for good.
+UNREADABLE = "!unreadable"
+
+
+def config_signature(root: str | os.PathLike[str]) -> dict[str, str]:
+    """Digest SB's own config files, so changing one counts as the project changing."""
+    root_p = Path(root)
+    out: dict[str, str] = {}
+    for name in _CONFIG_INPUTS:
+        p = root_p / name
+        try:
+            out[f":config:{name}"] = file_hash(p, normalize_newlines=True) if p.is_file() else "-"
+        except OSError:
+            out[f":config:{name}"] = "?"  # unreadable: never matches, so it re-checks next time
+    return out
 
 
 @dataclass
@@ -169,7 +202,8 @@ def index_cached(
     cached = store.load_extract(root_p) if incremental else {}
 
     # 1. One stat per file: it produces the freshness signature and the sizes used below.
-    signature: dict[str, str] = {}
+    #    Seeded with SB's own config files, which the walk excludes but the graph depends on.
+    signature: dict[str, str] = dict(config_signature(root_p))
     sizes: dict[str, int] = {}
     present: list[str] = []
     for rel in rels:
@@ -186,6 +220,7 @@ def index_cached(
             # os.path.lexists answers this without following the link.
             if os.path.lexists(path):
                 present.append(rel)
+                signature[rel] = UNREADABLE  # retried as soon as it can be stat'ed again
             continue
         signature[rel] = f"{st.st_size}:{st.st_mtime_ns}"
         sizes[rel] = st.st_size
@@ -232,10 +267,14 @@ def index_cached(
             # needed, the parse.
             data = read_bytes_capped(root_p / rel)
             if data is None:
+                # Stat worked but the read did not: a locked file. Its edges are missing from this
+                # build, so do not let the signature call it settled — otherwise the loss is
+                # permanent and invisible.
                 hashed += 1
                 hv = _hash_rel(root_p, rel)
                 if hv is not None:
                     manifest[rel] = hv
+                signature[rel] = UNREADABLE
                 continue
             hashed += 1
             key: str | None = _digest_bytes(data)
@@ -326,11 +365,12 @@ def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     """
     root_p = Path(root).resolve()
     rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
-    out: dict[str, str] = {}
+    out: dict[str, str] = dict(config_signature(root_p))
     for rel in rels:
         try:
             st = (root_p / rel).stat()
         except OSError:
+            out[rel] = UNREADABLE
             continue
         out[rel] = f"{st.st_size}:{st.st_mtime_ns}"
     return out

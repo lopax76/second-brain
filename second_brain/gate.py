@@ -24,6 +24,11 @@ class GateReport:
         default_factory=lambda: {"added": [], "removed": [], "changed": []}
     )
     orphans: list[str] = field(default_factory=list)
+    # Files the manifest could only compare by size+mtime, never by content: above
+    # ``_CONTENT_HASH_CAP`` (or not a text type) no bytes are read, by design, so data-heavy
+    # projects stay cheap. For these, "clean" means "the stamp did not move" — weaker than for
+    # every other file, and previously not said out loud anywhere.
+    stamp_only: list[str] = field(default_factory=list)
 
     @property
     def stale_count(self) -> int:
@@ -41,6 +46,12 @@ class GateReport:
             f"stale files: {self.stale_count} (+{len(added)} / -{len(removed)} / ~{len(changed)})",
             f"orphans: {len(self.orphans)} (info)",
         ]
+        if self.stamp_only:
+            lines.append(
+                f"checked by size+mtime only, not by content: {len(self.stamp_only)} (info)"
+            )
+            for rel in self.stamp_only[:5]:
+                lines.append(f"  [stamp-only] {rel}")
         for src, tgt in self.broken[:20]:
             lines.append(f"  [broken] {src} -> {tgt}")
         return "\n".join(lines)
@@ -82,4 +93,12 @@ def evaluate(
         if old_manifest is not None
         else {"added": [], "removed": [], "changed": []}
     )
-    return GateReport(broken=find_broken(graph), stale=stale, orphans=find_orphans(graph))
+    # A manifest value shaped "s<size>:m<mtime>" is a stat stamp, not a content digest: say so.
+    stamp_only = sorted(
+        rel for rel, v in new_manifest.items()
+        if isinstance(v, str) and v.startswith("s") and ":m" in v
+    )
+    return GateReport(
+        broken=find_broken(graph), stale=stale, orphans=find_orphans(graph),
+        stamp_only=stamp_only,
+    )

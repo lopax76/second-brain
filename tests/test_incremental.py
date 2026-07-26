@@ -335,8 +335,13 @@ def test_an_entry_that_exists_but_cannot_be_stat_ed_stays_a_node(tmp_path):
     finally:
         pathlib.Path.stat = real_stat
 
+    from second_brain.freshness import UNREADABLE
+
     assert "AGENTS.md" in res.graph.nodes  # still a node...
-    assert "AGENTS.md" not in res.signature  # ...but nothing was learned about its content
+    # ...and the signature records that it could not be read, rather than omitting it. Omitting it
+    # made a fresh signature agree with the stored one (both silent), so the lost edges stuck for
+    # good; the sentinel differs from any real value, so the file is retried once it can be read.
+    assert res.signature["AGENTS.md"] == UNREADABLE
     doc = res.graph.nodes["doc.md"]
     assert "broken_refs" not in doc.meta  # so the reference to it still resolves
 
@@ -407,6 +412,77 @@ def test_large_text_file_keeps_incremental_equal_to_full(tmp_path):
     assert any(
         e["source"] == "big.md" and e["target"] == "zzzz.py" for e in json.loads(got)["edges"]
     )
+
+
+def test_changing_secondbrain_json_makes_the_project_stale(tmp_path, monkeypatch):
+    """SB's own config is an input to the graph, so it belongs in the freshness signature.
+
+    ``.secondbrain.json`` is excluded from the walk, so editing it used to leave a stale graph that
+    reported itself fresh — `is_stale` False, `gate` green — for every subsequent query.
+    """
+    import second_brain.freshness as fr
+    from second_brain.model import NodeType
+
+    monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "0")
+    (tmp_path / "note.md").write_text("# note\n", encoding="utf-8")
+    first = fr.load_or_refresh(tmp_path)
+    assert first.nodes["note.md"].type is not NodeType.DECISION
+
+    (tmp_path / ".secondbrain.json").write_text(
+        '{"classify": {"type_overrides": {"note.md": "decision"}}}', encoding="utf-8"
+    )
+    assert fr.is_stale(tmp_path) is True
+    assert fr.load_or_refresh(tmp_path).nodes["note.md"].type is NodeType.DECISION
+
+
+def test_an_unreadable_file_is_retried_once_it_can_be_read(tmp_path):
+    """A momentary lock must not cost a file its edges permanently.
+
+    Both a stored and a fresh signature used to omit an unreadable file, so they agreed and nothing
+    ever retried it: its edges were gone for good. The sentinel differs from any real value.
+    """
+    import pathlib
+
+    import second_brain.freshness as fr
+
+    (tmp_path / "doc.md").write_text("[a](target.md)\n", encoding="utf-8")
+    (tmp_path / "target.md").write_text("# t\n", encoding="utf-8")
+
+    real_read = pathlib.Path.read_bytes
+
+    def refuse_doc(self, *a, **k):
+        if self.name == "doc.md":
+            raise OSError("locked by another process")
+        return real_read(self, *a, **k)
+
+    pathlib.Path.read_bytes = refuse_doc
+    try:
+        locked = index_cached(tmp_path, operational=False)
+    finally:
+        pathlib.Path.read_bytes = real_read
+
+    assert locked.signature["doc.md"] == fr.UNREADABLE
+    assert not any(e.source == "doc.md" and e.target == "target.md" for e in locked.graph.edges)
+
+    # Now readable: the sentinel no longer matches, so the file is re-read and its edge comes back.
+    recovered = index_cached(tmp_path, operational=False)
+    assert recovered.signature["doc.md"] != fr.UNREADABLE
+    assert any(e.source == "doc.md" and e.target == "target.md" for e in recovered.graph.edges)
+
+
+def test_gate_declares_which_files_it_could_only_check_by_stamp(tmp_path):
+    """Above the content-hash cap `gate` compares a stat stamp, not content. It must say so."""
+    from second_brain import gate
+    from second_brain.freshness import build_manifest
+
+    (tmp_path / "small.md") .write_text("# s\n", encoding="utf-8")
+    (tmp_path / "big.md").write_text("y" * 1_200_000, encoding="utf-8")
+    res = index_cached(tmp_path, operational=False)
+    rep = gate.evaluate(res.graph, res.manifest, build_manifest(tmp_path))
+
+    assert "big.md" in rep.stamp_only
+    assert "small.md" not in rep.stamp_only
+    assert "size+mtime only" in rep.summary()
 
 
 def test_full_flag_ignores_the_cache(tmp_path):
