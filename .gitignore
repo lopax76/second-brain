@@ -19,6 +19,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Local state of the RoundTable tool (includes a store.sqlite): machine-specific, never published.
+.roundtable/
+
 # Internal / personal (kept locally, never published)
 PROGETTO.md
 docs/SB-design-brief.md
