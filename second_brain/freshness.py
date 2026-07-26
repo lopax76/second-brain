@@ -16,7 +16,13 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from second_brain.extract import CachedExtract, FileExtract, extract_file, is_extractable
+from second_brain.extract import (
+    CachedExtract,
+    FileExtract,
+    extract_text,
+    is_extractable,
+    read_bytes_capped,
+)
 from second_brain.ignore import load_ignore_patterns
 from second_brain.indexer import build_graph, gitignore_rules_for, iter_files
 from second_brain.model import Graph, NodeType
@@ -106,31 +112,20 @@ def _stat_sig(root: Path, rel: str) -> str | None:
     return f"{st.st_size}:{st.st_mtime_ns}"
 
 
-def _is_content_hash(value: str) -> bool:
-    """True if a manifest value is a real content digest rather than a size+mtime stamp.
+def _digest_bytes(data: bytes) -> str:
+    """Digest raw bytes exactly as :func:`file_hash` would with ``normalize_newlines=True``.
 
-    :func:`_hash_rel` returns a BLAKE2b hex digest for text up to ``_CONTENT_HASH_CAP`` and the
-    fallback ``s<size>:m<seconds>`` stamp otherwise; only the stamp contains ``:``.
+    Same algorithm, same normalization — so a digest taken from bytes already in hand is
+    interchangeable with the manifest value :func:`_hash_rel` computes for the same file.
     """
-    return ":" not in value
+    h = hashlib.blake2b(digest_size=16)
+    h.update(data.replace(b"\r\n", b"\n").replace(b"\r", b"\n"))
+    return h.hexdigest()
 
 
-def _content_key(root: Path, rel: str, manifest_value: str | None) -> str | None:
-    """A key that changes whenever this file's CONTENT changes — what the cache must key on.
-
-    The manifest value qualifies for text files up to the content-hash cap. Above it the manifest
-    holds ``size + whole-second mtime``, and **two different contents can share that stamp**: edit
-    a large file to the same length within the same second and the stamp does not move. Keying the
-    extraction cache on it made a rebuild reuse a stale extraction — a graph that no longer matched
-    a from-scratch build, with ``gate`` unable to see it (the same stamp is what gate recomputes).
-    So large files get a real digest here. They are few, and only extractable ones reach this.
-    """
-    if manifest_value is not None and _is_content_hash(manifest_value):
-        return manifest_value  # already a content digest: free
-    try:
-        return file_hash(root / rel, normalize_newlines=True)
-    except OSError:
-        return None
+def _hashes_content(rel: str, size: int) -> bool:
+    """Whether :func:`_hash_rel` would produce a real content digest for this file."""
+    return _ext(rel) in _TEXT_HASH_EXTS and size <= _CONTENT_HASH_CAP
 
 
 @dataclass
@@ -163,10 +158,10 @@ def index_cached(
     the stored signature, so the next query sees a mismatch and rebuilds (false-stale, safe).
 
     Exactly one thing is reused, and only against fresh evidence: the **extraction** (imports,
-    reference targets, symbols) of a file whose *content digest* still matches the one it was
-    taken from. The manifest is recomputed from the files every time — it is what ``gate``
-    compares against, so it has to be evidence rather than memory, and a rebuild has to be able
-    to heal a store that drifted rather than re-confirm it.
+    reference targets, symbols) of a file whose key still matches the one it was stored under —
+    a content digest taken from the very bytes the findings came from. The manifest is recomputed
+    from the files every time: it is what ``gate`` compares against, so it has to be evidence
+    rather than memory, and a rebuild has to be able to heal a drifted store, not re-confirm it.
 
     Resolution is never reused: :func:`build_graph` re-resolves every reference in the project on
     every call, so adding or deleting a file still updates every other file's edges. That is what
@@ -181,51 +176,106 @@ def index_cached(
     from second_brain import store
     cached = store.load_extract(root_p) if incremental else {}
 
-    # 1. One stat per file: it produces the freshness signature AND decides what to re-hash.
+    # 1. One stat per file: it produces the freshness signature and the sizes used below.
     signature: dict[str, str] = {}
+    sizes: dict[str, int] = {}
+    present: list[str] = []
     for rel in rels:
-        sig = _stat_sig(root_p, rel)
-        if sig is not None:
-            signature[rel] = sig
+        path = root_p / rel
+        try:
+            st = path.stat()
+        except OSError:
+            # Cannot stat. Two very different reasons, and they must not be conflated:
+            #   * the entry is GONE (deleted between the walk and now) -> it must not become a node;
+            #   * the entry EXISTS but cannot be followed — a dangling symlink, which is exactly
+            #     what a git clone of a symlinked AGENTS.md/CLAUDE.md leaves on Windows, or a file
+            #     momentarily locked. Those are real directory entries that other documents link
+            #     to, and dropping them would silently turn those links into broken references.
+            # os.path.lexists answers this without following the link.
+            if os.path.lexists(path):
+                present.append(rel)
+            continue
+        signature[rel] = f"{st.st_size}:{st.st_mtime_ns}"
+        sizes[rel] = st.st_size
+        present.append(rel)
+    # A file listed by the walk but gone by now must not become a node: it used to stay in the
+    # graph with its edges while being absent from both signature and manifest, so the next walk
+    # could not notice it and `gate` stayed green over a phantom that never went away.
+    rels = present
 
-    # 2. Manifest: always recomputed from the files themselves, never carried over.
-    #    An earlier version of this reused the stored hash when size+mtime had not moved. It made
-    #    the store able to hold a hash that did not match the file, and — worse — the state was
-    #    SELF-PERPETUATING: the stale hash validated the stale cache entry, which produced the same
-    #    stale hash again, so `gate` reported drift while every rebuild kept reproducing it. Only
-    #    `--full` broke the loop. The manifest is what `gate` compares against, so it must be
-    #    evidence, not memory; a rebuild has to be able to heal the store, not re-confirm it.
+    # 2 + 3. Manifest and extraction, from a SINGLE read per extractable file.
+    #
+    # These used to be two passes: hash everything, then open the files that changed. That meant
+    # the digest and the extraction came from two different reads at two different instants, and a
+    # file edited in between got stored as "digest of version X, findings of version Y". When the
+    # file then settled on X — the common case, because the digest pass ran first — every later
+    # build recomputed X, matched the cache, and served Y's findings again. Permanently, with
+    # `gate` green: gate compares digests with digests, and those agreed.
+    #
+    # Now the bytes are read once and both the digest and the findings come from *those* bytes, so
+    # a mislabelled entry is not merely unlikely, it is unrepresentable.
     manifest: dict[str, str] = {}
-    hashed = 0
-    for rel in rels:
-        hashed += 1
-        hv = _hash_rel(root_p, rel)
-        if hv is not None:
-            manifest[rel] = hv
-
-    # 3. Extraction: re-read only files whose content hash moved. A cache entry taken WITHOUT the
-    #    symbol layer cannot serve a --symbols build, so it is re-extracted; the reverse is fine.
     extracts: dict[str, FileExtract] = {}
     fresh_cache: dict[str, CachedExtract] = {}
-    extracted = reused = 0
+    hashed = extracted = reused = 0
+
     for rel in rels:
-        if not is_extractable(rel):
-            continue  # never opened by the indexer: nothing to extract, nothing to cache
-        hv = _content_key(root_p, rel, manifest.get(rel))
+        # 0 for an entry that exists but could not be stat'ed (dangling symlink, locked file):
+        # the reads below then fail too, so it stays a node with no size and no edges — which is
+        # exactly what a from-scratch build produces for it.
+        size = sizes.get(rel, 0)
+        extractable = is_extractable(rel)
+
+        if not extractable:
+            hashed += 1
+            hv = _hash_rel(root_p, rel)  # never opens data/binaries: stat-only stamp
+            if hv is not None:
+                manifest[rel] = hv
+            continue
+
         entry = cached.get(rel)
+        data: bytes | None = None
+        if _hashes_content(rel, size):
+            # Text within the cap: one read serves the manifest digest, the cache key and, if
+            # needed, the parse.
+            data = read_bytes_capped(root_p / rel)
+            if data is None:
+                hashed += 1
+                hv = _hash_rel(root_p, rel)
+                if hv is not None:
+                    manifest[rel] = hv
+                continue
+            hashed += 1
+            key: str | None = _digest_bytes(data)
+            manifest[rel] = key
+        else:
+            # Above the cap the manifest is a coarse stamp by design ("no bytes are read", so
+            # data-heavy projects stay cheap). Re-reading a 50 MB log on every build just to key
+            # the cache would throw that away, so the key is the PRECISE size+mtime_ns signature
+            # instead — exactly the evidence `is_stale` already trusts to decide whether to
+            # rebuild at all, and unaffected by the same-second collision the coarse stamp has.
+            hashed += 1
+            hv = _hash_rel(root_p, rel)
+            if hv is not None:
+                manifest[rel] = hv
+            key = signature.get(rel)
+
         fe: FileExtract | None = None
-        if entry is not None and hv is not None and entry.hash == hv:
+        if entry is not None and key is not None and entry.hash == key:
             if entry.data.has_symbols or not symbols:
                 fe = entry.data
                 reused += 1
         if fe is None:
             extracted += 1
-            fe = extract_file(root_p, rel, symbols=symbols)
+            if data is None:
+                data = read_bytes_capped(root_p / rel)
+            if data is not None:
+                fe = extract_text(rel, data.decode("utf-8", errors="ignore"), symbols=symbols)
         if fe is None:
             continue
         extracts[rel] = fe
-        if hv is not None:
-            fresh_cache[rel] = CachedExtract(hash=hv, data=fe)
+        if key is not None:
+            fresh_cache[rel] = CachedExtract(hash=key, data=fe)
 
     if stats is not None:
         stats.update({"files": len(rels), "hashed": hashed,

@@ -31,12 +31,26 @@ from second_brain.pysymbols import Def
 from second_brain.pysymbols import extract as extract_symbol_calls
 from second_brain.references import extract_references_tagged
 
-__all__ = ["CACHE_VERSION", "FileExtract", "extract_file", "is_extractable",
-           "cache_to_json", "cache_from_json"]
+__all__ = ["CACHE_VERSION", "cache_id", "FileExtract", "extract_file", "extract_text",
+           "read_bytes_capped", "is_extractable", "cache_to_json", "cache_from_json"]
 
-# Bumped whenever the shape or the meaning of an extraction changes. A stored cache with a
-# different version is ignored (one full rebuild), never mis-read.
-CACHE_VERSION = 1
+# Bumped when the SHAPE of a stored entry changes. It deliberately does not try to describe the
+# *meaning* of an extraction: see cache_id().
+CACHE_VERSION = 2
+
+
+def cache_id() -> str:
+    """Identity a stored cache must match to be reusable: shape version + SB version.
+
+    Keying an entry on the file's content alone says what was read, never **who read it** — so a
+    release that changes what an extractor finds (this one rewrote ``python_imports``) would serve
+    the old findings forever for every file already cached, with ``gate`` green, if whoever wrote
+    the release forgot to bump a hand-maintained constant. Binding the identity to
+    ``second_brain.__version__`` removes the need to remember: any released change invalidates the
+    cache, and the cost of being wrong is one full rebuild.
+    """
+    from second_brain import __version__
+    return f"{CACHE_VERSION}-{__version__}"
 
 _JS_EXTS = {".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs"}
 _DOC_REF_EXTS = {".md", ".markdown", ".rst", ".txt", ".html", ".htm"}
@@ -112,26 +126,24 @@ class CachedExtract:
     data: FileExtract = field(default_factory=FileExtract)
 
 
-def _read_text(path: Path) -> str | None:
+def read_bytes_capped(path: Path) -> bytes | None:
+    """Read a file whole, or ``None`` if it is too large / unreadable.
+
+    Returns raw bytes rather than text so a caller can both digest and decode **the same bytes**.
+    Deciding the size cap from the bytes actually read (not from a separate ``stat``) is what keeps
+    the digest and the extraction describing the same thing: a cap checked against a raw ``stat``
+    while the digest was taken over newline-normalized bytes compared two different quantities, so
+    one digest could match both a file that gets extracted and a file that gets refused.
+    """
     try:
-        if path.stat().st_size > _MAX_READ_BYTES:
-            return None
-        return path.read_text(encoding="utf-8", errors="ignore")
+        data = path.read_bytes()
     except OSError:
         return None
+    return None if len(data) > _MAX_READ_BYTES else data
 
 
-def extract_file(root: Path, rel: str, *, symbols: bool = False) -> FileExtract | None:
-    """Read one file and return its raw findings, or ``None`` if it is not extractable/readable.
-
-    ``None`` means "produces no edges and was not opened" — the caller stores nothing for it.
-    """
-    if not is_extractable(rel):
-        return None
-    text = _read_text(root / rel)
-    if text is None:
-        return None
-
+def extract_text(rel: str, text: str, *, symbols: bool = False) -> FileExtract:
+    """Pull the raw findings out of already-read text. No I/O: the caller owns the read."""
     ext = _ext(rel)
     fe = FileExtract(has_symbols=symbols)
     if ext == ".py":
@@ -147,17 +159,86 @@ def extract_file(root: Path, rel: str, *, symbols: bool = False) -> FileExtract 
     return fe
 
 
+def extract_file(root: Path, rel: str, *, symbols: bool = False) -> FileExtract | None:
+    """Read one file and return its raw findings, or ``None`` if not extractable/readable.
+
+    ``None`` means "produces no edges and was not opened" — the caller stores nothing for it.
+    """
+    if not is_extractable(rel):
+        return None
+    data = read_bytes_capped(root / rel)
+    if data is None:
+        return None
+    return extract_text(rel, data.decode("utf-8", errors="ignore"), symbols=symbols)
+
+
 def cache_to_json(cache: dict[str, CachedExtract]) -> dict[str, Any]:
-    """Serialize the whole cache (version-stamped)."""
+    """Serialize the whole cache (identity-stamped)."""
     return {
-        "version": CACHE_VERSION,
+        "version": cache_id(),
         "files": {rel: {"h": ce.hash, **ce.data.to_json()} for rel, ce in sorted(cache.items())},
     }
 
 
+def _str_pairs(value: Any, width: int) -> list[list[str]] | None:
+    """Validate a list of fixed-width string rows; ``None`` if anything is off."""
+    if not isinstance(value, list):
+        return None
+    out: list[list[str]] = []
+    for row in value:
+        if not isinstance(row, list) or len(row) != width:
+            return None
+        if not all(isinstance(c, str) for c in row):
+            return None
+        out.append(row)
+    return out
+
+
+def _validate(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Strictly type-check one stored entry; ``None`` means "re-extract this file".
+
+    Shape checks alone were not enough. ``from_json`` coerces the two integers but passed every
+    other value straight through, so a poisoned entry — a numeric reference target, a nested list
+    where a string belongs — survived parsing and only exploded much later inside reference
+    resolution, far from any guard. Anything that is not exactly the expected type is refused here.
+    """
+    py = entry.get("p", [])
+    if not isinstance(py, list):
+        return None
+    for imp in py:
+        if not isinstance(imp, list) or len(imp) != 3:
+            return None
+        level, module, names = imp
+        if not isinstance(level, int) or isinstance(level, bool):
+            return None
+        if module is not None and not isinstance(module, str):
+            return None
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            return None
+
+    js = entry.get("j", [])
+    if not isinstance(js, list) or not all(isinstance(s, str) for s in js):
+        return None
+
+    if _str_pairs(entry.get("r", []), 2) is None:
+        return None
+    if _str_pairs(entry.get("c", []), 2) is None:
+        return None
+
+    for d in entry.get("s", []):
+        if not isinstance(d, list) or len(d) != 3:
+            return None
+        qual, kind, line = d
+        if not (isinstance(qual, str) and isinstance(kind, str)):
+            return None
+        if not isinstance(line, int) or isinstance(line, bool):
+            return None
+    return entry
+
+
 def cache_from_json(data: Any) -> dict[str, CachedExtract]:
     """Parse a stored cache; anything unexpected yields an empty cache (one full rebuild)."""
-    if not isinstance(data, dict) or data.get("version") != CACHE_VERSION:
+    if not isinstance(data, dict) or data.get("version") != cache_id():
         return {}
     files = data.get("files")
     if not isinstance(files, dict):
@@ -167,7 +248,7 @@ def cache_from_json(data: Any) -> dict[str, CachedExtract]:
         if not (isinstance(rel, str) and isinstance(entry, dict)):
             continue
         h = entry.get("h")
-        if not isinstance(h, str):
+        if not isinstance(h, str) or _validate(entry) is None:
             continue
         try:
             out[rel] = CachedExtract(hash=h, data=FileExtract.from_json(entry))

@@ -84,7 +84,10 @@ def load_extract(root: str | os.PathLike[str]) -> dict[str, CachedExtract]:
         return {}
     try:
         return cache_from_json(json.loads(p.read_text(encoding="utf-8")))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
+        # RecursionError is a RuntimeError, NOT a ValueError: deeply nested JSON in the store made
+        # it escape this guard and crash `build` on every run (only --full survived, because it
+        # never loads the cache). The store is derived data — an unreadable one costs a rebuild.
         return {}
 
 

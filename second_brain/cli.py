@@ -43,10 +43,23 @@ def cmd_build(args: argparse.Namespace) -> int:
     stats: dict[str, int] = {}
     res = index_cached(args.path, symbols=sym, incremental=not full, stats=stats)
     g = res.graph
-    store.save(args.path, g, res.manifest, signature=res.signature, symbols=sym,
-               extract=res.extract)
+    saved = True
+    try:
+        store.save(args.path, g, res.manifest, signature=res.signature, symbols=sym,
+                   extract=res.extract)
+    except OSError as exc:
+        # A store that cannot be written (read-only checkout, locked directory, full disk) must not
+        # take the command down: the read path already degrades this way, and the report below is
+        # still worth producing. Say so out loud rather than pretending the build persisted.
+        saved = False
+        print(f"warning: could not write the store ({exc}); this build was not persisted",
+              file=sys.stderr)
     # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
-    rp = report.write_report(args.path, g, scan=False)
+    rp: object = None
+    try:
+        rp = report.write_report(args.path, g, scan=False)
+    except OSError:
+        pass  # same store directory, same reason; already reported above
     c = g.counts()
     print(f"built '{g.project}': {len(g.nodes)} nodes, {len(g.edges)} edges")
     print("  nodes:", c["nodes"])
@@ -55,8 +68,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"  reused: {stats['reused']} files unchanged, "
               f"{stats['extracted']} re-read, {stats['hashed']} re-hashed")
     print(f"  store: {store.store_dir(args.path)}")
-    print(f"  report: {rp}")
-    return 0
+    if rp is not None:
+        print(f"  report: {rp}")
+    # Nothing was persisted: the caller (a git hook, CI) must be able to tell without parsing text.
+    return 0 if saved else 1
 
 
 def cmd_gate(args: argparse.Namespace) -> int:

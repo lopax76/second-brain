@@ -4,6 +4,64 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] - 2026-07-25
+
+Everything here comes from an adversarial cross-check of 0.9.2. Its central promise — an
+incremental result identical to a full rebuild — did not hold, and the reason is worth recording:
+the digest and the findings were taken from **two separate reads at two different instants**.
+
+### Fixed
+
+- **A file edited during a build could poison the cache permanently.** The manifest pass digested
+  a file at one moment and the extraction pass parsed it at another, so an entry could be stored
+  as "digest of version X, findings of version Y". When the file then settled on X — the common
+  case, the digest pass runs first — every later build recomputed X, matched the cache, and served
+  Y's findings again, for good. `gate` could not see it: it compares digests with digests, and
+  those agreed. **The bytes are now read once and both the digest and the findings come from those
+  bytes**, so a mislabelled entry is not unlikely, it is unrepresentable. This also removes the
+  CRLF/size-cap mismatch (a digest over newline-normalized bytes was compared against a cap
+  checked on the raw size) and the re-read of every extractable file above 1 MB on every build.
+- **The cache identity is now bound to `second_brain.__version__`**, not to a hand-maintained
+  constant. Keying an entry on file content says what was read, never *who read it*: a release
+  that changes what an extractor finds — 0.9.2 rewrote `python_imports` — would otherwise serve
+  the old findings forever for every already-cached file if whoever cut it forgot to bump.
+- **A stored entry is type-checked, not just shape-checked.** A numeric reference target or a
+  nested list where a string belongs used to survive parsing and crash inside reference
+  resolution, far from any guard.
+- **`RecursionError` no longer escapes the store guard.** It is a `RuntimeError`, not a
+  `ValueError`, so deeply nested JSON in `extract.json` crashed `build` on every run — only
+  `--full` survived, because it never loads the cache.
+- **A file deleted between the walk and the build is no longer a permanent phantom node.** It used
+  to keep its edges while being absent from both signature and manifest, so no later walk could
+  notice it and `gate` stayed green. An entry that *exists but cannot be stat'ed* — a dangling
+  symlink, which is what a git clone of a symlinked `AGENTS.md` leaves on Windows — is
+  deliberately kept, because documents link to it and dropping it would silently turn those links
+  into broken references.
+- **`build` no longer crashes when the store cannot be written** (read-only checkout, locked
+  directory, full disk). It warns, still prints the graph, and exits non-zero so a hook or CI can
+  tell that nothing was persisted.
+
+### Measured
+
+22.233 files: cold **16,1s**, rebuild after one edit **5,1s**. 5.243 files / 120 agents: cold
+**1,90s**, rebuild **1,71s**. Incremental verified byte-identical to a from-scratch build at both
+scales. 325 tests, ruff clean.
+
+### Known and NOT fixed (pre-existing, found by the same cross-check)
+
+- **Two overlapping builds can leave `graph.json` from one and `manifest.json`/`signature.json`
+  from the other.** `store.save` writes each file atomically but takes no lock across them, so the
+  result is a permanent false-fresh with a green `gate`. Needs either a lock or a consistency
+  stamp over the whole store; it is not specific to incremental indexing.
+- **For files above the content-hash cap, `gate` is not a content check** — it recomputes the same
+  coarse `size + whole-second mtime` stamp the freshness signature uses. A replacement preserving
+  size and mtime (`cp -p`, `tar -x`, a backup restore, a coarse-grained filesystem) is invisible
+  to both.
+- **`.secondbrain.json` is in neither the signature nor the manifest**, so changing the `classify`
+  block leaves a stale graph that reports fresh.
+- **A file locked for an instant during a build loses its edges** for that build and, above the
+  cap, without `gate` noticing.
+
 ## [0.9.2] - 2026-07-25
 
 Scaling release: make a rebuild proportional to what *changed*, not to how big the project is.

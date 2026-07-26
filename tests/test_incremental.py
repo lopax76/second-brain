@@ -206,6 +206,154 @@ def test_a_drifted_store_heals_on_the_next_build(tmp_path):
     )
 
 
+def test_reverting_a_file_serves_its_own_findings_not_the_other_version(tmp_path):
+    """The label on a cache entry must describe the bytes the findings came from.
+
+    This is what made the mid-build race permanent: the digest and the extraction were taken from
+    two separate reads, so an entry could end up keyed by version X while holding version Y's
+    findings. It stayed wrong forever, because the file had settled on X and every later build
+    recomputed X and matched. Reverting content is the shortest way to catch a mislabelled entry.
+    """
+    (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "zeta.py").write_text("Z = 1\n", encoding="utf-8")
+    doc = tmp_path / "doc.md"
+
+    doc.write_text("[x](alpha.py)\n", encoding="utf-8")
+    _incremental(tmp_path)
+    doc.write_text("[x](zeta.py)\n", encoding="utf-8")
+    _incremental(tmp_path)
+    doc.write_text("[x](alpha.py)\n", encoding="utf-8")  # back to the first version
+    got, _ = _incremental(tmp_path)
+
+    assert got == _full(tmp_path)
+    edges = [e for e in json.loads(got)["edges"] if e["source"] == "doc.md"]
+    assert any(e["target"] == "alpha.py" for e in edges)
+    assert not any(e["target"] == "zeta.py" for e in edges)
+
+
+def test_a_file_that_vanishes_after_the_walk_is_not_a_node(tmp_path):
+    """Regression: a phantom node used to survive every rebuild with ``gate`` green.
+
+    ``rels`` is fixed by the walk, and a node was created for every entry whether or not the file
+    still existed. Such a file was absent from both the signature and the manifest, so the next
+    walk could not see any change and nothing ever removed it.
+    """
+    import second_brain.freshness as fr
+
+    (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
+    real_iter = fr.iter_files
+
+    def iter_with_phantom(root, patterns, git_rules=None):
+        return sorted([*real_iter(root, patterns, git_rules), "ghost.py"])
+
+    fr.iter_files = iter_with_phantom
+    try:
+        res = index_cached(tmp_path, operational=False)
+    finally:
+        fr.iter_files = real_iter
+
+    assert "ghost.py" not in res.graph.nodes
+    assert "ghost.py" not in res.manifest
+    assert "ghost.py" not in res.signature
+
+
+def test_an_entry_that_exists_but_cannot_be_stat_ed_stays_a_node(tmp_path):
+    """A dangling symlink is a real directory entry, and things link to it.
+
+    Regression: the phantom-node fix first dropped every file whose ``stat`` failed, conflating
+    "deleted between the walk and now" with "exists but cannot be followed". A git clone of a
+    symlinked ``AGENTS.md`` leaves exactly the latter on Windows — and dropping the node silently
+    turned every reference to it into a broken one.
+    """
+    import pathlib
+
+    (tmp_path / "doc.md").write_text("[a](AGENTS.md)\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# agents\n", encoding="utf-8")
+
+    real_stat = pathlib.Path.stat
+
+    def stat_that_fails_on_agents(self, *a, **k):
+        if self.name == "AGENTS.md":
+            raise OSError("simulated dangling link")
+        return real_stat(self, *a, **k)
+
+    pathlib.Path.stat = stat_that_fails_on_agents
+    try:
+        res = index_cached(tmp_path, operational=False)
+    finally:
+        pathlib.Path.stat = real_stat
+
+    assert "AGENTS.md" in res.graph.nodes  # still a node...
+    assert "AGENTS.md" not in res.signature  # ...but nothing was learned about its content
+    doc = res.graph.nodes["doc.md"]
+    assert "broken_refs" not in doc.meta  # so the reference to it still resolves
+
+
+def test_cache_is_invalidated_by_a_new_second_brain_version(tmp_path):
+    """A release that changes what an extractor finds must not serve the old findings."""
+    import second_brain
+    from second_brain.extract import cache_id
+
+    _seed(tmp_path)
+    _incremental(tmp_path)
+    assert store.load_extract(tmp_path)  # populated under the current identity
+
+    original = second_brain.__version__
+    second_brain.__version__ = f"{original}-next"
+    try:
+        assert cache_id().endswith("-next")
+        assert store.load_extract(tmp_path) == {}  # stored under the old identity: refused
+        _, stats = _incremental(tmp_path)
+        assert stats["reused"] == 0
+    finally:
+        second_brain.__version__ = original
+
+
+def test_poisoned_entry_types_are_refused_not_crashed_on(tmp_path):
+    """A well-shaped entry holding wrong types used to explode inside reference resolution."""
+    _seed(tmp_path)
+    _incremental(tmp_path)
+    p = tmp_path / ".secondbrain" / "extract.json"
+    data = json.loads(p.read_text(encoding="utf-8"))
+    good = data["files"]["doc.md"]["h"]
+    data["files"]["doc.md"] = {"h": good, "r": [[999, "link"]]}          # numeric target
+    data["files"]["app.py"]["p"] = [[0, ["not", "a", "string"], []]]      # list where str belongs
+    p.write_text(json.dumps(data), encoding="utf-8")
+
+    got, _ = _incremental(tmp_path)  # must not raise
+    assert got == _full(tmp_path)
+
+
+def test_deeply_nested_store_does_not_crash_the_build(tmp_path):
+    """RecursionError is a RuntimeError, not a ValueError: it used to escape the store guard."""
+    _seed(tmp_path)
+    _incremental(tmp_path)
+    p = tmp_path / ".secondbrain" / "extract.json"
+    p.write_text("[" * 20000 + "]" * 20000, encoding="utf-8")
+
+    assert store.load_extract(tmp_path) == {}
+    got, _ = _incremental(tmp_path)  # must not raise
+    assert got == _full(tmp_path)
+
+
+def test_large_text_file_keeps_incremental_equal_to_full(tmp_path):
+    """Files above the content-hash cap are keyed on the precise signature, not the coarse stamp."""
+    filler = "y" * 2_000_000  # over the 1 MB hash cap, under the 5 MB read cap
+    (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "zeta.py").write_text("Z = 1\n", encoding="utf-8")
+    big = tmp_path / "big.md"
+
+    big.write_text(f"[l](alpha.py)\n{filler}", encoding="utf-8")
+    _incremental(tmp_path)
+    big.write_text(f"[l](zeta.py)\n{filler}", encoding="utf-8")
+    got, _ = _incremental(tmp_path)
+
+    assert got == _full(tmp_path)
+    assert any(
+        e["source"] == "big.md" and e["target"] == "zeta.py" for e in json.loads(got)["edges"]
+    )
+
+
 def test_full_flag_ignores_the_cache(tmp_path):
     _seed(tmp_path)
     _incremental(tmp_path)
