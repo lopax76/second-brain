@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-10-03
+
+### Fixed
+
+- **Agents' memories citing POSIX absolute paths** (`/home/…/project/file.md`) were not linked in
+  the superior graph: only Windows drive paths were recognised in prose. Both forms now are
+  (0.10.0's CI failed on Linux for this reason; it passed on Windows).
+
 ## [0.10.0] - 2026-10-03
 
 Second Brain grows from one graph per folder to a **workspace**: one graph per project, a

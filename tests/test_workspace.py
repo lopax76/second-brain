@@ -121,3 +121,14 @@ def test_the_superior_graph_goes_stale_when_a_project_changes(tmp_path, monkeypa
     assert freshness.is_stale(root)                          # ... so the superior must refresh
     sup = freshness.load_or_refresh(root, refresh=True)
     assert sup.nodes["progetto:alfa"].meta["files"] == 3
+
+
+def test_memory_paths_are_found_in_windows_and_posix_form():
+    from second_brain.superiore import _code_paths
+    text = ("Il codice sta in C:/Users/x/Documents/Beta/README.md e in /home/x/Docs/Beta/a.md.\n"
+            r"Vedi anche `Note\regole.md` ma non https://example.com/a/b ne' /api." "\n")
+    found = _code_paths(text)
+    assert "C:/Users/x/Documents/Beta/README.md" in found
+    assert "/home/x/Docs/Beta/a.md" in found
+    assert r"Note\regole.md" in found
+    assert not any("example.com" in f for f in found) and "/api" not in found

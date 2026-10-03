@@ -55,7 +55,12 @@ _CODE_SPAN = re.compile(r"`([^`\n]{3,300})`")
 _PATHLIKE = re.compile(r"^(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/])?[^\s*?<>|]+[\\/][^\s*?<>|]+$")
 
 
-_ABS_IN_PROSE = re.compile(r"(?<![\w/\\])[A-Za-z]:[\\/][^\s`'\"<>|*?()\[\]]+")
+# Absolute paths written in prose: Windows (C:\... or C:/...) and POSIX (/home/..., at least two
+# segments so a lone "/" or "/api" is not taken). Only paths that resolve inside the workspace
+# ever become edges, so a false match costs nothing.
+_ABS_IN_PROSE = re.compile(
+    r"(?<![\w/\\:])(?:[A-Za-z]:[\\/][^\s`'\"<>|*?()\[\]]+"
+    r"|/(?:[^\s`'\"<>|*?()\[\]/]+/)+[^\s`'\"<>|*?()\[\]/]+)")
 
 
 def _code_paths(text: str) -> list[str]:
