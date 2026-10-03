@@ -34,7 +34,7 @@ re-check on every call.
 | Tool | Arguments | Returns |
 |------|-----------|---------|
 | `project_map` | – | Compact digest: areas (file counts / sizes / dominant types), node- and edge-type tallies, the most-connected files, and orphan / broken counts. The cheap thing to load when work starts. |
-| `find` | `text` | Files/nodes whose name or path contains `text` (case-insensitive): `id`, `type`, `path`. |
+| `find` | `text`, `limit` (default 100) | Files/nodes whose name or path contains `text` (case-insensitive): `id`, `type`, `path`. |
 | `neighbors` | `node_id`, `limit` (default 0) | A node and its incoming/outgoing connections (imports, references, area membership), size, description, and any broken refs. `limit` > 0 caps each direction and reports the true totals + `truncated` (a god-node won't flood the context); 0 = all. Returns `{ "error": "node not found", ... }` for an unknown id, so an assistant can tell "no edges" from "no node". |
 | `subgraph` | `node_id`, `hops` (default 1) | A small subgraph (nodes + edges) within `hops` of `node_id`. |
 | `impact` | `node_id`, `direction` (`up`/`down`/`both`, default `both`), `max_depth` (default 2), `budget` (default 0) | Blast radius grouped by depth: `upstream` = who depends on `node_id` (what breaks if you change it), `downstream` = what it depends on. Each node carries its incident `degree`; `budget` > 0 ranks the impacted nodes (nearest + most-connected first) and trims to ~that many tokens. |
@@ -42,8 +42,20 @@ re-check on every call.
 | `why` | `source`, `target` | Shortest path between two nodes over knowledge edges (undirected) — how are they connected. Returns the path node-by-node with edge types; `connected: false` if unlinked. |
 | `focus` | `task`, `budget` (default 2000), `signatures` (default false), `recency` (default 0), `half_life_days` (default 30) | Task-aware retrieval: the minimal high-value subgraph for `task` within ~`budget` tokens. Anchors the task to the most relevant files (**BM25** lexical ranking — rare, specific terms win), runs personalised PageRank from them, and returns the top nodes + the knowledge edges among them — the context for a task, not the whole digest. Falls back to globally important nodes when nothing matches. With `signatures=true`, also returns the key function/class signatures of the top Python files (the API, without opening them). `recency` (0..1) blends a deterministic git recency/frequency signal into the ranking (the ACT-R base-level of memory) so recently/often-touched files surface first; anchored to the newest commit in the graph (reproducible), a no-op without git history; `half_life_days` tunes the decay. |
 | `communities` | `key_files` (default 5), `surprising` (default 10), `limit` (default 0) | The project's real modules: clusters discovered from imports+references (not folders), each with size, cohesion, key files and dominant types, plus the top cross-module bridges. `limit` > 0 returns only the N largest (with the true total + `truncated`). The structural lens, far cheaper than the full `report`. |
-| `report` | – | The full `GRAPH_REPORT.md` as Markdown: god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The cheapest way to orient before grepping. |
-| `health` | – | Anti-drift status: `ok` (bool), `broken` (list of `[source, target]` pairs), `stale` (`{added, removed, changed}` lists vs the last build), and `orphans` (count). |
+| `report` | `max_chars` (default 6000) | The `GRAPH_REPORT.md` as Markdown: god nodes, communities, surprising cross-community links, decisions by family, suggested questions, and problems. The cheapest way to orient before grepping. |
+| `health` | `deep` (default false) | Anti-drift status: `ok`, `check` (`stat` or `content`), `broken` (`[source, target]` pairs), `stale` (`{added, removed, changed}` vs the last build, first 50 each, with `stale_counts`), `orphans`, and `rebuilding` when another process is writing the store. `deep=true` re-hashes every file by content (slow on large trees). |
+| `posso_scrivere` | `file` | Call before modifying a file. `esito`: `ok`, `attenzione` (linked to another agent's work, or changed on disk since your last write) or `blocco` (another agent is working on it: do not write), with `motivo` and the other active works. On ok/attenzione the file is recorded as yours. |
+| `inizia_lavoro` | `intento`, `file` (optional list) | Declare your work on the project (intent + files you plan to change): other agents are stopped before touching them. Returns who else is working there and contested files. |
+| `chiudi_lavoro` | – | End your work on the project; frees your files. |
+| `lavori_in_corso` | – | Every active work in the workspace: project, agent, intent, files, last sign of life. |
+
+**Workspaces (0.10).** Started on a workspace folder (`second-brain-mcp <workspace>`), every tool
+above also takes `progetto`: empty = the project of the agent's working folder, `"superiore"` =
+the superior graph (all projects, general files, agents' memories), or a project id/name. Set
+`SECOND_BRAIN_AGENT` (e.g. `claude-code`, `codex`) in each client's server config: it is the
+identity the work registry uses.
+
+`report` takes `max_chars` (default 6000; 0 = whole report).
 
 All responses are plain JSON-able structures. None of them include file contents.
 

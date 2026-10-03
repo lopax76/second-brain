@@ -295,8 +295,8 @@ def test_a_file_that_vanishes_after_the_walk_is_not_a_node(tmp_path):
     (tmp_path / "alpha.py").write_text("A = 1\n", encoding="utf-8")
     real_iter = fr.iter_files
 
-    def iter_with_phantom(root, patterns, git_rules=None):
-        return sorted([*real_iter(root, patterns, git_rules), "ghost.py"])
+    def iter_with_phantom(root, patterns, git_rules=None, **kw):
+        return sorted([*real_iter(root, patterns, git_rules, **kw), "ghost.py"])
 
     fr.iter_files = iter_with_phantom
     try:
@@ -509,24 +509,65 @@ def test_the_coarse_stamp_distinguishes_writes_within_one_second(tmp_path):
     from second_brain.freshness import _hash_rel
 
     big = tmp_path / "big.md"
-    filler = "z" * 1_200_000  # above the content-hash cap: stamp, not digest
+    filler = "z" * 1_200_000  # above the content-hash cap
     big.write_text(f"aaaa{filler}", encoding="utf-8")
     first = _hash_rel(tmp_path, "big.md")
-    big.write_text(f"bbbb{filler}", encoding="utf-8")  # same length, same second
+    big.write_text(f"bbbb{filler}", encoding="utf-8")  # same length, often the same NTFS tick
     second = _hash_rel(tmp_path, "big.md")
 
+    # On NTFS mtime_ns advances in ~1 ms steps, so the stamp alone could not separate these two
+    # writes (this test failed 4 runs out of 6 on Windows). A file this fresh is "racily clean":
+    # it is digested by content, so the two versions always differ.
     assert first is not None and second is not None
-    assert first.startswith("s") and ":m" in first  # it really is the stamp branch
+    assert first.startswith("r") and second.startswith("r")
     assert first != second
+
+
+def test_a_settled_large_file_keeps_the_cheap_stat_stamp(tmp_path):
+    """Outside the racy window a large file is NOT read: the stamp stays the cheap path."""
+    import os
+    import time
+
+    from second_brain.freshness import _hash_rel
+
+    big = tmp_path / "big.md"
+    big.write_text("z" * 1_200_000, encoding="utf-8")
+    old = time.time() - 60
+    os.utime(big, (old, old))
+    value = _hash_rel(tmp_path, "big.md")
+    assert value is not None and value.startswith("s") and ":m" in value
+
+
+def test_a_racy_signature_never_matches_its_settled_self(tmp_path):
+    """A file signed while still racy must look changed at the next check, once settled."""
+    import os
+    import time
+
+    from second_brain import freshness as fr
+
+    f = tmp_path / "doc.md"
+    f.write_text("uno", encoding="utf-8")
+    racy = fr.fast_signature(tmp_path)["doc.md"]
+    old = time.time() - 60
+    os.utime(f, (old, old))
+    settled = fr.fast_signature(tmp_path)["doc.md"]
+    assert racy.endswith(":r") and not settled.endswith(":r")
+    assert racy != settled
 
 
 def test_gate_declares_which_files_it_could_only_check_by_stamp(tmp_path):
     """Above the content-hash cap `gate` compares a stat stamp, not content. It must say so."""
+    import os
+    import time
+
     from second_brain import gate
     from second_brain.freshness import build_manifest
 
     (tmp_path / "small.md") .write_text("# s\n", encoding="utf-8")
     (tmp_path / "big.md").write_text("y" * 1_200_000, encoding="utf-8")
+    # settled: a file written a moment ago is "racily clean" and gets digested by content instead
+    old = time.time() - 60
+    os.utime(tmp_path / "big.md", (old, old))
     res = index_cached(tmp_path, operational=False)
     rep = gate.evaluate(res.graph, res.manifest, build_manifest(tmp_path))
 

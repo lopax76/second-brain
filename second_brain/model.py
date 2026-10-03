@@ -34,6 +34,7 @@ class NodeType(str, Enum):
     AREA = "area"             # logical cluster / container
     SESSION = "session"       # a work session / git commit
     SYMBOL = "symbol"         # a function/class inside a code file (opt-in symbol layer)
+    PROJECT = "project"       # a whole project, in the workspace's superior graph (0.10)
 
 
 class EdgeType(str, Enum):
@@ -61,6 +62,7 @@ NODE_COLORS: dict[NodeType, str] = {
     NodeType.AREA: "#6B7280",
     NodeType.SESSION: "#92400E",
     NodeType.SYMBOL: "#0EA5E9",
+    NodeType.PROJECT: "#78350F",
 }
 
 EDGE_COLORS: dict[EdgeType, str] = {

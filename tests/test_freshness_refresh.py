@@ -185,8 +185,8 @@ def test_signature_is_captured_before_any_content_is_read(tmp_path, monkeypatch)
 
     real_iter = fr.iter_files
 
-    def iter_then_create(root, patterns, git_rules=None):
-        rels = real_iter(root, patterns, git_rules)
+    def iter_then_create(root, patterns, git_rules=None, **kw):
+        rels = real_iter(root, patterns, git_rules, **kw)
         (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # after the walk, before reads
         return rels
 

@@ -145,6 +145,7 @@ Il layer di import-codice di Second Brain rende l'intero workspace come un grafo
 pip install second-brain-graph              # da PyPI
 pip install "second-brain-graph[mcp]"       # + server MCP opzionale
 pip install -e .                            # oppure da un clone
+uv tool install "second-brain-graph[mcp]"   # installazione unica isolata: CLI + server MCP
 ```
 
 [Su PyPI](https://pypi.org/project/second-brain-graph/). Richiede Python 3.10+. Dipendenze
@@ -287,6 +288,33 @@ tick del filesystem dell'ultimo build — che `second-brain gate` (content-hash)
    pannello a sinistra puoi cercare, cambiare raggruppamento (community / area / cartella / tipo),
    isolare una singola community o mostrare solo gli orfani.
 
+## Spazio di lavoro e più agenti (0.10)
+
+Una cartella che contiene molti progetti diventa uno **spazio di lavoro**
+(`second-brain workspace init <cartella>`):
+
+- **un grafo per progetto**, ciascuno con il suo store e il suo lucchetto, costruito solo alla
+  prima interrogazione: ricostruire un progetto non tocca mai gli altri;
+- un **grafo superiore** sopra di loro: i file che non appartengono a nessun progetto, un nodo per
+  progetto, le memorie degli agenti AI (memorie di Claude Code, `CLAUDE.md`, memorie di Codex,
+  `AGENTS.md`, in sola lettura) e i collegamenti fra tutti (una nota che cita un progetto, un
+  progetto che ne cita un altro, una memoria che appartiene al suo progetto);
+- **un solo server MCP** per tutto: `second-brain-mcp <spazio>`; ogni strumento accetta `progetto`
+  (vuoto = il progetto della cartella di lavoro dell'agente, `"superiore"` = tutto lo spazio).
+
+**Più agenti, nessuna sovrascrittura.** Un registro condiviso dei lavori dice a un agente, prima
+che scriva un file, se un altro agente ci sta lavorando (`blocco`), se sta lavorando su qualcosa
+di collegato (`attenzione`) o nessuna delle due (`ok`). Claude Code lo applica con un hook
+(`second-brain hook-scrittura` su PreToolUse/PostToolUse per Edit/Write); gli altri agenti usano
+lo strumento MCP `posso_scrivere`. Imposta `SECOND_BRAIN_AGENT` nella configurazione del server di
+ogni client. Anche gli store dei grafi si scrivono sotto un lucchetto fra processi, e chi lo
+ottiene dopo controlla prima cosa ha già fatto chi c'era: il suo lavoro si riusa, non si cancella.
+
+**graphify come strato del codice.** Dove un progetto ha `graphify-out/graph.json`
+([graphify](https://github.com/safishamsi/graphify), 37 linguaggi), le sue relazioni fra file
+diventano archi (`via: "graphify"`, con relazione e confidenza) — solo quelle i cui file non sono
+cambiati dopo l'esecuzione di graphify.
+
 ## Layer di query (per gli assistenti AI)
 
 `second-brain map`, `find`, `neighbors`, `impact`, `why`, `focus` e `report` restituiscono risposte
@@ -385,13 +413,18 @@ Read-only sui sorgenti, zero dipendenze runtime, deterministico. Tutto vive nel 
 | [`viewer.py`](second_brain/viewer.py) | Viewer mappa 2D a community offline (vis-network, adattato da Graphify). |
 | [`export.py`](second_brain/export.py) | Esporta il grafo in GraphML. |
 | [`agent_integration.py`](second_brain/agent_integration.py) | Integra SB negli agent AI: direttiva CLAUDE.md/AGENTS.md, hook Claude Code, hook git. |
+| [`workspace.py`](second_brain/workspace.py) | Spazio di lavoro: rilevamento dei progetti, store centralizzati per progetto, sorgenti di memoria degli agenti. |
+| [`superiore.py`](second_brain/superiore.py) | Il grafo superiore: nodi-progetto, file generali, memorie degli agenti, collegamenti. |
+| [`lavori.py`](second_brain/lavori.py) | Registro dei lavori: un agente può scrivere questo file adesso (ok / attenzione / blocco)? |
+| [`lock.py`](second_brain/lock.py) | Lucchetto di scrittura fra processi per ogni store; chi sta scrivendo. |
+| [`graphify_layer.py`](second_brain/graphify_layer.py) | Importa le relazioni fra file del codice di graphify (solo se fresche) come archi. |
 
 Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.md) e i
 [tool MCP](docs/mcp.md).
 
 ## Stato & roadmap
 
-Beta — **v0.9.5**. Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
+Beta — **v0.10.0** (spazio di lavoro, grafo superiore, registro dei lavori fra agenti, strato del codice da graphify). Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
 l'**indicizzazione incrementale** (un rebuild rilegge solo i file il cui contenuto è cambiato;
 `build --full` forza la rilettura completa); le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer

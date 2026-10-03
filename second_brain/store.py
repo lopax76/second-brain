@@ -39,7 +39,23 @@ _STAMPED = ("graph.json", "manifest.json", "signature.json")
 
 
 def store_dir(root: str | os.PathLike[str]) -> Path:
-    return Path(root).resolve() / STORE_DIRNAME
+    """Where the graph of ``root`` lives.
+
+    Standalone: ``<root>/.secondbrain``. Inside a workspace (0.10) the stores are centralised:
+    the workspace root itself is the SUPERIOR graph (``<ws>/.secondbrain/superiore``) and each
+    registered project has its own (``<ws>/.secondbrain/progetti/<id>``) — separate files and
+    separate write locks, so work on one project never rewrites another project's graph.
+    """
+    p = Path(root).resolve()
+    from second_brain import workspace
+    ws = workspace.find_workspace(p)
+    if ws is not None:
+        if p == ws.root:
+            return ws.superior_store
+        proj = ws.project_at(p)
+        if proj is not None:
+            return ws.project_store(proj)
+    return p / STORE_DIRNAME
 
 
 def _digest(text: str) -> str:
@@ -101,10 +117,69 @@ def save(
             d / "extract.json",
             json.dumps(cache_to_json(extract), ensure_ascii=False, separators=(",", ":")),
         )
+    # Who wrote this build and when: the next writer (another agent, after the lock) reads it to
+    # know the store was refreshed by someone else meanwhile, and by whom.
+    from second_brain.lock import agent_name
+    _atomic_write(d / WRITER_NAME, json.dumps({
+        "agent": agent_name(), "pid": os.getpid(),
+        "when": __import__("time").strftime("%Y-%m-%d %H:%M:%S"),
+        "graph": stamp["graph.json"]}, indent=1))
+    # A small summary for the superior graph (0.10): it describes this project without anyone
+    # having to load a graph.json that can weigh tens of MB.
+    _atomic_write(d / SUMMARY_NAME, json.dumps(summarise(graph, stamp["graph.json"]),
+                                               ensure_ascii=False, indent=1))
     # LAST, always: the stamp binds the files above into one set. Written after them so a crash
     # leaves a stamp that does not match — refused on load, which is the safe direction.
     _atomic_write(d / STAMP_NAME, json.dumps(stamp, indent=2, sort_keys=True))
     return d
+
+
+SUMMARY_NAME = "riepilogo.json"
+WRITER_NAME = "scritto-da.json"
+
+
+def load_writer(root: str | os.PathLike[str]) -> dict | None:
+    """Who wrote the current build of ``root``'s store (agent, pid, when), if known."""
+    try:
+        data = json.loads((store_dir(root) / WRITER_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def summarise(graph: Graph, digest: str = "") -> dict:
+    """Files, links, areas, most-connected files and the references that LEAVE the project."""
+    import time as _time
+
+    from second_brain.model import NodeType
+    files = [n for n in graph.nodes.values() if n.path]
+    degree: dict[str, int] = {}
+    for e in graph.edges:
+        degree[e.source] = degree.get(e.source, 0) + 1
+        degree[e.target] = degree.get(e.target, 0) + 1
+    top = sorted((n.id for n in files), key=lambda i: (-degree.get(i, 0), i))[:10]
+    external: set[str] = set()
+    for n in files:
+        for t in n.meta.get("external_refs", []) or []:
+            external.add(t)
+    return {
+        "project": graph.project,
+        "digest": digest,
+        "updated": _time.strftime("%Y-%m-%d %H:%M:%S"),
+        "files": len(files),
+        "links": len(graph.edges),
+        "areas": sorted(n.label for n in graph.nodes.values() if n.type is NodeType.AREA),
+        "key_files": top,
+        "external_refs": sorted(external)[:1000],
+    }
+
+
+def load_summary(store_path: str | os.PathLike[str]) -> dict | None:
+    try:
+        data = json.loads((Path(store_path) / SUMMARY_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def is_coherent(root: str | os.PathLike[str]) -> bool:

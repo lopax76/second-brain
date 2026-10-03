@@ -136,7 +136,9 @@ def _server(tmp_path):
 
 
 def _text(server, name, args=None):
-    content, _ = asyncio.run(server.call_tool(name, args or {}))
+    res = asyncio.run(server.call_tool(name, args or {}))
+    # mcp 1.x FastMCP returns (content, structured); mcp 2.x MCPServer a CallToolResult
+    content = res[0] if isinstance(res, tuple) else res.content
     return content[0].text
 
 
@@ -144,10 +146,12 @@ def _json(server, name, args=None):
     return json.loads(_text(server, name, args))
 
 
-def test_mcp_exposes_all_eleven_tools(tmp_path):
+def test_mcp_exposes_all_tools(tmp_path):
     names = {t.name for t in asyncio.run(_server(tmp_path).list_tools())}
     assert names == {"project_map", "find", "neighbors", "subgraph", "impact", "impact_diff",
-                     "why", "communities", "focus", "report", "health"}
+                     "why", "communities", "focus", "report", "health",
+                     # 0.10: anti-collisione fra agenti
+                     "posso_scrivere", "inizia_lavoro", "chiudi_lavoro", "lavori_in_corso"}
 
 
 def test_mcp_every_tool_executes(tmp_path):

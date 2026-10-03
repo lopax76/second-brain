@@ -656,9 +656,14 @@ def focus(
     edges_out = [{"source": e.source, "target": e.target, "type": e.type.value}
                  for e in graph.edges
                  if e.type in KNOWLEDGE and e.source in seen and e.target in seen]
-    return {
+    # The seed list used to be returned whole: on a 200k-node graph a common word anchors
+    # hundreds of files (621 ids, ~12k tokens measured on 03/10/2026) and the answer was 7.5x the
+    # budget. Only the strongest seeds are listed now, with the true total.
+    seeds_ranked = [nid for nid, _ in ranked if nid in seed_ids]
+    result: dict[str, Any] = {
         "task": task,
-        "seeds": sorted(seeds),
+        "seeds": seeds_ranked[:_FOCUS_SEEDS_SHOWN],
+        "seeds_total": len(seeds),
         "fallback": fallback,
         "recency": recency if recency > 0 else 0.0,
         "budget_tokens": budget_tokens,
@@ -666,6 +671,40 @@ def focus(
         "nodes": nodes_out,
         "edges": edges_out,
     }
+    return _fit_result(result, budget_tokens)
+
+
+_FOCUS_SEEDS_SHOWN = 20
+
+
+def _fit_result(result: dict[str, Any], budget_tokens: int) -> dict[str, Any]:
+    """Make the WHOLE answer respect the budget, not just its node rows.
+
+    The node loop above counts only node rows; the edges among them and the envelope were free,
+    so the real output could exceed the budget. Here the serialised answer is measured and, while
+    over budget, edges are dropped first (they are derivable), then the lowest-ranked nodes (with
+    their edges). At least one node always survives. ``token_estimate`` becomes the real cost.
+    """
+    import json as _json
+
+    def cost() -> int:
+        # measured as the MCP SDK sends it (indented JSON), not compact: compact under-counted ~45%
+        return budget.text_cost(_json.dumps(result, ensure_ascii=False, indent=2))
+
+    if budget_tokens > 0:
+        trimmed = False
+        while cost() > budget_tokens and result["edges"]:
+            result["edges"].pop()
+            trimmed = True
+        while cost() > budget_tokens and len(result["nodes"]) > 1:
+            gone = result["nodes"].pop()["id"]
+            result["edges"] = [e for e in result["edges"]
+                               if e["source"] != gone and e["target"] != gone]
+            trimmed = True
+        if trimmed:
+            result["truncated"] = True
+    result["token_estimate"] = cost()
+    return result
 
 
 def attach_signatures(graph: Graph, root: str, result: dict[str, Any], *,

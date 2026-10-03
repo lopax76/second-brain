@@ -4,6 +4,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-10-03
+
+Second Brain grows from one graph per folder to a **workspace**: one graph per project, a
+**superior graph** above them, and a shared **work registry** so several AI agents (e.g. Claude
+Code and Codex) can work on the same machine without overwriting each other.
+
+### Added
+
+- **Workspaces** (`.secondbrain-workspace.json`, `second-brain workspace init|show`). Every
+  project gets its own graph, store and write lock under `<ws>/.secondbrain/progetti/<id>/`; a
+  project graph is built only when it is first queried. Rebuilding one project never rewrites
+  another's store.
+- **The superior graph** (`<ws>/.secondbrain/superiore/`): every file that belongs to no project,
+  one `project` node per project (from a small `riepilogo.json` each build now writes — no
+  multi-MB graph is loaded), the agents' memory files (Claude Code memories, `CLAUDE.md`,
+  Codex memories, `AGENTS.md`; read-only), and the links between all of them: general file →
+  project, project → project, project → general file, memory → the project it belongs to and the
+  files it cites (including backticked and absolute paths, which agents use). It goes stale — and
+  refreshes — when a project summary or a memory changes.
+- **External references.** A path that leaves the project (`../other/x.md`, an absolute path) is
+  no longer silently dropped: it is recorded as `external_refs` and resolved by the superior graph.
+- **Work registry for agents** (CLI `lavori`, `inizia`, `chiudi`, `posso-scrivere`; MCP
+  `posso_scrivere`, `inizia_lavoro`, `chiudi_lavoro`, `lavori_in_corso`). Before writing a file an
+  agent asks: **block** if another agent declared or already wrote it, **warning** if it is linked
+  (one hop) to the other agent's files or changed on disk since this agent's last write, **ok**
+  otherwise. Works expire after 30 minutes without a sign of life; an agent never blocks itself;
+  different projects never block each other.
+- **Claude Code hook** `second-brain hook-scrittura` (PreToolUse/PostToolUse on Edit/Write):
+  denies a contested write with the reason, adds a warning as context, records the file after the
+  write. Silent outside a workspace and on its own errors.
+- **One MCP server for the whole workspace.** Started on the workspace folder, every tool takes
+  `progetto` (empty = the project of the agent's working folder, `"superiore"` = everything);
+  server `instructions` describe the workflow.
+- **graphify as the code layer.** Where a project has `graphify-out/graph.json`, graphify's
+  relations between *different files* (calls, imports, implements, inherits, uses, references)
+  become edges with `via: "graphify"`, the relation and its confidence. A relation is imported only
+  if neither file changed after graphify wrote its graph; a new graphify run makes the project
+  graph stale.
+- **Cross-process write lock** per store (stdlib `msvcrt`/`fcntl`). A process that finds the store
+  being written serves the graph it has and says who is writing. **After acquiring the lock,
+  freshness is re-checked**: if the previous holder already refreshed the store, its graph is
+  served and nothing is rewritten; otherwise the rebuild starts from the files as they are now, on
+  the extraction cache the previous writer left. Each build records who wrote it
+  (`scritto-da.json`). `second-brain build` (and the git hook) write under the lock too.
+
+### Fixed
+
+- **The MCP server did not start on a fresh install**: `mcp` 2.x renamed `FastMCP` to
+  `MCPServer`, and the server exited claiming the extra was missing. Both SDK lines are supported
+  (tested with mcp 1.30 and 2.3).
+- **`focus` exceeded its budget** on large graphs (the seed list alone could be hundreds of ids;
+  measured 7.5× the budget). The whole answer is now measured — as sent, indented JSON — and
+  trimmed (edges first, then lowest-ranked nodes); `seeds` lists the strongest 20 plus
+  `seeds_total`.
+- **"Racily clean" files** (as git calls them): on NTFS `mtime_ns` advances in ~1 ms steps, so two
+  writes could share a stamp — the 0.9.5 note claiming the collision was removed was wrong on
+  Windows. A file touched in the last 2 s is now digested by content and its signature marked to
+  be re-examined once settled.
+- **A failed refresh is no longer silent**: the stale graph is still served, but the problem is
+  reported in MCP answers instead of being swallowed.
+- **`health` is cheap by default** (stat signature; `deep=true` re-hashes content) and **`report`
+  via MCP is capped** (`max_chars`, default 6000).
+
 ## [0.9.5] - 2026-07-26
 
 The four defects 0.9.4 listed as *known and not fixed*. Three are closed; the fourth is reduced

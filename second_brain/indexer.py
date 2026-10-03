@@ -70,7 +70,8 @@ def gitignore_rules_for(root: Path) -> list[GitRule] | None:
 
 
 def iter_files(
-    root: Path, patterns: list[str], git_rules: list[GitRule] | None = None
+    root: Path, patterns: list[str], git_rules: list[GitRule] | None = None,
+    graphify: list[str] | None = None,
 ) -> list[str]:
     """Return sorted POSIX relative paths of indexable files under ``root``.
 
@@ -82,12 +83,33 @@ def iter_files(
     re-include a path under an excluded directory).
     """
     rels: list[str] = []
+    # The workspace root is the SUPERIOR graph: it must not swallow the projects (each has its
+    # own graph) nor the folders the workspace excludes. Pruned at the walk, never read.
+    pruned: set[str] = set()
+    from second_brain import workspace as _ws
+    ws = _ws.find_workspace(root)
+    if ws is not None and Path(root).resolve() == ws.root:
+        pruned = ws.pruned_dirs()
     for dirpath, dirnames, filenames in os.walk(root):
         kept: list[str] = []
         for d in dirnames:
             full = os.path.join(dirpath, d)
+            if d == "graphify-out" and graphify is not None:
+                # graphify's own output is not indexed as files, but its graph is read as the
+                # code layer (graphify_layer): remember where it is, during this same walk.
+                if os.path.isfile(os.path.join(full, "graph.json")):
+                    try:
+                        graphify.append(Path(full).relative_to(root).as_posix())
+                    except ValueError:
+                        pass
             if is_ignored_dir(d) or _is_reparse(full):
                 continue
+            if pruned:
+                try:
+                    if Path(full).relative_to(root).as_posix() in pruned:
+                        continue
+                except ValueError:
+                    pass
             if git_rules:
                 try:
                     rel_d = Path(full).relative_to(root).as_posix()
@@ -197,6 +219,27 @@ def _is_external(target: str) -> bool:
     # Any leading '/' is outside the project: POSIX absolute (/etc/hosts) or UNC (//server/share,
     # from a cleaned \\server\share). Marking these broken was a false positive in the gate.
     return target.startswith("/")
+
+
+def _leaves_project(target: str, from_rel: str) -> bool:
+    """A drive-letter / home path, or a relative path that climbs above the project root."""
+    if "://" in target:
+        return False
+    if (len(target) >= 2 and target[1] == ":" and target[0].isalpha()) or target.startswith("~/"):
+        return True
+    joined = posixpath.normpath(posixpath.join(posixpath.dirname(from_rel), target))
+    return joined.startswith("../") or joined == ".."
+
+
+def _into_pruned(target: str, from_rel: str, pruned: set[str]) -> bool:
+    """True if ``target`` (relative to ``from_rel``) lands inside one of the ``pruned`` dirs."""
+    if not pruned or "://" in target:
+        return False
+    for cand in (posixpath.normpath(posixpath.join(posixpath.dirname(from_rel), target)),
+                 posixpath.normpath(target.lstrip("/"))):
+        if any(cand == d or cand.startswith(d + "/") for d in pruned):
+            return True
+    return False
 
 
 def _resolve_ref(
@@ -329,6 +372,15 @@ def build_graph(
     py_files = [r for r in rels if _ext(r) == ".py"]
     module_map = _python_module_map(py_files)
 
+    # In the SUPERIOR graph of a workspace the project folders are not nodes: a reference into
+    # one of them (`../Alfa/PROGETTO.md` from `Note/x.md`) is a cross-graph link, kept for the
+    # superior enrichment instead of being dropped as "an existing file we do not index".
+    pruned: set[str] = set()
+    from second_brain import workspace as _ws
+    ws = _ws.find_workspace(root_p)
+    if ws is not None and root_p == ws.root:
+        pruned = ws.pruned_dirs()
+
     # 3. Edges from file contents. Only code (imports) and docs (references) are ever READ;
     #    data/config/binaries are never opened - the graph needs only their type/size/area.
     #    This is what keeps indexing light on data-heavy projects (no reading huge JSON/CSV/logs).
@@ -359,6 +411,7 @@ def build_graph(
                     g.add_edge(Edge(rel, tgt, EdgeType.IMPORTS))
         if ext in _DOC_REF_EXTS:
             broken: list[str] = []
+            external: list[str] = []
             for target, kind in fe.refs:
                 resolved, is_broken = _resolve_ref(
                     target, kind, rel, node_ids, basename_index, stem_index, root_p
@@ -367,8 +420,15 @@ def build_graph(
                     g.add_edge(Edge(rel, resolved, EdgeType.REFERENCES))
                 elif is_broken:
                     broken.append(target)
+                elif _leaves_project(target, rel) or _into_pruned(target, rel, pruned):
+                    # Not an error, not ignored any more (0.10): a path that points OUTSIDE this
+                    # project is how projects and the general memory cite each other. The
+                    # superior graph resolves it against the workspace.
+                    external.append(target)
             if broken:
                 g.nodes[rel].meta["broken_refs"] = broken
+            if external:
+                g.nodes[rel].meta["external_refs"] = sorted(set(external))
 
     # 3b. Optional symbol layer: function/class nodes + intra-file `calls` edges (opt-in; off by
     #     default to keep the file-level map small). Symbol nodes carry no `path` (they are

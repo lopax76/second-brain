@@ -29,3 +29,7 @@ docs/baseline-measurement.md
 docs/cold-experiment-prompt.md
 docs/logo-candidates/
 docs/PIANO-v0.3_2026-06-14.md
+
+# documenti privati di lavoro (rapporti, progetti di sviluppo con dati locali)
+docs/RAPPORTO-*.md
+docs/DESIGN-*.md

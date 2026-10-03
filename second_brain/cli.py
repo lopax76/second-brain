@@ -7,6 +7,8 @@ under ``.secondbrain/``.
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import shutil
 import sys
 
@@ -41,12 +43,21 @@ def cmd_build(args: argparse.Namespace) -> int:
     sym = getattr(args, "symbols", False)
     full = getattr(args, "full", False)
     stats: dict[str, int] = {}
-    res = index_cached(args.path, symbols=sym, incremental=not full, stats=stats)
-    g = res.graph
+    from second_brain import lock
     saved = True
+    g: Graph | None = None
     try:
-        store.save(args.path, g, res.manifest, signature=res.signature, symbols=sym,
-                   extract=res.extract)
+        # The whole build runs under the store's write lock, waiting for another writer (an
+        # agent's refresh, a git hook) to finish: the walk then starts from what that writer left,
+        # so its work is extended, never overwritten by a build that began before it ended.
+        with lock.write_lock(store.store_dir(args.path), blocking=True):
+            res = index_cached(args.path, symbols=sym, incremental=not full, stats=stats)
+            g = res.graph
+            store.save(args.path, g, res.manifest, signature=res.signature, symbols=sym,
+                       extract=res.extract)
+    except lock.Busy as busy:
+        print(f"build non eseguito: {busy}", file=sys.stderr)
+        return 1
     except OSError as exc:
         # A store that cannot be written (read-only checkout, locked directory, full disk) must not
         # take the command down: the read path already degrades this way, and the report below is
@@ -54,6 +65,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         saved = False
         print(f"warning: could not write the store ({exc}); this build was not persisted",
               file=sys.stderr)
+        if g is None:  # not even the lock file could be created: build anyway, unpersisted
+            res = index_cached(args.path, symbols=sym, incremental=not full, stats=stats)
+            g = res.graph
+    assert g is not None
     # scan=False: keep build light (no second per-file integrity scan); `report`/`assess` do it.
     rp: object = None
     try:
@@ -394,6 +409,104 @@ def cmd_symbols(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workspace(args: argparse.Namespace) -> int:
+    from second_brain import workspace
+    if args.action == "init":
+        f = workspace.init(args.path)
+        print(f"  {f}")
+    ws = workspace.find_workspace(args.path)
+    if ws is None:
+        print("nessuno spazio di lavoro qui: 'second-brain workspace init <cartella>'",
+              file=sys.stderr)
+        return 1
+    print(f"spazio di lavoro: {ws.root}")
+    print(f"  grafo superiore: {ws.superior_store}")
+    print(f"  progetti ({len(ws.projects)}):")
+    for p in ws.projects:
+        s = store.load_summary(ws.project_store(p))
+        state = f"{s['files']} file, aggiornato {s['updated']}" if s else "non ancora costruito"
+        print(f"    {p.id:<28} {p.rel}  [{state}]")
+    print(f"  esclusi: {', '.join(ws.exclude) or '-'}")
+    print(f"  memorie degli agenti: {len(ws.memory_files())} file")
+    return 0
+
+
+def cmd_lavori(args: argparse.Namespace) -> int:
+    from second_brain import lavori
+    rows = lavori.in_corso(args.path)
+    if not rows:
+        print("nessun lavoro in corso")
+    for r in rows:
+        print(f"  {r['progetto']:<24} {r['agente']:<12} dal {r['dal']}  "
+              f"ultimo {r['ultimo_segnale']}  {r['intento']}")
+        for f in r["file"]:
+            print(f"      {f}")
+    return 0
+
+
+def _agente(args: argparse.Namespace) -> str:
+    from second_brain.lock import agent_name
+    return args.agente or agent_name()
+
+
+def cmd_inizia(args: argparse.Namespace) -> int:
+    from second_brain import lavori
+    print(json.dumps(lavori.inizia(args.path, _agente(args), intento=args.intento,
+                                   file=args.file), ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_chiudi(args: argparse.Namespace) -> int:
+    from second_brain import lavori
+    print(json.dumps(lavori.chiudi(args.path, _agente(args)), ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_posso_scrivere(args: argparse.Namespace) -> int:
+    from second_brain import lavori
+    res = lavori.posso_scrivere(args.file, _agente(args))
+    print(json.dumps(res, ensure_ascii=False, indent=1))
+    return 3 if res["esito"] == "blocco" else 0
+
+
+def cmd_hook_scrittura(args: argparse.Namespace) -> int:
+    """Claude Code PreToolUse/PostToolUse hook for file writes (reads the hook JSON on stdin).
+
+    Pre: a write to a file another agent is working on is DENIED with the reason; a linked file
+    gets the warning as additional context. Post: the file's new signature is recorded. Outside a
+    workspace, or for any internal error, it allows silently — a hook must never break the work.
+    """
+    from second_brain import lavori, workspace
+    try:
+        data = json.load(sys.stdin)
+        inp = data.get("tool_input") or {}
+        target = inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
+        if not target:
+            return 0
+        if not os.path.isabs(target):
+            target = os.path.join(data.get("cwd") or os.getcwd(), target)
+        if workspace.find_workspace(os.path.dirname(target)) is None:
+            return 0
+        agente = args.agente or "claude-code"
+        if data.get("hook_event_name") == "PostToolUse":
+            lavori.dopo_scrittura(target, agente)
+            return 0
+        res = lavori.posso_scrivere(target, agente, sessione=str(data.get("session_id", "")))
+    except Exception as exc:  # noqa: BLE001 - never block on our own failure
+        print(f"second-brain hook: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 0
+    if res["esito"] == "blocco":
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": "Second Brain: " + res["motivo"]}}, ensure_ascii=True))
+    elif res["esito"] == "attenzione":
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": "Second Brain, attenzione: " + res["motivo"]}},
+            ensure_ascii=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="second-brain",
@@ -516,6 +629,36 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("hook-context", help="(internal) emit PreToolUse additionalContext JSON")
     sp.add_argument("path", nargs="?", default=".", help="project root (default: .)")
     sp.set_defaults(func=cmd_hook_context)
+
+    sp = sub.add_parser("workspace", help="spazio di lavoro: grafi per progetto + superiore")
+    sp.add_argument("action", choices=["init", "show"])
+    sp.add_argument("path", nargs="?", default=".", help="cartella (default: .)")
+    sp.set_defaults(func=cmd_workspace)
+
+    sp = sub.add_parser("lavori", help="lavori in corso degli agenti nello spazio di lavoro")
+    sp.add_argument("path", nargs="?", default=".")
+    sp.set_defaults(func=cmd_lavori)
+
+    sp = sub.add_parser("inizia", help="registra un lavoro su un progetto (anti-collisione)")
+    sp.add_argument("path", nargs="?", default=".", help="cartella del progetto")
+    sp.add_argument("--agente", default="", help="chi lavora (default: dedotto)")
+    sp.add_argument("--intento", default="", help="cosa si sta facendo, in una riga")
+    sp.add_argument("--file", nargs="*", default=[], help="file che si intende modificare")
+    sp.set_defaults(func=cmd_inizia)
+
+    sp = sub.add_parser("chiudi", help="chiude il lavoro dell'agente sul progetto")
+    sp.add_argument("path", nargs="?", default=".")
+    sp.add_argument("--agente", default="")
+    sp.set_defaults(func=cmd_chiudi)
+
+    sp = sub.add_parser("posso-scrivere", help="controllo prima di scrivere un file (exit 3 = no)")
+    sp.add_argument("file")
+    sp.add_argument("--agente", default="")
+    sp.set_defaults(func=cmd_posso_scrivere)
+
+    sp = sub.add_parser("hook-scrittura", help="(interno) hook PreToolUse/PostToolUse di Claude")
+    sp.add_argument("--agente", default="")
+    sp.set_defaults(func=cmd_hook_scrittura)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

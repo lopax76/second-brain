@@ -140,6 +140,7 @@ Second Brain's code-import layer renders the whole workspace as a graph you can 
 pip install second-brain-graph              # from PyPI
 pip install "second-brain-graph[mcp]"       # + optional MCP server
 pip install -e .                            # or from a clone
+uv tool install "second-brain-graph[mcp]"   # one isolated install for CLI + MCP server
 ```
 
 [On PyPI](https://pypi.org/project/second-brain-graph/). Requires Python 3.10+. Runtime
@@ -282,6 +283,32 @@ same-size edit within the same filesystem tick as the last build — which `seco
    switch grouping (community / area / folder / type), focus a single community, or show only
    orphans.
 
+## Workspaces and several agents (0.10)
+
+One folder holding many projects becomes a **workspace** (`second-brain workspace init <folder>`):
+
+- **one graph per project**, each with its own store and write lock, built only when first
+  queried — rebuilding one project never touches another;
+- a **superior graph** over them: the files that belong to no project, one node per project, the
+  AI agents' memory files (Claude Code memories, `CLAUDE.md`, Codex memories, `AGENTS.md`,
+  read-only), and the links between all of them (a note citing a project, a project citing
+  another, a memory belonging to its project);
+- **one MCP server** for everything: `second-brain-mcp <workspace>`; every tool takes `progetto`
+  (empty = the project of the agent's working folder, `"superiore"` = the whole workspace).
+
+**Several agents, no overwrites.** A shared work registry tells an agent, before it writes a file,
+whether another agent is working on it (`blocco`), on something linked to it (`attenzione`), or
+neither (`ok`). Claude Code enforces it with a hook (`second-brain hook-scrittura` on
+PreToolUse/PostToolUse for Edit/Write); other agents call the `posso_scrivere` MCP tool. Set
+`SECOND_BRAIN_AGENT` in each client's server config. The graph stores themselves are written
+under a cross-process lock, and whoever gets the lock next first checks what the previous holder
+already did — its work is reused, never overwritten.
+
+**graphify as the code layer.** Where a project has `graphify-out/graph.json`
+([graphify](https://github.com/safishamsi/graphify), 37 languages), its cross-file relations are
+imported as edges (`via: "graphify"`, with relation and confidence) — only those whose files did
+not change after graphify ran.
+
 ## Query layer (for AI assistants)
 
 `second-brain map`, `find`, `neighbors`, `impact`, `why`, `focus`, and `report` return compact,
@@ -380,13 +407,18 @@ Read-only on your sources, zero runtime dependencies, deterministic. Everything 
 | [`viewer.py`](second_brain/viewer.py) | Offline 2D community-map viewer (vis-network, adapted from Graphify). |
 | [`export.py`](second_brain/export.py) | Exports the graph to GraphML. |
 | [`agent_integration.py`](second_brain/agent_integration.py) | Wires SB into AI agents: CLAUDE.md/AGENTS.md directive, Claude Code hook, git hooks. |
+| [`workspace.py`](second_brain/workspace.py) | Workspaces: project detection, centralised per-project stores, agents' memory sources. |
+| [`superiore.py`](second_brain/superiore.py) | The superior graph: project nodes, general files, agents' memories, cross links. |
+| [`lavori.py`](second_brain/lavori.py) | Work registry: may an agent write this file now (ok / attenzione / blocco)? |
+| [`lock.py`](second_brain/lock.py) | Cross-process write lock per store; who is writing. |
+| [`graphify_layer.py`](second_brain/graphify_layer.py) | Imports graphify's cross-file code relations (fresh only) as edges. |
 
 Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and the
 [MCP tools](docs/mcp.md).
 
 ## Status & roadmap
 
-Beta — **v0.9.5**. Working today: the typed graph; the anti-drift **gate**; **incremental
+Beta — **v0.10.0** (workspaces, superior graph, multi-agent work registry, graphify code layer). Working today: the typed graph; the anti-drift **gate**; **incremental
 indexing** (a rebuild re-reads only the files whose content moved; `build --full` forces a
 complete re-read); **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D

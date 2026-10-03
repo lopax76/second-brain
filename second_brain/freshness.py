@@ -12,9 +12,11 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from second_brain.extract import (
     CachedExtract,
@@ -71,6 +73,29 @@ def file_hash(path: Path, *, normalize_newlines: bool = False) -> str:
     return h.hexdigest()
 
 
+# "Racily clean" files, as git calls them. A stat stamp can only tell two versions apart if
+# their mtimes differ, and filesystems advance mtime in coarse steps: on NTFS two writes 1 ms
+# apart were measured with the SAME mtime_ns (8 of 50 on 03/10/2026), FAT has 2 s steps. So a
+# file whose mtime is this close to the moment we look at it cannot be judged by its stamp: its
+# manifest value is a content digest instead, and its signature is marked so the next check
+# re-examines it once it has settled. Costs a read only for files touched in the last 2 seconds.
+RACY_WINDOW_NS = 2_000_000_000
+
+
+def _is_racy(st: os.stat_result) -> bool:
+    return time.time_ns() - st.st_mtime_ns < RACY_WINDOW_NS
+
+
+def _stat_sig(st: os.stat_result) -> str:
+    """``size:mtime_ns`` — with ``:r`` when the file is too fresh for its stamp to be trusted.
+
+    The suffix guarantees a mismatch at the next comparison (the settled file signs without it),
+    so a write that landed inside the same mtime tick as the build is never taken as unchanged.
+    """
+    sig = f"{st.st_size}:{st.st_mtime_ns}"
+    return sig + ":r" if _is_racy(st) else sig
+
+
 def _hash_rel(root: Path, rel: str) -> str | None:
     """Freshness signature for a file.
 
@@ -90,9 +115,16 @@ def _hash_rel(root: Path, rel: str) -> str | None:
             return None
     # Nanoseconds, not whole seconds. With `m{int(st.st_mtime)}` two different contents of the same
     # length written inside one second produced the SAME stamp, so `gate` — which recomputes this
-    # very value — reported clean over a changed file. st_mtime_ns costs nothing extra and removes
-    # that collision; what remains is a replacement that preserves size AND exact mtime (cp -p,
-    # tar -x, a restore), which no stat-based check can see. Callers are told: see gate's report.
+    # very value — reported clean over a changed file. st_mtime_ns narrows that window to the
+    # filesystem's tick (~1 ms on NTFS, not zero: the 0.9.5 claim that it vanished was wrong on
+    # Windows); a file still inside the racy window is therefore digested by content here.
+    # What remains is a replacement that preserves size AND exact mtime long after the fact
+    # (cp -p, tar -x, a restore), which no stat-based check can see: see gate's report.
+    if _is_racy(st):
+        try:
+            return "r" + file_hash(p)
+        except OSError:
+            return None
     return f"s{st.st_size}:m{st.st_mtime_ns}"
 
 
@@ -149,6 +181,31 @@ def config_signature(root: str | os.PathLike[str]) -> dict[str, str]:
             out[f":config:{name}"] = file_hash(p, normalize_newlines=True) if p.is_file() else "-"
         except OSError:
             out[f":config:{name}"] = "?"  # unreadable: never matches, so it re-checks next time
+    # The superior graph of a workspace also depends on the workspace file, on every project's
+    # summary and on the agents' memory files (0.10): any of them moving makes it stale.
+    from second_brain import workspace as _ws
+    ws = _ws.find_workspace(root_p)
+    if ws is not None and root_p.resolve() == ws.root:
+        from second_brain.superiore import extra_signature
+        wf = ws.root / _ws.WORKSPACE_FILE
+        try:
+            out[":config:workspace"] = file_hash(wf, normalize_newlines=True)
+        except OSError:
+            out[":config:workspace"] = "?"
+        out.update(extra_signature(ws))
+    return out
+
+
+def _graphify_signature(root_p: Path, out_dirs: list[str]) -> dict[str, str]:
+    """graphify's graph.json files are an input of the project graph: when graphify rewrites one,
+    the project graph is stale (and picks up the new code relations)."""
+    out: dict[str, str] = {}
+    for d in out_dirs:
+        try:
+            st = (root_p / d / "graph.json").stat()
+            out[f":graphify:{d}"] = f"{st.st_size}:{st.st_mtime_ns}"
+        except OSError:
+            out[f":graphify:{d}"] = "?"
     return out
 
 
@@ -199,7 +256,9 @@ def index_cached(
     dict as ``stats`` to receive ``{files, hashed, extracted, reused}`` for reporting.
     """
     root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
+    gfy: list[str] = []
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p),
+                      graphify=gfy)
 
     from second_brain import store
     cached = store.load_extract(root_p) if incremental else {}
@@ -207,6 +266,7 @@ def index_cached(
     # 1. One stat per file: it produces the freshness signature and the sizes used below.
     #    Seeded with SB's own config files, which the walk excludes but the graph depends on.
     signature: dict[str, str] = dict(config_signature(root_p))
+    signature.update(_graphify_signature(root_p, gfy))
     sizes: dict[str, int] = {}
     present: list[str] = []
     for rel in rels:
@@ -225,7 +285,7 @@ def index_cached(
                 present.append(rel)
                 signature[rel] = UNREADABLE  # retried as soon as it can be stat'ed again
             continue
-        signature[rel] = f"{st.st_size}:{st.st_mtime_ns}"
+        signature[rel] = _stat_sig(st)
         sizes[rel] = st.st_size
         present.append(rel)
     # A file listed by the walk but gone by now must not become a node: it used to stay in the
@@ -319,6 +379,14 @@ def index_cached(
     if operational:
         from second_brain.operational import enrich
         enrich(graph, root_p)
+    if gfy:  # graphify's code graph as the code layer (cross-file relations, fresh only)
+        from second_brain.graphify_layer import enrich as enrich_graphify
+        enrich_graphify(graph, root_p, gfy)
+    from second_brain import workspace as _ws
+    ws = _ws.find_workspace(root_p)
+    if ws is not None and root_p == ws.root:
+        from second_brain.superiore import enrich as enrich_superior
+        enrich_superior(graph, ws)  # projects, agents' memories, cross links
     return BuildResult(graph=graph, manifest=manifest, extract=fresh_cache, signature=signature)
 
 
@@ -367,15 +435,18 @@ def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     catches it exactly).
     """
     root_p = Path(root).resolve()
-    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p))
+    gfy: list[str] = []
+    rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p),
+                      graphify=gfy)
     out: dict[str, str] = dict(config_signature(root_p))
+    out.update(_graphify_signature(root_p, gfy))
     for rel in rels:
         try:
             st = (root_p / rel).stat()
         except OSError:
             out[rel] = UNREADABLE
             continue
-        out[rel] = f"{st.st_size}:{st.st_mtime_ns}"
+        out[rel] = _stat_sig(st)
     return out
 
 
@@ -445,7 +516,10 @@ def load_or_refresh(
     The rebuild preserves the stored mode (file-level or ``--symbols``), and a store write that
     fails (read-only checkout) degrades to serving the in-memory graph instead of crashing.
     """
-    from second_brain import store
+    from second_brain import lock, store
+    global last_problem, last_handover
+    last_problem = None
+    last_handover = None
     if refresh is None:
         refresh = auto_refresh_enabled()
 
@@ -454,9 +528,14 @@ def load_or_refresh(
         # Capture the signature BEFORE reading file contents: if a file changes during the walk,
         # the stored signature is then "older" than the change, so the next query sees a mismatch
         # and rebuilds (false-stale = safe) — instead of a permanent false-fresh.
-        res = index_cached(root)  # its own walk also yields the signature (no second pass)
-        _save_quiet(root, res.graph, res.manifest, symbols=False,
-                    signature=res.signature, extract=res.extract)
+        # Nothing to serve yet, so wait for a build another process may have started.
+        with lock.write_lock(store.store_dir(root), blocking=True):
+            g = store.load_graph(root)  # it may have finished while we waited
+            if g is not None:
+                return g
+            res = index_cached(root)  # its own walk also yields the signature (no second pass)
+            _save_quiet(root, res.graph, res.manifest, symbols=False,
+                        signature=res.signature, extract=res.extract)
         return res.graph
     if refresh and _should_check(root) and is_stale(root):
         # Prefer the persisted build mode; fall back to "are there symbol nodes?" only if the
@@ -464,10 +543,47 @@ def load_or_refresh(
         mode = store.load_symbols_mode(root)
         use_symbols = mode if mode is not None else _has_symbols(g)
         try:
-            res = index_cached(root, symbols=use_symbols)
-        except Exception:
-            return g  # any rebuild failure -> serve the loaded graph (stale but alive), never crash
-        _save_quiet(root, res.graph, res.manifest, symbols=use_symbols,
-                    signature=res.signature, extract=res.extract)
+            # One writer per store: two agents asking at once used to rebuild twice, racing on the
+            # same files. The second one now serves the graph it has and says why.
+            with lock.write_lock(store.store_dir(root)):
+                # Re-check UNDER the lock. The decision to rebuild was taken before holding it:
+                # meanwhile the previous holder may have rebuilt the store already. Then its work
+                # is what we serve — rebuilding from our stale decision would redo it at best and,
+                # with a store written from an older view, undo it at worst.
+                if not is_stale(root):
+                    fresh = store.load_graph(root)
+                    if fresh is not None:
+                        _note_handover(root)
+                        return fresh
+                # Rebuilt from the files on disk as they are NOW (never from the graph we hold in
+                # memory), on top of the extraction cache the previous writer left: nothing it
+                # did is lost, only what changed since is re-read.
+                res = index_cached(root, symbols=use_symbols)
+                _save_quiet(root, res.graph, res.manifest, symbols=use_symbols,
+                            signature=res.signature, extract=res.extract)
+        except lock.Busy as busy:
+            last_problem = {"kind": "busy", "message": f"grafo non aggiornato: {busy}",
+                            "holder": busy.holder}
+            return g
+        except Exception as exc:  # noqa: BLE001 - any rebuild failure must not crash a query
+            # Serve the loaded graph (stale but alive) — but never silently any more: the old
+            # bare `return g` hid even a MemoryError, and the assistant trusted a stale map.
+            last_problem = {"kind": "refresh-failed",
+                            "message": f"aggiornamento del grafo fallito, servo quello vecchio: "
+                                       f"{type(exc).__name__}: {exc}"}
+            print(f"second-brain: {last_problem['message']}", file=sys.stderr)
+            return g
         return res.graph
     return g
+
+
+# What went wrong at the last load_or_refresh, for the caller to surface (None = nothing).
+last_problem: dict[str, Any] | None = None
+# Who last wrote the store, when we found it already refreshed by them (None = not the case).
+last_handover: dict[str, Any] | None = None
+
+
+def _note_handover(root: str | os.PathLike[str]) -> None:
+    from second_brain import store
+    global last_handover
+    last_handover = store.load_writer(root)
