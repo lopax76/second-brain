@@ -47,40 +47,51 @@ def _ext(name: str) -> str:
     return os.path.splitext(name)[1].lower()
 
 
-def _is_reparse(path: str) -> bool:
-    """True for symlinks and Windows junctions/reparse points (must not be descended into).
-
-    ``os.walk`` skips POSIX directory symlinks, but on Windows a *junction* is not a symlink
-    and ``os.walk`` would follow it — causing infinite loops / file explosion on a self- or
-    parent-pointing junction. Detect the reparse-point attribute and skip it.
-    """
-    try:
-        if os.path.islink(path):
-            return True
-        attrs = getattr(os.stat(path, follow_symlinks=False), "st_file_attributes", 0)
-        return bool(attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
-    except OSError:
-        return True  # unreadable -> safest to skip
-
-
 def gitignore_rules_for(root: Path) -> list[GitRule] | None:
     """Compiled root-``.gitignore`` rules when the project opts in (config ``respect_gitignore``),
     else ``None`` (the walk then ignores .gitignore entirely — byte-identical default)."""
     return load_gitignore_rules(root) if load_config(root).respect_gitignore else None
 
 
+_REPARSE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+
+
+def _entry_is_reparse(entry: os.DirEntry[str]) -> bool:
+    """True for symlinks and Windows junctions/reparse points (must not be descended into).
+
+    A directory symlink is not followed anyway, but on Windows a *junction* is not a symlink and
+    would be followed — infinite loops / file explosion on a self- or parent-pointing junction.
+    The attributes come with the directory listing on Windows: no extra system call per folder.
+    """
+    try:
+        if entry.is_symlink():
+            return True
+        attrs = getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+        return bool(attrs & _REPARSE)
+    except OSError:
+        return True  # unreadable -> safest to skip
+
+
 def iter_files(
     root: Path, patterns: list[str], git_rules: list[GitRule] | None = None,
-    graphify: list[str] | None = None,
+    graphify: list[str] | None = None, stats: dict[str, os.stat_result] | None = None,
 ) -> list[str]:
     """Return sorted POSIX relative paths of indexable files under ``root``.
 
-    ``os.walk`` does not follow directory symlinks, and junctions/reparse points are pruned
-    explicitly (loop-safe on Windows too). An entry that cannot be expressed relative to
-    ``root`` (exotic symlink/junction) is skipped, never aborting. When ``git_rules`` is given
-    (project opted in to ``respect_gitignore``), files and directories matched by the root
-    ``.gitignore`` are also skipped — pruning an ignored directory is correct (git cannot
-    re-include a path under an excluded directory).
+    Directory symlinks are not followed, and junctions/reparse points are pruned explicitly
+    (loop-safe on Windows too); an unreadable directory is skipped, never aborting. When
+    ``git_rules`` is given (project opted in to ``respect_gitignore``), files and directories
+    matched by the root ``.gitignore`` are also skipped — pruning an ignored directory is correct
+    (git cannot re-include a path under an excluded directory).
+
+    ``stats``, when given, receives each file's ``stat`` as the directory listing reported it.
+    On Windows that costs nothing (no system call per file, measured 3,6 s saved on 127k files)
+    but the listing's size/time of a file still held open for writing can lag behind the file:
+    callers that need the exact value re-``stat`` the files whose listing value disagrees.
+
+    The walk is ``os.scandir`` with relative paths built as strings: the former ``os.walk`` +
+    ``pathlib`` version spent most of its time building Path objects (6,4 s vs 3,4 s raw on 127k
+    files). Same files, same order, same pruning.
     """
     rels: list[str] = []
     # The workspace root is the SUPERIOR graph: it must not swallow the projects (each has its
@@ -90,45 +101,47 @@ def iter_files(
     ws = _ws.find_workspace(root)
     if ws is not None and Path(root).resolve() == ws.root:
         pruned = ws.pruned_dirs()
-    for dirpath, dirnames, filenames in os.walk(root):
-        kept: list[str] = []
-        for d in dirnames:
-            full = os.path.join(dirpath, d)
-            if d == "graphify-out" and graphify is not None:
-                # graphify's own output is not indexed as files, but its graph is read as the
-                # code layer (graphify_layer): remember where it is, during this same walk.
-                if os.path.isfile(os.path.join(full, "graph.json")):
-                    try:
-                        graphify.append(Path(full).relative_to(root).as_posix())
-                    except ValueError:
-                        pass
-            if is_ignored_dir(d) or _is_reparse(full):
-                continue
-            if pruned:
-                try:
-                    if Path(full).relative_to(root).as_posix() in pruned:
-                        continue
-                except ValueError:
-                    pass
-            if git_rules:
-                try:
-                    rel_d = Path(full).relative_to(root).as_posix()
-                except ValueError:
-                    rel_d = ""
-                if rel_d and gitignored(rel_d, True, git_rules):
-                    continue
-            kept.append(d)
-        dirnames[:] = kept
-        for fn in filenames:
+    stack: list[tuple[str, str]] = [(os.fspath(root), "")]
+    while stack:
+        dirpath, prefix = stack.pop()
+        try:
+            with os.scandir(dirpath) as it:
+                entries = list(it)
+        except OSError:
+            continue  # like os.walk: an unreadable directory is skipped
+        subdirs: list[tuple[str, str]] = []
+        for entry in entries:
+            name = entry.name
+            rel = prefix + name
             try:
-                rel = (Path(dirpath) / fn).relative_to(root).as_posix()
-            except ValueError:
+                is_dir = entry.is_dir()  # follows symlinks, as os.walk classifies
+            except OSError:
+                is_dir = False
+            if is_dir:
+                if name == "graphify-out" and graphify is not None:
+                    # graphify's own output is not indexed as files, but its graph is read as the
+                    # code layer (graphify_layer): remember where it is, during this same walk.
+                    if os.path.isfile(os.path.join(entry.path, "graph.json")):
+                        graphify.append(rel)
+                if is_ignored_dir(name) or _entry_is_reparse(entry):
+                    continue
+                if pruned and rel in pruned:
+                    continue
+                if git_rules and gitignored(rel, True, git_rules):
+                    continue
+                subdirs.append((entry.path, rel + "/"))
                 continue
-            if is_ignored_file(rel, fn, patterns):
+            if is_ignored_file(rel, name, patterns):
                 continue
             if git_rules and gitignored(rel, False, git_rules):
                 continue
             rels.append(rel)
+            if stats is not None:
+                try:
+                    stats[rel] = entry.stat()
+                except OSError:
+                    pass  # the caller stats it again and records it as unreadable if it is
+        stack.extend(reversed(subdirs))
     return sorted(rels)
 
 

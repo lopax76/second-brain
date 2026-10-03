@@ -13,6 +13,7 @@ import hashlib
 import math
 import os
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -426,8 +427,15 @@ _OFF_VALUES = {"0", "false", "no", "off"}
 _LAST_CHECK: dict[str, float] = {}
 
 
-def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
+def fast_signature(
+    root: str | os.PathLike[str], *, confirm: dict[str, str] | None = None,
+) -> dict[str, str]:
     """Cheap per-file signature ``{relpath: "size:mtime_ns"}`` using stat only (no file reads).
+
+    ``confirm`` is the stored signature: a file whose directory-listing stat already matches it
+    costs no system call (Windows); every other file is stat'ed for real. The one thing this can
+    miss is a file being written RIGHT NOW whose listing entry still shows its old size and time
+    (NTFS updates it when the writer closes the file): it is seen at the first check after that.
 
     ``st_mtime_ns`` (nanoseconds) is used rather than whole seconds so an edit made shortly after
     a build is still detected; the only blind spot is a same-size edit within the *same filesystem
@@ -436,11 +444,21 @@ def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     """
     root_p = Path(root).resolve()
     gfy: list[str] = []
+    listed: dict[str, os.stat_result] = {}
     rels = iter_files(root_p, load_ignore_patterns(root_p), gitignore_rules_for(root_p),
-                      graphify=gfy)
+                      graphify=gfy, stats=listed)
     out: dict[str, str] = dict(config_signature(root_p))
     out.update(_graphify_signature(root_p, gfy))
     for rel in rels:
+        st = listed.get(rel)
+        if st is not None:
+            sig = _stat_sig(st)
+            # The listing's value is trusted only where it agrees with the stored one: any
+            # disagreement is settled by a real stat, which is what the build recorded. Without
+            # a stored signature (`confirm` None) every value is a real stat, as before.
+            if confirm is not None and confirm.get(rel) == sig:
+                out[rel] = sig
+                continue
         try:
             st = (root_p / rel).stat()
         except OSError:
@@ -450,13 +468,19 @@ def fast_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     return out
 
 
-def is_stale(root: str | os.PathLike[str]) -> bool:
-    """True if the project changed since the stored signature (or there is no signature yet)."""
+def stale_against(root: str | os.PathLike[str]) -> tuple[bool, dict[str, str] | None]:
+    """``(stale, stored signature)`` — the stored signature is returned so a caller can later
+    tell whether somebody rebuilt the store in the meantime without walking the tree again."""
     from second_brain import store
     old = store.load_signature(root)
     if old is None:
-        return True  # no baseline -> rebuild once (which writes the signature)
-    return old != fast_signature(root)
+        return True, None  # no baseline -> rebuild once (which writes the signature)
+    return old != fast_signature(root, confirm=old), old
+
+
+def is_stale(root: str | os.PathLike[str]) -> bool:
+    """True if the project changed since the stored signature (or there is no signature yet)."""
+    return stale_against(root)[0]
 
 
 def auto_refresh_enabled() -> bool:
@@ -516,10 +540,18 @@ def load_or_refresh(
     The rebuild preserves the stored mode (file-level or ``--symbols``), and a store write that
     fails (read-only checkout) degrades to serving the in-memory graph instead of crashing.
     """
-    from second_brain import lock, store
     global last_problem, last_handover
-    last_problem = None
-    last_handover = None
+    _here.problem = _here.handover = None
+    try:
+        return _load_or_refresh(root, refresh=refresh)
+    finally:
+        # module-level copies for callers that read them right after their own call (CLI,
+        # tests); a server building in a background thread reads the per-thread ones instead
+        last_problem, last_handover = _here.problem, _here.handover
+
+
+def _load_or_refresh(root: str | os.PathLike[str], *, refresh: bool | None) -> Graph:
+    from second_brain import lock, store
     if refresh is None:
         refresh = auto_refresh_enabled()
 
@@ -537,7 +569,10 @@ def load_or_refresh(
             _save_quiet(root, res.graph, res.manifest, symbols=False,
                         signature=res.signature, extract=res.extract)
         return res.graph
-    if refresh and _should_check(root) and is_stale(root):
+    if not (refresh and _should_check(root)):
+        return g
+    stale, seen = stale_against(root)
+    if stale:
         # Prefer the persisted build mode; fall back to "are there symbol nodes?" only if the
         # store predates mode.json (so a --symbols build of a then-symbol-less tree is preserved).
         mode = store.load_symbols_mode(root)
@@ -549,8 +584,11 @@ def load_or_refresh(
                 # Re-check UNDER the lock. The decision to rebuild was taken before holding it:
                 # meanwhile the previous holder may have rebuilt the store already. Then its work
                 # is what we serve — rebuilding from our stale decision would redo it at best and,
-                # with a store written from an older view, undo it at worst.
-                if not is_stale(root):
+                # with a store written from an older view, undo it at worst. Whether anybody
+                # wrote is told by the stored signature itself: unchanged since our check means
+                # nobody did, and the tree need not be walked a second time (measured 4-10 s on
+                # a 127k-file project); changed means a rebuild landed, and freshness is re-checked.
+                if store.load_signature(root) != seen and not is_stale(root):
                     fresh = store.load_graph(root)
                     if fresh is not None:
                         _note_handover(root)
@@ -562,16 +600,16 @@ def load_or_refresh(
                 _save_quiet(root, res.graph, res.manifest, symbols=use_symbols,
                             signature=res.signature, extract=res.extract)
         except lock.Busy as busy:
-            last_problem = {"kind": "busy", "message": f"grafo non aggiornato: {busy}",
+            _here.problem = {"kind": "busy", "message": f"grafo non aggiornato: {busy}",
                             "holder": busy.holder}
             return g
         except Exception as exc:  # noqa: BLE001 - any rebuild failure must not crash a query
             # Serve the loaded graph (stale but alive) — but never silently any more: the old
             # bare `return g` hid even a MemoryError, and the assistant trusted a stale map.
-            last_problem = {"kind": "refresh-failed",
+            _here.problem = {"kind": "refresh-failed",
                             "message": f"aggiornamento del grafo fallito, servo quello vecchio: "
                                        f"{type(exc).__name__}: {exc}"}
-            print(f"second-brain: {last_problem['message']}", file=sys.stderr)
+            print(f"second-brain: {_here.problem['message']}", file=sys.stderr)
             return g
         return res.graph
     return g
@@ -585,5 +623,15 @@ last_handover: dict[str, Any] | None = None
 
 def _note_handover(root: str | os.PathLike[str]) -> None:
     from second_brain import store
-    global last_handover
-    last_handover = store.load_writer(root)
+    _here.handover = store.load_writer(root)
+
+
+# The same two facts, per thread: two loads running at once (a first build in the background
+# while another project is queried) must not overwrite each other's warning.
+_here = threading.local()
+_here.problem = _here.handover = None
+
+
+def outcome() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """``(problem, handover)`` of the last :func:`load_or_refresh` run by THIS thread."""
+    return getattr(_here, "problem", None), getattr(_here, "handover", None)

@@ -13,7 +13,7 @@ import os
 import re
 from pathlib import Path
 
-from second_brain import assess, communities, query, rank
+from second_brain import assess, communities, memo, query, rank
 from second_brain.model import EdgeType, Graph, NodeType
 from second_brain.store import store_dir
 
@@ -183,7 +183,9 @@ def render_report(
     out += ["", "## Problems", ""]
     problems: list[str] = []
     if root is not None and scan_problems:
-        integ = assess.scan_integrity(root, graph)
+        # reads every text file (7.4 s on 127k files): once per loaded graph
+        integ = memo.per_graph(graph, ("integrity", str(root)),
+                               lambda: assess.scan_integrity(root, graph))
         if integ["truncated"]:
             problems.append(f"- **{len(integ['truncated'])}** truncated/corrupted files")
         if integ["empty"]:

@@ -103,9 +103,9 @@ def test_refresh_ttl_throttles_check(tmp_path, monkeypatch):
     monkeypatch.setenv("SECOND_BRAIN_REFRESH_TTL", "60")
     fr._LAST_CHECK.clear()
     calls = {"n": 0}
-    real = fr.is_stale
-    monkeypatch.setattr(fr, "is_stale", lambda r: (calls.__setitem__("n", calls["n"] + 1)
-                                                   or real(r)))
+    real = fr.stale_against
+    monkeypatch.setattr(fr, "stale_against", lambda r: (calls.__setitem__("n", calls["n"] + 1)
+                                                        or real(r)))
     load_or_refresh(tmp_path)                                   # 1st: checks
     (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")  # change
     g = load_or_refresh(tmp_path)                              # within TTL: check skipped

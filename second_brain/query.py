@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from second_brain import bm25, budget, communities, rank
+from second_brain import bm25, budget, communities, memo, rank
 from second_brain import recency as recency_mod
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
@@ -546,10 +546,10 @@ def _graph_fingerprint(graph: Graph) -> int:
     edges-only fingerprint would alias two graphs that differ only by an isolated-node turnover
     at equal counts — serving cached scores that silently drop the new node.
     """
-    return hash((
+    return memo.per_graph(graph, "fingerprint", lambda: hash((
         frozenset(graph.nodes),
         frozenset((e.source, e.target, e.type.value) for e in graph.edges),
-    ))
+    )))
 
 
 def _node_text(node: Node) -> str:
@@ -577,8 +577,10 @@ def _focus_seeds(graph: Graph, task: str) -> dict[str, float]:
     toks = bm25.tokenize(task)
     if not toks:
         return {}
-    docs = {nid: _node_text(n) for nid, n in graph.nodes.items() if n.type is not NodeType.AREA}
-    return bm25.BM25(docs).scores(toks)
+    # The index depends on the graph alone: built once per loaded graph (2.2 s on 127k nodes).
+    index = memo.per_graph(graph, "bm25", lambda: bm25.BM25(
+        {nid: _node_text(n) for nid, n in graph.nodes.items() if n.type is not NodeType.AREA}))
+    return index.scores(toks)
 
 
 def focus(

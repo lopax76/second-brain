@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 
@@ -469,40 +470,72 @@ def cmd_posso_scrivere(args: argparse.Namespace) -> int:
     return 3 if res["esito"] == "blocco" else 0
 
 
+_PATCH_FILE = re.compile(
+    r"^\*\*\* (?:Add|Update|Delete) File: (.+?)\s*$|^\*\*\* Move to: (.+?)\s*$", re.MULTILINE)
+
+
+def _hook_targets(inp: dict) -> list[str]:
+    """The files a write tool is about to touch.
+
+    Claude Code (Edit/Write/NotebookEdit) names one file; Codex's ``apply_patch`` carries the
+    patch text in ``command`` and names every file in its ``*** Update File:`` style headers.
+    """
+    one = inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
+    if one:
+        return [one]
+    patch = inp.get("command") or inp.get("patch") or inp.get("input") or ""
+    if isinstance(patch, list):
+        patch = "\n".join(str(p) for p in patch)
+    out: list[str] = []
+    for m in _PATCH_FILE.finditer(str(patch)):
+        f = m.group(1) or m.group(2)
+        if f and f not in out:
+            out.append(f)
+    return out
+
+
 def cmd_hook_scrittura(args: argparse.Namespace) -> int:
-    """Claude Code PreToolUse/PostToolUse hook for file writes (reads the hook JSON on stdin).
+    """PreToolUse/PostToolUse hook for file writes, for Claude Code and Codex (JSON on stdin).
 
     Pre: a write to a file another agent is working on is DENIED with the reason; a linked file
-    gets the warning as additional context. Post: the file's new signature is recorded. Outside a
-    workspace, or for any internal error, it allows silently — a hook must never break the work.
+    gets the warning as additional context. Post: the file's new signature is recorded. A Codex
+    patch touching several files is denied if ANY of them is contested. Outside a workspace, or
+    for any internal error, it allows silently — a hook must never break the work.
     """
     from second_brain import lavori, workspace
+    blocchi: list[str] = []
+    avvisi: list[str] = []
     try:
         data = json.load(sys.stdin)
-        inp = data.get("tool_input") or {}
-        target = inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
-        if not target:
-            return 0
-        if not os.path.isabs(target):
-            target = os.path.join(data.get("cwd") or os.getcwd(), target)
-        if workspace.find_workspace(os.path.dirname(target)) is None:
+        cwd = data.get("cwd") or os.getcwd()
+        targets = [t if os.path.isabs(t) else os.path.join(cwd, t)
+                   for t in _hook_targets(data.get("tool_input") or {})]
+        targets = [t for t in targets if workspace.find_workspace(os.path.dirname(t)) is not None]
+        if not targets:
             return 0
         agente = args.agente or "claude-code"
         if data.get("hook_event_name") == "PostToolUse":
-            lavori.dopo_scrittura(target, agente)
+            for t in targets:
+                lavori.dopo_scrittura(t, agente)
             return 0
-        res = lavori.posso_scrivere(target, agente, sessione=str(data.get("session_id", "")))
+        for t in targets:
+            res = lavori.posso_scrivere(t, agente, sessione=str(data.get("session_id", "")))
+            if res["esito"] == "blocco":
+                blocchi.append(res["motivo"])
+            elif res["esito"] == "attenzione":
+                avvisi.append(res["motivo"])
     except Exception as exc:  # noqa: BLE001 - never block on our own failure
         print(f"second-brain hook: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 0
-    if res["esito"] == "blocco":
+    if blocchi:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse", "permissionDecision": "deny",
-            "permissionDecisionReason": "Second Brain: " + res["motivo"]}}, ensure_ascii=True))
-    elif res["esito"] == "attenzione":
+            "permissionDecisionReason": "Second Brain: " + " | ".join(blocchi)}},
+            ensure_ascii=True))
+    elif avvisi:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": "Second Brain, attenzione: " + res["motivo"]}},
+            "additionalContext": "Second Brain, attenzione: " + " | ".join(avvisi)}},
             ensure_ascii=True))
     return 0
 
@@ -656,7 +689,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--agente", default="")
     sp.set_defaults(func=cmd_posso_scrivere)
 
-    sp = sub.add_parser("hook-scrittura", help="(interno) hook PreToolUse/PostToolUse di Claude")
+    sp = sub.add_parser("hook-scrittura",
+                        help="(interno) hook PreToolUse/PostToolUse di Claude Code e Codex")
     sp.add_argument("--agente", default="")
     sp.set_defaults(func=cmd_hook_scrittura)
 

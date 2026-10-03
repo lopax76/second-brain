@@ -29,6 +29,15 @@ content signature and reloads/rebuilds only if the project changed. On a ~130k-f
 the difference between several seconds and an instant per call. Set `SECOND_BRAIN_REFRESH_TTL=0` to
 re-check on every call.
 
+What depends only on the loaded graph (global PageRank, the search index, the integrity scan of
+`report`) is computed once per graph, so only the first `focus`/`report` on a big project pays
+for it (0.5 s afterwards on 127k files).
+
+**First build in the background.** A project queried for the first time has no graph yet. The
+server builds it in a background thread and waits up to `SECOND_BRAIN_BUILD_WAIT` seconds
+(**default 20**); a larger project answers with an error saying the graph is being built and to
+retry shortly, and the next call picks up the finished graph.
+
 ## Tools
 
 | Tool | Arguments | Returns |

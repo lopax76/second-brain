@@ -15,19 +15,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from second_brain import memo
 from second_brain.model import EdgeType, Graph, Node
 
 # Importance flows along knowledge edges (A imports/references B -> B gains importance).
 KNOWLEDGE: tuple[EdgeType, ...] = (EdgeType.IMPORTS, EdgeType.REFERENCES)
-
-
-def _out_adjacency(graph: Graph, relations: tuple[EdgeType, ...]) -> dict[str, list[str]]:
-    """Directed out-edges per node id, restricted to ``relations`` (targets must be real nodes)."""
-    out: dict[str, list[str]] = {nid: [] for nid in graph.nodes}
-    for e in graph.edges:
-        if e.type in relations and e.source in out and e.target in graph.nodes:
-            out[e.source].append(e.target)
-    return out
 
 
 def pagerank(
@@ -45,38 +37,66 @@ def pagerank(
     here instead of uniform) — pass it to bias the walk toward seed nodes (personalised PageRank).
     Non-negative weights; if it sums to zero it is ignored (falls back to uniform).
     """
-    nodes = sorted(graph.nodes)
-    n = len(nodes)
-    if n == 0:
+    if not graph.nodes:
         return {}
+    if not personalization:
+        # The global ranking depends on the graph alone: computed once per loaded graph.
+        key = ("pagerank", relations, damping, max_iter, tol)
+        return dict(memo.per_graph(graph, key, lambda: _iterate(
+            graph, relations, damping, max_iter, tol, None)))
+    return _iterate(graph, relations, damping, max_iter, tol, personalization)
 
-    out = _out_adjacency(graph, relations)
-    outdeg = {nid: len(out[nid]) for nid in nodes}
+
+def _prepared(graph: Graph, relations: tuple[EdgeType, ...]) -> tuple[
+        list[str], list[int], list[tuple[int, int, list[int]]]]:
+    """Sorted node ids, dangling positions and ``(position, outdegree, targets)`` per source —
+    integer positions instead of string keys, built once per graph."""
+    def build() -> tuple[list[str], list[int], list[tuple[int, int, list[int]]]]:
+        nodes = sorted(graph.nodes)
+        pos = {nid: i for i, nid in enumerate(nodes)}
+        out: list[list[int]] = [[] for _ in nodes]
+        for e in graph.edges:
+            if e.type in relations:
+                s, t = pos.get(e.source), pos.get(e.target)
+                if s is not None and t is not None:
+                    out[s].append(t)
+        dangling = [i for i, o in enumerate(out) if not o]
+        sources = [(i, len(o), o) for i, o in enumerate(out) if o]
+        return nodes, dangling, sources
+    return memo.per_graph(graph, ("pagerank-adj", relations), build)
+
+
+def _iterate(
+    graph: Graph, relations: tuple[EdgeType, ...], damping: float, max_iter: int, tol: float,
+    personalization: dict[str, float] | None,
+) -> dict[str, float]:
+    """The power iteration. Same operations in the same order as the former dict version
+    (sorted nodes, edges in graph order), so the scores are bit-identical — only list positions
+    replace string-keyed lookups."""
+    nodes, dangling_at, sources = _prepared(graph, relations)
+    n = len(nodes)
 
     if personalization:
-        p = {nid: max(0.0, float(personalization.get(nid, 0.0))) for nid in nodes}
-        s = sum(p.values())
-        p = {nid: (v / s if s > 0 else 1.0 / n) for nid, v in p.items()} if s > 0 \
-            else {nid: 1.0 / n for nid in nodes}
+        p = [max(0.0, float(personalization.get(nid, 0.0))) for nid in nodes]
+        s = sum(p)
+        p = [v / s for v in p] if s > 0 else [1.0 / n] * n
     else:
-        p = {nid: 1.0 / n for nid in nodes}
+        p = [1.0 / n] * n
 
-    rank = {nid: 1.0 / n for nid in nodes}
+    rank = [1.0 / n] * n
     for _ in range(max_iter):
-        dangling = sum(rank[nid] for nid in nodes if outdeg[nid] == 0)
+        dangling = sum(rank[i] for i in dangling_at)
         # Teleport + dangling mass, both distributed by the restart vector.
-        new = {nid: (1.0 - damping) * p[nid] + damping * dangling * p[nid] for nid in nodes}
-        for src in nodes:
-            d = outdeg[src]
-            if d:
-                share = damping * rank[src] / d
-                for tgt in out[src]:
-                    new[tgt] += share
-        err = sum(abs(new[nid] - rank[nid]) for nid in nodes)
+        new = [(1.0 - damping) * pi + damping * dangling * pi for pi in p]
+        for src, d, targets in sources:
+            share = damping * rank[src] / d
+            for tgt in targets:
+                new[tgt] += share
+        err = sum(abs(a - b) for a, b in zip(new, rank, strict=True))
         rank = new
         if err < tol:
             break
-    return rank
+    return dict(zip(nodes, rank, strict=True))
 
 
 def personalised(

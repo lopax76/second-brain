@@ -304,9 +304,10 @@ Una cartella che contiene molti progetti diventa uno **spazio di lavoro**
 
 **Più agenti, nessuna sovrascrittura.** Un registro condiviso dei lavori dice a un agente, prima
 che scriva un file, se un altro agente ci sta lavorando (`blocco`), se sta lavorando su qualcosa
-di collegato (`attenzione`) o nessuna delle due (`ok`). Claude Code lo applica con un hook
-(`second-brain hook-scrittura` su PreToolUse/PostToolUse per Edit/Write); gli altri agenti usano
-lo strumento MCP `posso_scrivere`. Imposta `SECOND_BRAIN_AGENT` nella configurazione del server di
+di collegato (`attenzione`) o nessuna delle due (`ok`). Claude Code e Codex lo applicano con lo
+stesso hook (`second-brain hook-scrittura --agente <nome>` su PreToolUse/PostToolUse per
+Edit/Write e, per Codex, `apply_patch`: tutti i file della patch); gli altri agenti usano lo
+strumento MCP `posso_scrivere`. Imposta `SECOND_BRAIN_AGENT` nella configurazione del server di
 ogni client. Anche gli store dei grafi si scrivono sotto un lucchetto fra processi, e chi lo
 ottiene dopo controlla prima cosa ha già fatto chi c'era: il suo lavoro si riusa, non si cancella.
 
@@ -424,7 +425,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.10.1** (spazio di lavoro, grafo superiore, registro dei lavori fra agenti, strato del codice da graphify). Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
+Beta — **v0.10.2** (spazio di lavoro, grafo superiore, registro dei lavori fra agenti con hook per Claude Code e Codex, strato del codice da graphify). Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
 l'**indicizzazione incrementale** (un rebuild rilegge solo i file il cui contenuto è cambiato;
 `build --full` forza la rilettura completa); le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer

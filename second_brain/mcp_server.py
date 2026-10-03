@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from typing import Any
 
@@ -57,6 +58,7 @@ _GRAPH_CACHE: dict[str, tuple[float, Graph]] = {}
 def clear_graph_cache() -> None:
     """Drop the in-process graph cache (e.g. after an out-of-band rebuild)."""
     _GRAPH_CACHE.clear()
+    _STORED.clear()
 
 
 def _graph(project: str) -> Graph:
@@ -66,12 +68,86 @@ def _graph(project: str) -> Graph:
     cached = _GRAPH_CACHE.get(project)
     if cached is not None and ttl > 0 and (now - cached[0]) < ttl:
         return cached[1]
-    g = load_or_refresh(project)
     from second_brain import freshness as _fr
-    _PROBLEM[project] = _fr.last_problem
+    if project in _BUILDING or not (store.store_dir(project) / "graph.json").is_file():
+        g, problem = _first_build(project)
+    else:
+        g = load_or_refresh(project)
+        problem = _fr.outcome()[0]
+    _PROBLEM[project] = problem
     # a graph served despite a problem is not cached: the next call must retry the refresh
-    if _fr.last_problem is None:
+    if problem is None:
         _GRAPH_CACHE[project] = (now, g)
+    return g
+
+
+# First builds running in the background: project -> (thread, start time, result box).
+_BUILDING: dict[str, tuple[threading.Thread, float, dict[str, Any]]] = {}
+
+
+def _build_wait() -> float:
+    try:
+        return max(0.0, float(os.environ.get("SECOND_BRAIN_BUILD_WAIT", "20")))
+    except ValueError:
+        return 20.0
+
+
+def _first_build(project: str) -> tuple[Graph, dict[str, Any] | None]:
+    """A project with no graph yet: build it in a background thread and wait a little.
+
+    A small project is ready within the wait and the call answers as before. A very large one
+    (35 s measured on 33k files) no longer holds the agent inside the call: after
+    ``SECOND_BRAIN_BUILD_WAIT`` seconds (default 20) the call returns an error saying the graph is
+    being built and to retry; the build goes on, and the next call picks up its result.
+    """
+    from second_brain import freshness as _fr
+    job = _BUILDING.get(project)
+    if job is None:
+        box: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                box["graph"] = load_or_refresh(project)
+                box["problem"] = _fr.outcome()[0]
+            except BaseException as exc:  # noqa: BLE001 - handed to the caller as is
+                box["error"] = exc
+
+        th = threading.Thread(target=run, name=f"second-brain-build:{project}", daemon=True)
+        job = (th, time.monotonic(), box)
+        _BUILDING[project] = job
+        th.start()
+    th, started, box = job
+    th.join(_build_wait())
+    if th.is_alive():
+        raise RuntimeError(
+            f"Second Brain: il grafo di «{os.path.basename(project) or project}» si sta costruendo "
+            f"per la prima volta (da {time.monotonic() - started:.0f} s; un progetto molto grande "
+            f"richiede circa un minuto). Riprova fra poco; intanto usa progetto='superiore' o la "
+            f"ricerca normale.")
+    _BUILDING.pop(project, None)
+    if "error" in box:
+        raise box["error"]
+    return box["graph"], box.get("problem")
+
+
+_STORED: dict[str, tuple[tuple[int, int], Graph]] = {}
+
+
+def _stored_graph(project: str) -> Graph | None:
+    """The graph AS STORED (no refresh: `health` reports on the store, it does not change it),
+    parsed again only when graph.json changed on disk (1.6 s per parse on a 127k-node graph)."""
+    p = store.store_dir(project) / "graph.json"
+    try:
+        st = p.stat()
+    except OSError:
+        return None
+    key = (st.st_size, st.st_mtime_ns)
+    hit = _STORED.get(project)
+    if hit is not None and hit[0] == key:
+        return hit[1]
+    g = store.load_graph(project)
+    if g is not None:
+        _STORED[project] = (key, g)
     return g
 
 
@@ -255,7 +331,7 @@ def build_server(base: str):
         every file by content, like ``second-brain gate`` (slow on a large tree: 66 s measured on
         a 400k-file workspace)."""
         project = _dove(progetto)
-        g = store.load_graph(project)
+        g = _stored_graph(project)
         if g is None:
             return {"status": "no-baseline", "hint": "run 'second-brain build' first"}
         holder = lock.read_holder(store.store_dir(project))
@@ -268,7 +344,7 @@ def build_server(base: str):
                    "orphans": len(rep.orphans)}
         else:
             old_sig = store.load_signature(project) or {}
-            new_sig = fast_signature(project)
+            new_sig = fast_signature(project, confirm=old_sig)
             changed = sorted(r for r in old_sig.keys() & new_sig.keys() if old_sig[r] != new_sig[r])
             stale = {"added": sorted(new_sig.keys() - old_sig.keys()),
                      "removed": sorted(old_sig.keys() - new_sig.keys()), "changed": changed}

@@ -298,8 +298,9 @@ One folder holding many projects becomes a **workspace** (`second-brain workspac
 
 **Several agents, no overwrites.** A shared work registry tells an agent, before it writes a file,
 whether another agent is working on it (`blocco`), on something linked to it (`attenzione`), or
-neither (`ok`). Claude Code enforces it with a hook (`second-brain hook-scrittura` on
-PreToolUse/PostToolUse for Edit/Write); other agents call the `posso_scrivere` MCP tool. Set
+neither (`ok`). Claude Code and Codex enforce it with the same hook (`second-brain
+hook-scrittura --agente <name>` on PreToolUse/PostToolUse for Edit/Write, and for Codex's
+`apply_patch`, every file of the patch); other agents call the `posso_scrivere` MCP tool. Set
 `SECOND_BRAIN_AGENT` in each client's server config. The graph stores themselves are written
 under a cross-process lock, and whoever gets the lock next first checks what the previous holder
 already did — its work is reused, never overwritten.
@@ -418,7 +419,7 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.10.1** (workspaces, superior graph, multi-agent work registry, graphify code layer). Working today: the typed graph; the anti-drift **gate**; **incremental
+Beta — **v0.10.2** (workspaces, superior graph, multi-agent work registry with a Claude Code and Codex hook, graphify code layer). Working today: the typed graph; the anti-drift **gate**; **incremental
 indexing** (a rebuild re-reads only the files whose content moved; `build --full` forces a
 complete re-read); **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D

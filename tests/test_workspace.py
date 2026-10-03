@@ -93,9 +93,10 @@ def test_a_locked_project_does_not_block_another_project(tmp_path, monkeypatch):
     freshness.load_or_refresh(root / "Beta")
     holder = subprocess.Popen(
         [sys.executable, "-c",
-         "import sys,time\nfrom second_brain import lock\n"
-         "with lock.write_lock(sys.argv[1]):\n    print('preso', flush=True); time.sleep(4)",
-         str(store.store_dir(root / "Alfa"))], stdout=subprocess.PIPE, text=True)
+         "import sys\nfrom second_brain import lock\n"
+         "with lock.write_lock(sys.argv[1]):\n    print('preso', flush=True); sys.stdin.read()",
+         str(store.store_dir(root / "Alfa"))],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     try:
         assert holder.stdout is not None and holder.stdout.readline().strip() == "preso"
         (root / "Beta" / "altro.md").write_text("# altro\n", encoding="utf-8")
@@ -105,7 +106,9 @@ def test_a_locked_project_does_not_block_another_project(tmp_path, monkeypatch):
         freshness.load_or_refresh(root / "Alfa", refresh=True)
         assert freshness.last_problem and freshness.last_problem["kind"] == "busy"
     finally:
-        holder.wait()
+        assert holder.stdin is not None
+        holder.stdin.close()
+        holder.wait(timeout=30)
     with lock.write_lock(store.store_dir(root / "Alfa")):
         pass
 

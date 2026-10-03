@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.2] - 2026-10-03
+
+Faster on very large projects, with **identical results** (same answers, bit-identical scores),
+and the anti-collision hook now covers Codex too. Measured on a 127k-file project, 0.10.1 -> 0.10.2:
+`health` 8.7 s -> 3.9 s; first `focus` 11.3 s -> 5.5 s, each further `focus` 2.9 s -> 0.5 s;
+`report` 5.7 s -> 0.5 s after the first.
+
+### Added
+
+- **Codex hook.** `hook-scrittura` reads Codex's `apply_patch` (the files named in the patch
+  headers, moves included): a patch touching any file another agent is working on is denied as a
+  whole. Register it in `~/.codex/hooks.json` with `--agente codex`.
+- **First build in the background** (MCP server). A project with no graph yet is built in a
+  background thread; if it is not ready within `SECOND_BRAIN_BUILD_WAIT` seconds (default 20) the
+  call answers that the graph is being built and to retry, instead of holding the agent for up
+  to a minute. Small projects answer in the same call as before.
+
+### Changed
+
+- **One directory walk instead of a walk plus a stat per file.** The walk uses `os.scandir` and
+  reuses the stat the directory listing already returned (free on Windows); a file whose listed
+  values disagree with the stored signature is stat'ed for real, so the result is unchanged.
+  Measured: listing and real stat agreed on all 127k files.
+- **The lock re-check walks again only when somebody else wrote.** Under the lock, the stored
+  signature tells whether another writer rebuilt meanwhile; if not, the second walk is skipped.
+  The rule is unchanged: another writer's work is reused, never overwritten.
+- **Per-graph memo** for what depends only on the loaded graph: global PageRank, the BM25 index,
+  the structural fingerprint and the integrity scan used by `report`.
+- **PageRank on integer positions** instead of string keys: same operations in the same order,
+  bit-identical scores (tested against the previous implementation).
+- **BM25 scores only the documents containing a query term** (inverted index), same results.
+- `health` reuses the stored graph while `graph.json` is unchanged.
+- The freshness outcome (`last_problem`, `last_handover`) is also kept per thread
+  (`freshness.outcome()`), so a background build cannot overwrite another call's warning.
+
+### Fixed
+
+- The test suite no longer sleeps while another process holds a lock: 22 s -> 8 s.
+
 ## [0.10.1] - 2026-10-03
 
 ### Fixed

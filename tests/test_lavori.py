@@ -114,3 +114,40 @@ def test_the_claude_code_hook_denies_a_contested_write(tmp_path):
     out = subprocess.run([sys.executable, "-m", "second_brain", "hook-scrittura"],
                          input=json.dumps(payload), capture_output=True, text=True, check=True)
     assert out.stdout.strip() == ""  # free file: allowed silently
+
+
+def test_the_codex_hook_reads_every_file_of_an_apply_patch(tmp_path):
+    """Codex sends ``apply_patch`` with the patch text in ``tool_input.command``."""
+    import subprocess
+    import sys
+
+    root = _ws(tmp_path)
+    lavori.posso_scrivere(root / "Alfa" / "b.py", "claude-code")
+    patch = ("*** Begin Patch\n*** Update File: c.md\n@@\n-# c\n+# c2\n"
+             "*** Update File: b.py\n@@\n-X = 1\n+X = 2\n*** End Patch\n")
+    payload = {"hook_event_name": "PreToolUse", "tool_name": "apply_patch", "session_id": "x",
+               "cwd": str(root / "Alfa"), "tool_input": {"command": patch}}
+    out = subprocess.run([sys.executable, "-m", "second_brain", "hook-scrittura",
+                          "--agente", "codex"],
+                         input=json.dumps(payload), capture_output=True, text=True, check=True)
+    decision = json.loads(out.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"           # b.py is Claude's: whole patch denied
+    assert "claude-code" in decision["permissionDecisionReason"]
+
+    payload["tool_input"] = {"command": "*** Begin Patch\n*** Add File: nuovo.md\n+# n\n"
+                                        "*** End Patch\n"}
+    out = subprocess.run([sys.executable, "-m", "second_brain", "hook-scrittura",
+                          "--agente", "codex"],
+                         input=json.dumps(payload), capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == ""
+    rows = [r for r in lavori.in_corso(root) if r["agente"] == "codex"]
+    assert rows and "nuovo.md" in json.dumps(rows)              # Codex's work is now registered
+
+
+def test_patch_headers_are_parsed_including_moves():
+    from second_brain.cli import _hook_targets
+    patch = ("*** Begin Patch\n*** Update File: a/x.py\n*** Move to: a/y.py\n"
+             "*** Delete File: z.md\n*** Add File: C:\\w\\n.md\n*** End Patch")
+    assert _hook_targets({"command": patch}) == ["a/x.py", "a/y.py", "z.md", "C:\\w\\n.md"]
+    assert _hook_targets({"file_path": "f.py"}) == ["f.py"]
+    assert _hook_targets({"command": "ls -la"}) == []

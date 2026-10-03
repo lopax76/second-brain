@@ -42,6 +42,8 @@ class BM25:
         self.idf: dict[str, float] = {
             t: math.log((n - c + 0.5) / (c + 0.5) + 1.0) for t, c in df.items()
         }
+        self._postings: dict[str, list[int]] | None = None
+        self._ids: list[str] = []
 
     def score(self, query: str | list[str], doc_id: str) -> float:
         """BM25 score of ``doc_id`` for ``query`` (0.0 if the document has none of the terms)."""
@@ -59,10 +61,24 @@ class BM25:
         return total
 
     def scores(self, query: str | list[str]) -> dict[str, float]:
-        """``{doc_id: score}`` for every document with a non-zero score (deterministic)."""
+        """``{doc_id: score}`` for every document with a non-zero score (deterministic).
+
+        Only the documents that contain a query term are scored (an inverted index, built on the
+        first query), in corpus order — the same result as scoring every document, without
+        visiting the ones that cannot match."""
         qtoks = query if isinstance(query, list) else tokenize(query)
+        if self._postings is None:
+            post: dict[str, list[int]] = {}
+            for i, tf in enumerate(self._tf.values()):
+                for t in tf:
+                    post.setdefault(t, []).append(i)
+            self._postings, self._ids = post, list(self._tf)
+        hit: set[int] = set()
+        for t in set(qtoks):
+            hit.update(self._postings.get(t, ()))
         out: dict[str, float] = {}
-        for d in self._tf:
+        for i in sorted(hit):
+            d = self._ids[i]
             s = self.score(qtoks, d)
             if s > 0.0:
                 out[d] = s
