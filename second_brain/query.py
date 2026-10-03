@@ -14,6 +14,7 @@ from typing import Any
 
 from second_brain import bm25, budget, communities, memo, rank
 from second_brain import recency as recency_mod
+from second_brain.classify import is_copy_or_log
 from second_brain.model import Edge, EdgeType, Graph, Node, NodeType
 
 KNOWLEDGE = (EdgeType.IMPORTS, EdgeType.REFERENCES)
@@ -580,7 +581,18 @@ def _focus_seeds(graph: Graph, task: str) -> dict[str, float]:
     # The index depends on the graph alone: built once per loaded graph (2.2 s on 127k nodes).
     index = memo.per_graph(graph, "bm25", lambda: bm25.BM25(
         {nid: _node_text(n) for nid, n in graph.nodes.items() if n.type is not NodeType.AREA}))
-    return index.scores(toks)
+    scores = index.scores(toks)
+    # Backup copies and logs anchor with a tenth of their weight: a copy matches the task exactly
+    # as well as its original (same name), and twenty copies used to pull the walk their way.
+    return {nid: s * _NOISE_WEIGHT if _is_noise(graph.nodes[nid]) else s
+            for nid, s in scores.items()}
+
+
+_NOISE_WEIGHT = 0.1
+
+
+def _is_noise(node: Node) -> bool:
+    return bool(node.path) and is_copy_or_log(node.path)
 
 
 def focus(
@@ -637,8 +649,12 @@ def focus(
         key=lambda kv: (-kv[1], kv[0]),
     )
     seed_ids = set(seeds)
-    order = ([nid for nid, _ in ranked if nid in seed_ids]
-             + [nid for nid, _ in ranked if nid not in seed_ids])
+    # Seeds first, then what the walk reached from them; backup copies and logs last, so they fill
+    # the budget only when nothing else is left (a script's neighbours beat its twelve .bak copies).
+    noise = {nid for nid, _ in ranked if _is_noise(graph.nodes[nid])}
+    order = ([nid for nid, _ in ranked if nid in seed_ids and nid not in noise]
+             + [nid for nid, _ in ranked if nid not in seed_ids and nid not in noise]
+             + [nid for nid, _ in ranked if nid in noise])
 
     chosen: list[str] = []
     seen: set[str] = set()
@@ -661,7 +677,8 @@ def focus(
     # The seed list used to be returned whole: on a 200k-node graph a common word anchors
     # hundreds of files (621 ids, ~12k tokens measured on 03/10/2026) and the answer was 7.5x the
     # budget. Only the strongest seeds are listed now, with the true total.
-    seeds_ranked = [nid for nid, _ in ranked if nid in seed_ids]
+    seeds_ranked = ([nid for nid, _ in ranked if nid in seed_ids and nid not in noise]
+                    + [nid for nid, _ in ranked if nid in seed_ids and nid in noise])
     result: dict[str, Any] = {
         "task": task,
         "seeds": seeds_ranked[:_FOCUS_SEEDS_SHOWN],

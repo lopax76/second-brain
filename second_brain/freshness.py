@@ -175,7 +175,9 @@ UNREADABLE = "!unreadable"
 def config_signature(root: str | os.PathLike[str]) -> dict[str, str]:
     """Digest SB's own config files, so changing one counts as the project changing."""
     root_p = Path(root)
-    out: dict[str, str] = {}
+    # The classifier is an input too: a store built by an older one refreshes once by itself.
+    from second_brain.classify import VERSION as _classifier
+    out: dict[str, str] = {":classifier": _classifier}
     for name in _CONFIG_INPUTS:
         p = root_p / name
         try:

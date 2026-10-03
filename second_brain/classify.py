@@ -19,8 +19,12 @@ from dataclasses import dataclass
 from second_brain.config import ClassifyConfig
 from second_brain.model import NodeType
 
+# Bumped whenever classify() can return a different type for the same path: it is part of every
+# store's freshness signature, so graphs built by an older classifier refresh once, by themselves.
+VERSION = "2"
+
 _PROGRAM_EXTS = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",
+    ".py", ".pyw", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs",
     ".go", ".rs", ".java", ".kt", ".c", ".cc", ".cpp", ".h", ".hpp",
     ".rb", ".php", ".cs", ".swift", ".scala", ".lua",
     ".ps1", ".psm1", ".sh", ".bash", ".bat", ".cmd", ".sql", ".vcl", ".r",
@@ -110,10 +114,36 @@ def _ext(name: str) -> str:
     return os.path.splitext(name)[1].lower()
 
 
+# Backup copies kept next to the original: "tray.pyw.bak-20260718-1835", "x.ps1.bak.20260610",
+# "Caddyfile.bak-prima-ingresso", "a.py.orig". The name before ".bak"/".orig" is the original.
+_COPY_RE = re.compile(r"(?i)^(?P<orig>.+?)\.(?:bak|orig)(?:[-_.][^/]*)?$")
+_LOG_RE = re.compile(r"(?i)\.log(?:\.\d+)?$")
+
+
+def copy_original(name: str) -> str | None:
+    """The original file name a backup copy was taken from, or ``None`` if not a copy."""
+    m = _COPY_RE.match(name)
+    return m.group("orig") if m else None
+
+
+def is_copy_or_log(rel_posix: str) -> bool:
+    """A backup copy or a log: real files, kept in the graph, but almost never the answer to a
+    task. ``focus`` ranks them after everything else (measured on 03/10/2026: 13 of the top 20
+    nodes for a backup question on Maestro were ``.bak`` copies and logs)."""
+    name = rel_posix.rsplit("/", 1)[-1]
+    return copy_original(name) is not None or bool(_LOG_RE.search(name))
+
+
 def classify(rel_posix: str, rules: ClassifyRules | None = None) -> NodeType:
-    """Return the NodeType for a POSIX relative path (using ``rules`` or the defaults)."""
+    """Return the NodeType for a POSIX relative path (using ``rules`` or the defaults).
+
+    A backup copy takes the type of its original (``x.ps1.bak-2026`` is a program, not config).
+    """
     r = rules or _DEFAULT_RULES
     name = rel_posix.rsplit("/", 1)[-1]
+    orig = copy_original(name)
+    if orig:
+        return classify(rel_posix[: len(rel_posix) - len(name)] + orig, rules)
     low = name.lower()
     ext = _ext(low)
     parts = [p.lower() for p in rel_posix.split("/")]

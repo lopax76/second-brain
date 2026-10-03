@@ -428,7 +428,7 @@ Doc di riferimento: lo [schema & tassonomia di `graph.json`](docs/graph-format.m
 
 ## Stato & roadmap
 
-Beta — **v0.10.2** (spazio di lavoro, grafo superiore, registro dei lavori fra agenti con hook per Claude Code e Codex, strato del codice da graphify). Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
+Beta — **v0.10.3** (spazio di lavoro, grafo superiore, registro dei lavori fra agenti con hook per Claude Code e Codex, strato del codice da graphify). Funzionante oggi: il grafo tipizzato; il **gate** anti-deriva;
 l'**indicizzazione incrementale** (un rebuild rilegge solo i file il cui contenuto è cambiato;
 `build --full` forza la rilettura completa); le **query
 auto-aggiornanti** (ricostruiscono solo quando il progetto è cambiato, senza scheduler); il viewer

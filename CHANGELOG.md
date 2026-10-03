@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.3] - 2026-10-03
+
+`focus` answers with the files, not with their backups. Measured on a real project (two tasks,
+budget 1500 tokens): backup copies and logs among the returned nodes 16/24 -> 0/23 and
+13/22 -> 0/24; the real scripts are found in both versions.
+
+### Changed
+
+- **Backup copies and logs no longer crowd `focus`.** Copies (`x.ps1.bak-20260718`,
+  `y.pyw.bak.1`, `Caddyfile.bak-…`, `a.py.orig`) and logs (`*.log`, `*.log.N`) stay in the graph,
+  but anchor the task with a tenth of their weight and come after the real files and their
+  neighbours, so they fill the budget only when nothing else is left.
+- **A backup copy takes the type of its original** (`x.ps1.bak-…` is a program, not config), and
+  `.pyw` is a program.
+- **The classifier is part of the freshness signature** (`classify.VERSION`): stores built by an
+  older classifier refresh once by themselves.
+
 ## [0.10.2] - 2026-10-03
 
 Faster on very large projects, with **identical results** (same answers, bit-identical scores),

@@ -422,7 +422,7 @@ Reference docs: the [`graph.json` schema & taxonomy](docs/graph-format.md) and t
 
 ## Status & roadmap
 
-Beta — **v0.10.2** (workspaces, superior graph, multi-agent work registry with a Claude Code and Codex hook, graphify code layer). Working today: the typed graph; the anti-drift **gate**; **incremental
+Beta — **v0.10.3** (workspaces, superior graph, multi-agent work registry with a Claude Code and Codex hook, graphify code layer). Working today: the typed graph; the anti-drift **gate**; **incremental
 indexing** (a rebuild re-reads only the files whose content moved; `build --full` forces a
 complete re-read); **self-refreshing
 reads** (queries rebuild only when the project changed, no scheduler); the offline **2D
