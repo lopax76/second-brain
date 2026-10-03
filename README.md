@@ -300,7 +300,10 @@ One folder holding many projects becomes a **workspace** (`second-brain workspac
 whether another agent is working on it (`blocco`), on something linked to it (`attenzione`), or
 neither (`ok`). Claude Code and Codex enforce it with the same hook (`second-brain
 hook-scrittura --agente <name>` on PreToolUse/PostToolUse for Edit/Write, and for Codex's
-`apply_patch`, every file of the patch); other agents call the `posso_scrivere` MCP tool. Set
+`apply_patch`, every file of the patch); other agents call the `posso_scrivere` MCP tool.
+On Windows Codex runs hooks through the session shell, often PowerShell: write the command
+without quotes around the executable path (`C:\...\second-brain.exe hook-scrittura --agente
+codex`), or PowerShell rejects it and Codex lets the write through. Set
 `SECOND_BRAIN_AGENT` in each client's server config. The graph stores themselves are written
 under a cross-process lock, and whoever gets the lock next first checks what the previous holder
 already did — its work is reused, never overwritten.

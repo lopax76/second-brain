@@ -307,7 +307,10 @@ che scriva un file, se un altro agente ci sta lavorando (`blocco`), se sta lavor
 di collegato (`attenzione`) o nessuna delle due (`ok`). Claude Code e Codex lo applicano con lo
 stesso hook (`second-brain hook-scrittura --agente <nome>` su PreToolUse/PostToolUse per
 Edit/Write e, per Codex, `apply_patch`: tutti i file della patch); gli altri agenti usano lo
-strumento MCP `posso_scrivere`. Imposta `SECOND_BRAIN_AGENT` nella configurazione del server di
+strumento MCP `posso_scrivere`. Su Windows Codex esegue gli hook con la shell della sessione,
+spesso PowerShell: scrivi il comando senza virgolette attorno al percorso dell'eseguibile
+(`C:\...\second-brain.exe hook-scrittura --agente codex`), altrimenti PowerShell lo rifiuta e
+Codex lascia passare la scrittura. Imposta `SECOND_BRAIN_AGENT` nella configurazione del server di
 ogni client. Anche gli store dei grafi si scrivono sotto un lucchetto fra processi, e chi lo
 ottiene dopo controlla prima cosa ha già fatto chi c'era: il suo lavoro si riusa, non si cancella.
 
